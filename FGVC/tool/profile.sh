@@ -1,0 +1,4 @@
+python video_completion.py --mode object_removal --path ../data/tennis --path_mask ../data/tennis_mask --outroot ../result/tennis_removal_seamless --seamless --profile_path ../../profile_ootb_seamless.csv
+python video_completion.py --mode object_removal --path ../data/tennis --path_mask ../data/tennis_mask --outroot ../result/tennis_removal  --profile_path ../../profile_ootb.csv
+python video_completion.py --mode object_removal --path ../data/tennis --path_mask ../../Mask-R-CNN-probeersel/test_output/00 --outroot ../result/tennis_removal_auto_seamless --seamless --profile_path ../../profile_auto_mask_seamless.csv
+python video_completion.py --mode object_removal --path ../data/tennis --path_mask ../../Mask-R-CNN-probeersel/test_output/00 --outroot ../result/tennis_removal_auto --profile_path ../../profile_auto_mask.csv
