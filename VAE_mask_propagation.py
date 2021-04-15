@@ -260,7 +260,7 @@ def main(args):
         summary_writer.add_scalars(
             "Regularization Loss", {"train": train_reg_loss, "val": train_reg_loss}, epoch)
         summary_writer.add_scalars(
-            "ELBO", {"train": train_rec_loss + train_reg_loss, "val": val_rec_loss + val_reg_loss}, epoch)
+            "Negative ELBO", {"train": train_rec_loss + train_reg_loss, "val": val_rec_loss + val_reg_loss}, epoch)
 
         # if epoch % 5 == 0:
         #     sample_and_save(model, epoch, summary_writer, 64)

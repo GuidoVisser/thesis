@@ -501,13 +501,13 @@ class VAE(nn.Module):
         # compute the losses
         L_rec = F.binary_cross_entropy_with_logits(next_mask_predictions, input_mask_batch, reduction='sum')
         L_reg = torch.sum(self.KLD(mean_z, log_std_z))
-        elbo = L_rec + L_reg
-        bpd = self.elbo_to_bpd(elbo, input_mask_batch.shape)
+        neg_elbo = L_rec + L_reg
+        bpd = self.neg_elbo_to_bpd(neg_elbo, input_mask_batch.shape)
         
         
         # print(f"reconstruction loss: {L_rec.item()}")
         # print(f"regularization loss: {L_reg.item()}")
-        # print(f"               elbo: {elbo.item()}")
+        # print(f"           neg_elbo: {neg_elbo.item()}")
         # print(f" bits per dimension: {bpd.item()}")
 
         return L_rec, L_reg, bpd
@@ -581,11 +581,11 @@ class VAE(nn.Module):
         return KLD
 
 
-    def elbo_to_bpd(self, elbo, img_shape):
+    def neg_elbo_to_bpd(self, neg_elbo, img_shape):
         """
-        Converts the summed negative log likelihood given by the ELBO into the bits per dimension score.
+        Converts the summed negative log likelihood given by the negative ELBO into the bits per dimension score.
         Inputs:
-            elbo - Tensor of shape [batch_size]
+            neg_elbo - Tensor of shape [batch_size]
             img_shape - Shape of the input images, representing [batch, channels, height, width]
         Outputs:
             bpd - The negative log likelihood in bits per dimension for the given image.
@@ -594,6 +594,6 @@ class VAE(nn.Module):
         normalizer = prod(img_shape[1:])
         
         # Calculate bits per dimension loss
-        bpd = elbo * log2(e) / normalizer
+        bpd = neg_elbo * log2(e) / normalizer
         
         return bpd
