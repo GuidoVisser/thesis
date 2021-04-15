@@ -1,0 +1,9 @@
+--find-links https://download.pytorch.org/whl/torch_stable.html
+opencv-python
+opencv-contrib-python
+imageio
+imageio-ffmpeg
+scipy
+scikit-image
+torch==1.6.0
+torchvision==0.7.0

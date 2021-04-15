@@ -347,6 +347,8 @@ class Contextual_Attention_Module(nn.Module):
             division = torch.true_divide(offset, fs[3]).long()
             offset = torch.stack([division, torch.true_divide(offset, fs[3])-division], dim=-1)
 
+            # division = torch.div(offset, fs[3]).long()
+            # offset = torch.stack([division, torch.div(offset, fs[3])-division], dim=-1)
             wi_center = raw_wi[0]
 
             yi = F.conv_transpose2d(yi, wi_center, stride=self.rate, padding=1) / 4. # (B=1, C=128, H=64, W=64)
@@ -406,6 +408,8 @@ def down_sample(x, size=None, scale_factor=None, mode='nearest', device=None):
     # size_origin = [x.size[2], x.size[3]]
     h = torch.true_divide(torch.arange(0, size[0]), (size[0])) * 2 - 1
     w = torch.true_divide(torch.arange(0, size[1]), (size[1])) * 2 - 1
+    # h = torch.div(torch.arange(0, size[0]), (size[0])) * 2 - 1
+    # w = torch.div(torch.arange(0, size[1]), (size[1])) * 2 - 1
     # create grid
     grid = torch.zeros(size[0],size[1],2)
     grid[:,:,0] = w.unsqueeze(0).repeat(size[0],1)

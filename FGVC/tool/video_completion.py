@@ -18,15 +18,15 @@ import torchvision.transforms.functional as F
 from RAFT import utils
 from RAFT import RAFT
 
-import utils.region_fill as rf
-from utils.Poisson_blend import Poisson_blend
-from utils.Poisson_blend_img import Poisson_blend_img
-from get_flowNN import get_flowNN
-from get_flowNN_gradient import get_flowNN_gradient
-from utils.common_utils import flow_edge
-from spatial_inpaint import spatial_inpaint
-from frame_inpaint import DeepFillv1
-from edgeconnect.networks import EdgeGenerator_
+from ..utils import region_fill
+from ..utils.Poisson_blend import Poisson_blend
+from ..utils.Poisson_blend_img import Poisson_blend_img
+from .get_flowNN import get_flowNN
+from .get_flowNN_gradient import get_flowNN_gradient
+from ..utils.common_utils import flow_edge
+from .spatial_inpaint import spatial_inpaint
+from .frame_inpaint import DeepFillv1
+from ..edgeconnect.networks import EdgeGenerator_
 
 from time import time
 import csv
@@ -78,7 +78,7 @@ def initialize_RAFT(args):
     """Initializes the RAFT model.
     """
     model = torch.nn.DataParallel(RAFT(args))
-    model.load_state_dict(torch.load(args.model))
+    model.load_state_dict(torch.load(args.vc_model))
 
     model = model.module
     model.to('cuda')
@@ -96,12 +96,12 @@ def calculate_flow(args, model, video, mode):
     nFrame, _, imgH, imgW = video.shape
     Flow = np.empty(((imgH, imgW, 2, 0)), dtype=np.float32)
 
-    # if os.path.isdir(os.path.join(args.outroot, 'flow', mode + '_flo')):
-    #     for flow_name in sorted(glob.glob(os.path.join(args.outroot, 'flow', mode + '_flo', '*.flo'))):
-    #         print("Loading {0}".format(flow_name), '\r', end='')
-    #         flow = utils.frame_utils.readFlow(flow_name)
-    #         Flow = np.concatenate((Flow, flow[..., None]), axis=-1)
-    #     return Flow
+    if os.path.isdir(os.path.join(args.outroot, 'flow', mode + '_flo')):
+        for flow_name in sorted(glob.glob(os.path.join(args.outroot, 'flow', mode + '_flo', '*.flo'))):
+            print("Loading {0}".format(flow_name), '\r', end='')
+            flow = utils.frame_utils.readFlow(flow_name)
+            Flow = np.concatenate((Flow, flow[..., None]), axis=-1)
+        return Flow
 
     create_dir(os.path.join(args.outroot, 'flow', mode + '_flo'))
     create_dir(os.path.join(args.outroot, 'flow', mode + '_png'))
@@ -178,13 +178,13 @@ def complete_flow(args, corrFlow, flow_mask, mode, edge=None):
 
     imgH, imgW, _, nFrame = corrFlow.shape
 
-    # if os.path.isdir(os.path.join(args.outroot, 'flow_comp', mode + '_flo')):
-    #     compFlow = np.empty(((imgH, imgW, 2, 0)), dtype=np.float32)
-    #     for flow_name in sorted(glob.glob(os.path.join(args.outroot, 'flow_comp', mode + '_flo', '*.flo'))):
-    #         print("Loading {0}".format(flow_name), '\r', end='')
-    #         flow = utils.frame_utils.readFlow(flow_name)
-    #         compFlow = np.concatenate((compFlow, flow[..., None]), axis=-1)
-    #     return compFlow
+    if os.path.isdir(os.path.join(args.outroot, 'flow_comp', mode + '_flo')):
+        compFlow = np.empty(((imgH, imgW, 2, 0)), dtype=np.float32)
+        for flow_name in sorted(glob.glob(os.path.join(args.outroot, 'flow_comp', mode + '_flo', '*.flo'))):
+            print("Loading {0}".format(flow_name), '\r', end='')
+            flow = utils.frame_utils.readFlow(flow_name)
+            compFlow = np.concatenate((compFlow, flow[..., None]), axis=-1)
+        return compFlow
 
     create_dir(os.path.join(args.outroot, 'flow_comp', mode + '_flo'))
     create_dir(os.path.join(args.outroot, 'flow_comp', mode + '_png'))
@@ -218,8 +218,8 @@ def complete_flow(args, corrFlow, flow_mask, mode, edge=None):
             compFlow[:, :, :, i] = Poisson_blend(flow, imgSrc_gx, imgSrc_gy, flow_mask_img, edge[:, :, i])
 
         else:
-            flow[:, :, 0] = rf.regionfill(flow[:, :, 0], flow_mask_img)
-            flow[:, :, 1] = rf.regionfill(flow[:, :, 1], flow_mask_img)
+            flow[:, :, 0] = region_fill.regionfill(flow[:, :, 0], flow_mask_img)
+            flow[:, :, 1] = region_fill.regionfill(flow[:, :, 1], flow_mask_img)
             compFlow[:, :, :, i] = flow
 
         # Flow visualization.
@@ -257,6 +257,8 @@ def edge_completion(args, EdgeGenerator, corrFlow, flow_mask, mode):
     return Edge
 
 def profile(function, t, fp):
+
+    fp = os.path.join(fp, "fgvc_profiling.csv")
     with open(fp, "a") as f:
         writer = csv.writer(f)
         writer.writerow([function, time() - t])
@@ -265,17 +267,20 @@ def profile(function, t, fp):
 
 def video_completion(args):
 
-    with open(args.profile_path, "w") as f:
-        writer = csv.writer(f)
-        writer.writerow(["function", "time (s)"])
+    # with open(args.outroot, "w") as f:
+    #     writer = csv.writer(f)
+    #     writer.writerow(["function", "time (s)"])
 
     t = time()
     # Flow model.
     RAFT_model = initialize_RAFT(args)
 
     # Loads frames.
-    filename_list = glob.glob(os.path.join(args.path, '*.png')) + \
-                    glob.glob(os.path.join(args.path, '*.jpg'))
+    filename_list = glob.glob(os.path.join(args.data_dir, args.video, '*.png')) + \
+                    glob.glob(os.path.join(args.data_dir, args.video, '*.jpg'))
+
+    # filename_list = sorted(filename_list)[200:]
+    # print(filename_list)
 
     # Obtains imgH, imgW and nFrame.
     imgH, imgW = np.array(Image.open(filename_list[0])).shape[:2]
@@ -289,14 +294,15 @@ def video_completion(args):
     video = torch.stack(video, dim=0)
     video = video.to('cuda')
 
-    t = profile("initialize", t, args.profile_path)
+    # t = profile("initialize", t, args.outroot)
 
     # Calcutes the corrupted flow.
     corrFlowF = calculate_flow(args, RAFT_model, video, 'forward')
-    t = profile("calculate forward flow", t, args.profile_path)
+    # t = profile("calculate forward flow", t, args.outroot)
     corrFlowB = calculate_flow(args, RAFT_model, video, 'backward')
-    t = profile("calculate backward flow", t, args.profile_path)
+    # t = profile("calculate backward flow", t, args.outroot)
     print('\nFinish flow prediction.')
+    del RAFT_model
 
     # Makes sure video is in BGR (opencv) format.
     video = video.permute(2, 3, 1, 0).cpu().numpy()[:, :, ::-1, :] / 255.
@@ -313,8 +319,8 @@ def video_completion(args):
 
     else:
         # Loads masks.
-        filename_list = glob.glob(os.path.join(args.path_mask, '*.png')) + \
-                        glob.glob(os.path.join(args.path_mask, '*.jpg'))
+        filename_list = glob.glob(os.path.join(args.mask_dir, args.video, 'combined/*.png')) + \
+                        glob.glob(os.path.join(args.mask_dir, args.video, 'combined/*.jpg'))
 
         mask = []
         flow_mask = []
@@ -333,7 +339,7 @@ def video_completion(args):
         mask = np.stack(mask, -1).astype(np.bool)
         flow_mask = np.stack(flow_mask, -1).astype(np.bool)
 
-    t = profile("initialize flow completion", t, args.profile_path)
+    # t = profile("initialize flow completion", t, args.outroot)
 
     if args.edge_guide:
         # Edge completion model.
@@ -350,13 +356,13 @@ def video_completion(args):
     else:
         FlowF_edge, FlowB_edge = None, None
 
-    t = profile("complete flow edges", t, args.profile_path)
+    # t = profile("complete flow edges", t, args.outroot)
 
     # Completes the flow.
     videoFlowF = complete_flow(args, corrFlowF, flow_mask, 'forward', FlowF_edge)
-    t = profile("complete forward flow", t, args.profile_path)
+    # t = profile("complete forward flow", t, args.outroot)
     videoFlowB = complete_flow(args, corrFlowB, flow_mask, 'backward', FlowB_edge)
-    t = profile("complete backward flow", t, args.profile_path)
+    # t = profile("complete backward flow", t, args.outroot)
     print('\nFinish flow completion.')
 
     iter = 0
@@ -366,7 +372,7 @@ def video_completion(args):
     # Image inpainting model.
     deepfill = DeepFillv1(pretrained_model=args.deepfill_model, image_shape=[imgH, imgW])
 
-    t = profile("initialize image completion", t, args.profile_path)
+    # t = profile("initialize image completion", t, args.outroot)
 
     # We iteratively complete the video.
     while(np.sum(mask_tofill) > 0):
@@ -394,7 +400,7 @@ def video_completion(args):
         mask_tofill, video_comp = spatial_inpaint(deepfill, mask_tofill, video_comp)
         iter += 1
 
-        t = profile("completion iteration", t, args.profile_path)
+        # t = profile("completion iteration", t, args.outroot)
 
 
     create_dir(os.path.join(args.outroot, 'frame_comp_' + 'final'))
@@ -405,21 +411,21 @@ def video_completion(args):
         imageio.mimwrite(os.path.join(args.outroot, 'frame_comp_' + 'final', 'final.mp4'), video_comp_, fps=12, quality=8, macro_block_size=1)
         # imageio.mimsave(os.path.join(args.outroot, 'frame_comp_' + 'final', 'final.gif'), video_comp_, format='gif', fps=12)
 
-    t = profile("Finished", t, args.profile_path)
+    # t = profile("Finished", t, args.outroot)
 
 def video_completion_seamless(args):
 
-    with open(args.profile_path, "w") as f:
-        writer = csv.writer(f)
-        writer.writerow(["function", "time (s)"])
+    # with open(args.outroot, "w") as f:
+    #     writer = csv.writer(f)
+    #     writer.writerow(["function", "time (s)"])
 
     t = time()
     # Flow model.
     RAFT_model = initialize_RAFT(args)
 
     # Loads frames.
-    filename_list = glob.glob(os.path.join(args.path, '*.png')) + \
-                    glob.glob(os.path.join(args.path, '*.jpg'))
+    filename_list = glob.glob(os.path.join(args.data_dir, args.video, '*.png')) + \
+                    glob.glob(os.path.join(args.data_dir, args.video, '*.jpg'))
 
     # Obtains imgH, imgW and nFrame.
     imgH, imgW = np.array(Image.open(filename_list[0])).shape[:2]
@@ -433,13 +439,13 @@ def video_completion_seamless(args):
     video = torch.stack(video, dim=0)
     video = video.to('cuda')
 
-    t = profile("initialize", t, args.profile_path)
+    # t = profile("initialize", t, args.outroot)
 
     # Calcutes the corrupted flow.
     corrFlowF = calculate_flow(args, RAFT_model, video, 'forward')
-    t = profile("calculate forward flow", t, args.profile_path)
+    # t = profile("calculate forward flow", t, args.outroot)
     corrFlowB = calculate_flow(args, RAFT_model, video, 'backward')
-    t = profile("calculate backward flow", t, args.profile_path)
+    # t = profile("calculate backward flow", t, args.outroot)
     print('\nFinish flow prediction.')
 
     # Makes sure video is in BGR (opencv) format.
@@ -458,8 +464,8 @@ def video_completion_seamless(args):
 
     else:
         # Loads masks.
-        filename_list = glob.glob(os.path.join(args.path_mask, '*.png')) + \
-                        glob.glob(os.path.join(args.path_mask, '*.jpg'))
+        filename_list = glob.glob(os.path.join(args.mask_dir, args.video, 'id_0/*.png')) + \
+                        glob.glob(os.path.join(args.mask_dir, args.video, 'id_0/*.jpg'))
 
         mask = []
         mask_dilated = []
@@ -484,7 +490,7 @@ def video_completion_seamless(args):
         mask_dilated = np.stack(mask_dilated, -1).astype(np.bool)
         flow_mask = np.stack(flow_mask, -1).astype(np.bool)
 
-    t = profile("initialize flow completion", t, args.profile_path)
+    # t = profile("initialize flow completion", t, args.outroot)
 
     if args.edge_guide:
         # Edge completion model.
@@ -501,17 +507,17 @@ def video_completion_seamless(args):
     else:
         FlowF_edge, FlowB_edge = None, None
 
-    t = profile("complete flow edges", t, args.profile_path)
+    # t = profile("complete flow edges", t, args.outroot)
 
     # Completes the flow.
     videoFlowF = complete_flow(args, corrFlowF, flow_mask, 'forward', FlowF_edge)
 
-    t = profile("complete forward flow", t, args.profile_path)
+    # t = profile("complete forward flow", t, args.outroot)
 
     videoFlowB = complete_flow(args, corrFlowB, flow_mask, 'backward', FlowB_edge)
     print('\nFinish flow completion.')
 
-    t = profile("complete backward flow", t, args.profile_path)
+    # t = profile("complete backward flow", t, args.outroot)
 
     # Prepare gradients
     gradient_x = np.empty(((imgH, imgW, 3, 0)), dtype=np.float32)
@@ -541,7 +547,7 @@ def video_completion_seamless(args):
     # Image inpainting model.
     deepfill = DeepFillv1(pretrained_model=args.deepfill_model, image_shape=[imgH, imgW])
 
-    t = profile("initialize completion", t, args.profile_path)
+    # t = profile("initialize completion", t, args.outroot)
 
     # We iteratively complete the video.
     while(np.sum(mask) > 0):
@@ -597,7 +603,7 @@ def video_completion_seamless(args):
         mask, video_comp = spatial_inpaint(deepfill, mask, video_comp)
         iter += 1
 
-        t = profile("completion iteration", t, args.profile_path)
+        # t = profile("completion iteration", t, args.outroot)
 
         # Re-calculate gradient_x/y_filled and mask_gradient
         for indFrame in range(nFrame):
@@ -617,7 +623,7 @@ def video_completion_seamless(args):
         imageio.mimwrite(os.path.join(args.outroot, 'frame_seamless_comp_' + 'final', 'final.mp4'), video_comp_, fps=12, quality=8, macro_block_size=1)
         # imageio.mimsave(os.path.join(args.outroot, 'frame_seamless_comp_' + 'final', 'final.gif'), video_comp_, format='gif', fps=12)
 
-    t = profile("Finished", t, args.profile_path)
+    # t = profile("Finished", t, args.outroot)
 
 def main(args):
 
@@ -638,24 +644,27 @@ if __name__ == '__main__':
     parser.add_argument('--seamless', action='store_true', help='Whether operate in the gradient domain')
     parser.add_argument('--edge_guide', action='store_true', help='Whether use edge as guidance to complete flow')
     parser.add_argument('--mode', default='object_removal', help="modes: object_removal / video_extrapolation")
-    parser.add_argument('--path', default='../data/tennis', help="dataset for evaluation")
-    parser.add_argument('--path_mask', default='../data/tennis_mask', help="mask for object removal")
+    # parser.add_argument('--path', default='../data/tennis', help="dataset for evaluation")
+    # parser.add_argument('--path_mask', default='../data/tennis_mask', help="mask for object removal")
+    parser.add_argument('--data_dir', default='../data/tennis', help="dataset for evaluation")
+    parser.add_argument('--mask_dir', default='../data/tennis_mask', help="mask for object removal")
+    parser.add_argument('--video', default='', help='the name of the video')
     parser.add_argument('--outroot', default='../result/', help="output directory")
     parser.add_argument('--consistencyThres', dest='consistencyThres', default=np.inf, type=float, help='flow consistency error threshold')
     parser.add_argument('--alpha', dest='alpha', default=0.1, type=float)
     parser.add_argument('--Nonlocal', dest='Nonlocal', default=False, type=bool)
 
     # RAFT
-    parser.add_argument('--model', default='../weight/raft-things.pth', help="restore checkpoint")
+    parser.add_argument('--vc_model', default='../weight/zip_serialization_false/raft-things.pth', help="restore checkpoint")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
 
     # Deepfill
-    parser.add_argument('--deepfill_model', default='../weight/imagenet_deepfill.pth', help="restore checkpoint")
+    parser.add_argument('--deepfill_model', default='../weight/zip_serialization_false/imagenet_deepfill.pth', help="restore checkpoint")
 
     # Edge completion
-    parser.add_argument('--edge_completion_model', default='../weight/edge_completion.pth', help="restore checkpoint")
+    parser.add_argument('--edge_completion_model', default='../weight/zip_serialization_false/edge_completion.pth', help="restore checkpoint")
 
     # extrapolation
     parser.add_argument('--H_scale', dest='H_scale', default=2, type=float, help='H extrapolation scale')
@@ -663,6 +672,8 @@ if __name__ == '__main__':
 
     # profiling
     parser.add_argument('--profile_path', default='../../profile.csv', help="path where profile data is saved")
+
+    parser.add_argument('--only_flow', action='store_true', help='specify if you only want to calculate the optical flow')
 
     args = parser.parse_args()
 

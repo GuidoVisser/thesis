@@ -1,64 +1,11 @@
-from VIS import MaskGenerator
 from FGVC.tool.video_completion import *
-from FGVC.RAFT.utils.utils import InputPadder
-from os import path, listdir
 import argparse
-import mmcv
-from PIL import Image
-import glob
-import torch
-from torchvision import transforms
-from torchvision.utils import save_image
-
-from visualisation import create_masked_completion_demo
-
 
 def main(args):
-
-    # pad frames in directory
-    img_list = listdir(path.join(args.data_dir, args.video))
-
-    img = mmcv.imread(path.join(args.data_dir, args.video, img_list[0]))
-    padder = InputPadder([0,0,img.shape[0], img.shape[1]])
-
-    frame_names = glob.glob(path.join(args.data_dir, args.video, "*.jpg")) +\
-             glob.glob(path.join(args.data_dir, args.video, "*.png"))
-    for frame_name in sorted(frame_names):
-
-        try:
-            frame = transforms.ToTensor()(Image.open(frame_name)).unsqueeze(0)
-        except Exception:
-            print(f"Error while processing the following image: {frame_name}")
-        
-        padded_frame = padder.pad(frame)[0].squeeze(0)
-        save_image(padded_frame, frame_name)
-
-    # generate masks
-    cfg = mmcv.Config.fromfile(path.join(args.vis_cfg))
-    MG = MaskGenerator(args.data_dir, args.mask_dir, cfg)
-    # TODO: generate mask from ground truth segmentations
-    MG.generate_masks_from_video_dir(args.video)
-    # MG.combine_all_masks(args.video)
-
-    # # perform video completion
-    # args.outroot = path.join(args.outroot, args.video)
-
-    # del MG
-
     video_completion(args)
 
-    # create_masked_completion_demo(
-    #     path.join(args.data_dir, args.video),
-    #     path.join(args.mask_dir, args.video, "id_0"),
-    #     path.join(args.outroot, "frame_seamless_comp_final"),
-    #     path.join(args.outroot, "demo.gif")
-    # )
-
-
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
-
 
     ######################
     ######   FGVC   ######
@@ -105,6 +52,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
-
-
 

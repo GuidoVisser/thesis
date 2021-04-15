@@ -15,8 +15,8 @@ from mmdet import datasets
 
 from mmdet.apis import inference_detector, show_result
 from mmdet.models import build_detector, detectors
-# from mmdet.core import results2json_videoseg
 
+from FGVC.RAFT.utils.utils import InputPadder
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -132,6 +132,8 @@ class MaskGenerator(object):
         """
         Generate a set of masks for the given video
         """
+        print(data_path)
+        print(self.results_dir)
         if not path.exists(path.join(self.results_dir, data_path)):
             mkdir(path.join(self.results_dir, data_path))
 
@@ -139,22 +141,75 @@ class MaskGenerator(object):
     
         results_generator = inference_detector(self.model, frame_paths, self.cfg)
         
+        max_k = 0
         for i, (bboxes, segmentations) in enumerate(results_generator):
             for k in segmentations.keys():
+
+                if k > max_k:
+                    max_k = k
 
                 current_path = path.join(self.results_dir, data_path, f"id_{k}")
                 if not path.exists(current_path):
                     mkdir(current_path)
 
-                mask = (1 - maskUtils.decode(segmentations[k])) * (k+1)
-                img = Image.open(path.join(self.data_dir, data_path, f"{i:05}.jpg"))
+                mask = maskUtils.decode(segmentations[k])
+                mask = self.dilate_mask(mask)
+                
+                save_path = path.join(current_path, f"{i:05}.png")
+                plt.imsave(save_path, mask, cmap=cm.gray)
 
-                plt.imshow(img)
-                # (path.join(current_path, f"{i:05}.png")
-                plt.imshow(mask, cmap=cmap, alpha=0.5)
-                plt.axis("off")
-                plt.show()
+        meta_data = {
+            "frame_count": len(frame_paths), 
+            "n_instances": max_k,
+            "shape": mask.shape 
+            }
 
+        with open(path.join(self.results_dir, data_path, "info.json"), "w") as f:
+            json.dump(meta_data, f, cls=NpEncoder)
+
+
+    def dilate_mask(self, mask, dilation=15):
+        """
+        Dilate the binary mask by a given amount of pixels
+
+        Args:
+            mask (torch.Tensor): binary mask
+            dilatation (int): amount of pixels that the mask needs to be dilated (defaults to 15 per Gao et al.)
+        
+        Returns:
+            dilated_mask (torch.Tensor): dilated binary mask
+        """
+        kernel = np.ones((dilation, dilation))
+        dilated_mask = cv2.dilate(mask, kernel)
+        
+        return dilated_mask
+
+    def combine_all_masks(self, mask_dir):
+        """
+        Combine all instance masks in a given directory into one
+
+        Args:
+            mask_dir (str): directory where all masks are stored
+        """
+        if not path.exists(path.join(self.results_dir, mask_dir, "combined")):
+            mkdir(path.join(self.results_dir, mask_dir, "combined"))
+
+        with open(path.join(self.results_dir, mask_dir, "info.json"), "r") as f:
+            meta_data = json.load(f)
+        
+        frame_count = meta_data["frame_count"]
+        n_instances = meta_data["n_instances"]
+        mask_shape = meta_data["shape"]
+
+        for frame in range(frame_count):
+            combined_mask = np.zeros(mask_shape)
+
+            for instance in range(n_instances):
+                if path.exists(path.join(self.results_dir, mask_dir, f"id_{instance}/{frame:05}.png")):
+                    instance_mask = np.array(Image.open(path.join(self.results_dir, mask_dir, f"id_{instance}/{frame:05}.png")).convert("L"))
+                    combined_mask = np.maximum(combined_mask, instance_mask)
+
+            plt.imsave(path.join(self.results_dir, mask_dir, f"combined/{frame:05}.png"), combined_mask, cmap=cm.gray)       
             
 
 if __name__ == "__main__":
