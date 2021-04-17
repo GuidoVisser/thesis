@@ -3,20 +3,20 @@ import mmcv
 import json
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+
 from PIL import Image
 from os import path, listdir, mkdir
 from mmcv.runner import load_checkpoint, parallel_test, obj_from_dict
 from pycocotools.coco import COCO
 from pycocotools import mask as maskUtils
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 
-from mmdet import datasets
+from models.MaskTrackRCNN.mmdet import datasets
+from models.MaskTrackRCNN.mmdet.apis import inference_detector, show_result
+from models.MaskTrackRCNN.mmdet.models import build_detector, detectors
 
-from mmdet.apis import inference_detector, show_result
-from mmdet.models import build_detector, detectors
-
-from FGVC.RAFT.utils.utils import InputPadder
+from models.RAFT.utils.utils import InputPadder
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):

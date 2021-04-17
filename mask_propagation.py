@@ -1,19 +1,78 @@
-import numpy as np
-import torch
+# python built-ins
 import glob
-from tqdm import tqdm
-from os import path, makedirs
+from os import path, makedirs, listdir
+
+# libraries
+import torch
+import numpy as np
 from PIL import Image
+from tqdm import tqdm
 from skimage.transform import warp
+from torchvision.utils import save_image
 
-from utils import create_dir
-from define_args import DEFAULT_ARGS
-from visualisation import create_masked_video
+# local modules
+from utils.utils import create_dir
+from utils.define_args import DEFAULT_ARGS
+from utils.video_utils import create_masked_video, load_frame, save_frame, load_flow_frame
+from models.MaskPropagationVAE.MaskPropagationVAE import VAE
 
-from FGVC.RAFT.utils.flow_viz import flow_to_image
-from FGVC.RAFT import RAFT
-from FGVC.RAFT import utils as RAFT_utils
+# RAFT
+from models.RAFT.utils.flow_viz import flow_to_image
+from models.RAFT import RAFT
+from models.RAFT import utils as RAFT_utils
 
+
+def propagate_mask_through_video(model, video_dir, flow_dir, out_dir, initial_mask):
+    # get filepaths of data
+    frames = [path.join(video_dir, frame) for frame in sorted(listdir(video_dir))]
+    flow_frames = [path.join(flow_dir, flow_frame) for flow_frame in sorted(listdir(flow_dir))]
+
+    # make sure mask has the right amount of dimensions
+    mask = load_frame(initial_mask, ismask=True)
+    for i in range(4 - len(mask.size())):
+        mask = mask.unsqueeze(0)
+
+    # save initial mask
+    create_dir(out_dir)
+    save_frame(mask, path.join(out_dir, "00000.png"), ismask=True)
+
+    # initialize padder
+    padder = RAFT_utils.utils.InputPadder(mask.size())
+    mask = padder.pad(mask)[0]
+    mask = mask.to(model.device)
+
+    for i in range(len(frames)-1):
+        # load data
+        frame = load_frame(frames[i+1])
+        flow_frame = load_flow_frame(flow_frames[i])
+
+        # pad data to match model dimensions
+        frame = padder.pad(frame)[0]
+
+        # set device of data to match the model
+        frame = frame.to(model.device)
+        flow_frame = flow_frame.to(model.device)
+
+        # predict next mask
+        next_mask = model.predict_next_mask(mask, flow_frame, frame)
+
+        print(next_mask)
+        
+        # save next mask
+        save_frame(next_mask, path.join(out_dir, f"{i+1:05d}.png"), ismask=True)
+
+        # Use next mask as current for next iteration
+        mask = next_mask
+    
+
+def propagate_mask(args):
+    model = VAE(num_filters=32, z_dim=200)
+    model.load_state_dict(torch.load(args.mask_prop_model))
+    model.to('cuda')
+    model.eval()
+
+    propagate_mask_through_video(model, args.video_dir, args.flow_dir, args.mask_dir, args.initial_mask)
+    
 
 def calculate_flow(args, model, video, mode):
     """
@@ -71,24 +130,10 @@ def calculate_flow(args, model, video, mode):
             RAFT_utils.frame_utils.writeFlow(path.join(args.outroot, args.video, 'flow', mode + '_flo', '%05d.flo'%i), flow)
 
     return Flow
+   
 
 
-def predict_next_mask(current_mask, flow):
-    """
-    Predict the mask of the next frame by warping it in accordance with the flow
-
-    Inputs:
-        current_mask (np.array): the mask on the current frame
-        flow(np.array): the forward flow from the current frame to the next frame
-    
-    Returns:
-        predicted_mask (np.array): the predicted mask on the next frame
-    """
-    pass
-    
-
-
-def propagate_mask(args, mask, flow):
+def propagate_mask_naive(args, mask, flow):
 
     frame_height, frame_width = mask.shape
 
@@ -168,9 +213,11 @@ def main(args):
 if __name__ == "__main__":
     
     args = DEFAULT_ARGS
-    args.outroot = "results/mask_propagation/DAVIS/480p"
-    args.mask_dir = "datasets/DAVIS/Annotations/480p"
-    args.video = "tennis"
+    args.mask_dir = "results/mask_propagation/DAVIS/480p/bear/masks"
+    args.video_dir = "datasets/DAVIS/JPEGImages/480p/bear"
+    args.initial_mask = "datasets/DAVIS/Annotations/480p/bear/00000.png"
+    args.flow_dir = "datasets/DAVIS/Flow/480p/flo/forward/bear"
+    args.mask_prop_model = "results/VAE_logs/2021_04_14_18_40_25/checkpoints/epoch.pt"
     
-    main(args)
+    propagate_mask(args)
     

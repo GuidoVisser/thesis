@@ -1,9 +1,10 @@
 import numpy as np
 import torch
-from PIL import Image
-from os import path, listdir
 import pathlib
 import random
+
+from PIL import Image
+from os import path, listdir
 
 
 class DAVISPairsDataset(object):
@@ -19,7 +20,6 @@ class DAVISPairsDataset(object):
                                 for frame 
                                 in list(sorted(listdir(path.join(self.frame_root, video))))
             ])
-
 
     def __getitem__(self, idx):
 

@@ -4,9 +4,6 @@ import torch
 import numpy as np
 import cv2
 
-from models import DeepFill
-
-
 class DeepFillv1(object):
     def __init__(self,
                  pretrained_model=None,

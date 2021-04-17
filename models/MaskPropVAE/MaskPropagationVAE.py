@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 import numpy as np
 
 from math import e, log2, prod
@@ -416,7 +415,7 @@ class Decoder(nn.Module):
         # Conv layers
         x = self.activation(self.conv3a(x) + x)
         x = self.activation(self.conv3b(x) + x)
-        x = self.conv3c(x) + x
+        x = self.conv3c(x)
 
         # print(f"Decode forward: Shape = {in_shape} ==> {tuple(x.size())}")
         
@@ -491,9 +490,10 @@ class VAE(nn.Module):
         
         # print(torch.sum(mean_z), torch.sum(log_std_z))
 
+        print(mean_z.max(), log_std_z.max())
         # use reparameterization trick to sample a latent vector
         z = self.sample_reparameterize(mean_z, torch.exp(log_std_z))
-
+        print(z.max())
         # use decoder to reconstruct image from latent vector
         self.decoder.residuals = self.encoder.residuals
         next_mask_predictions = self.decoder.forward(z)
@@ -511,6 +511,26 @@ class VAE(nn.Module):
         # print(f" bits per dimension: {bpd.item()}")
 
         return L_rec, L_reg, bpd
+
+
+    def predict_next_mask(self, current_mask, flow, frame):
+        # obtain mean and log std from encoder network
+        mean_z, log_std_z = self.encoder.forward(current_mask, flow, frame)
+        
+        # use reparameterization trick to sample a latent vector
+        z = self.sample_reparameterize(mean_z, torch.exp(log_std_z))
+
+        # print("1")
+        # print(z)
+
+        # use decoder to reconstruct image from latent vector
+        self.decoder.residuals = self.encoder.residuals
+        # print("2")
+        # print(self.decoder.residuals)
+        next_mask_prediction = self.decoder.forward(z)
+
+        return next_mask_prediction
+
 
     @torch.no_grad()
     def sample(self, batch_size):

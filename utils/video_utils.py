@@ -1,14 +1,30 @@
 import os
+import numpy as np
+import torch
 import moviepy
-# from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+import cv2
+import json
+from PIL import Image
 from moviepy.editor import ImageSequenceClip, CompositeVideoClip, concatenate_videoclips, VideoFileClip
 
-import cv2
 
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import json
+def load_flow_frame(filepath):
+    return torch.from_numpy(RAFT_utils.frame_utils.readFlow(filepath)).permute(2, 0, 1).unsqueeze(0)    
+
+def load_frame(filepath, ismask=False):
+    if ismask:
+        return torch.from_numpy(np.array(Image.open(filepath)).astype(np.uint8)).float()
+    else:
+        return torch.from_numpy(np.array(Image.open(filepath)).astype(np.uint8)).permute(2, 0, 1).float().unsqueeze(0)
+
+def save_frame(frame, filepath, ismask=False):
+   
+    if ismask:
+        img = Image.fromarray(frame[0][0].cpu().detach().numpy()).convert('L')
+    else:
+        img = Image.fromarray(frame[0].cpu().permute(1, 2, 0).detach().numpy()).convert('RGB')
+    
+    img.save(filepath)
 
 def folder_to_video(dir_path, save_path=None, fps=24):
     """
@@ -72,29 +88,6 @@ def video_to_folder(video, dir_path, image_ext=".png"):
     return
 
 
-
-def tensor_to_video(tensor):
-    pass
-
-
-def generate_bar_graphs_from_csv(data_dir):
-    """
-    Generate a set of bar graphs from a folder with csvs in it
-
-    Args:
-        data_dir (str): path to the directory with the data in it
-    """
-    csvs = [fp for fp in os.listdir(os.getcwd()) if fp.endswith(".csv")]
-
-    for csv in csvs:
-        df = pd.read_csv(csv)
-        plt.figure()
-        sns.barplot(data=df, x="function", y="time (s)", ci=None)
-
-        plt.xticks(rotation=15)
-        plt.savefig(f"{csv[:-4]}.png")
-
-
 def create_masked_video(video_folder, mask_folder, save_path=None, fps=24, mask_opacity=0.3):
     """
     Take the frames saved in {video_folder} and corresponding masks in {mask_folder} and
@@ -137,6 +130,15 @@ def create_masked_completion_demo(video_dir, mask_dir, completed_dir, save_path=
 
 
 if __name__ == "__main__":
+    print("Video utils: " \
+        "\n\t- folder_to_video" \
+        "\n\t- video_to_folder" \
+        "\n\t- create_masked_video" \
+        "\n\t- create_masked_completion_demo"
+        "\n\t- load_frame" \
+        "\n\t- save_frame" \
+        "\n\t- load_flow_frame")
+    
     # masked_video = create_masked_video(
     #     "datasets/DAVIS/JPEGImages/480p/lucia",
     #     "datasets/DAVIS/generated_masks/480p/lucia/combined",
@@ -158,4 +160,4 @@ if __name__ == "__main__":
     #     video_to_folder(video, dir_path)
     # video_to_folder("full video Guido ikea lowres.mp4", dir_path)
 
-    folder_to_video("results/flow_vid/frame_comp_final", "results/flow_vid/completed.mp4", fps=25)
+    # folder_to_video("results/flow_vid/frame_comp_final", "results/flow_vid/completed.mp4", fps=25)

@@ -1,8 +1,11 @@
-from FGVC.tool.video_completion import *
+from models.FGVC.tool.video_completion import *
 import argparse
 
 def main(args):
-    video_completion(args)
+    if args.seamless:
+        video_completion_seamless(args)
+    else:
+        video_completion(args)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -24,16 +27,16 @@ if __name__ == "__main__":
     parser.add_argument('--Nonlocal', dest='Nonlocal', default=False, type=bool)
 
     # RAFT
-    parser.add_argument('--vc_model', default='FGVC/weight/zip_serialization_false/raft-things.pth', help="restore checkpoint")
+    parser.add_argument('--vc_model', default='models/FGVC/weight/zip_serialization_false/raft-things.pth', help="restore checkpoint")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
 
     # Deepfill
-    parser.add_argument('--deepfill_model', default='FGVC/weight/zip_serialization_false/imagenet_deepfill.pth', help="restore checkpoint")
+    parser.add_argument('--deepfill_model', default='models/FGVC/weight/zip_serialization_false/imagenet_deepfill.pth', help="restore checkpoint")
 
     # Edge completion
-    parser.add_argument('--edge_completion_model', default='FGVC/weight/zip_serialization_false/edge_completion.pth', help="restore checkpoint")
+    parser.add_argument('--edge_completion_model', default='models/FGVC/weight/zip_serialization_false/edge_completion.pth', help="restore checkpoint")
 
     # extrapolation
     parser.add_argument('--H_scale', dest='H_scale', default=2, type=float, help='H extrapolation scale')

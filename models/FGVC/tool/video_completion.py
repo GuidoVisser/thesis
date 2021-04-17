@@ -15,18 +15,22 @@ import scipy.ndimage
 from skimage.feature import canny
 import torchvision.transforms.functional as F
 
-from RAFT import utils
-from RAFT import RAFT
+from models.edgeconnect.networks import EdgeGenerator_
+from models.DeepFill_Models import DeepFill
+from models.RAFT import utils
+from models.RAFT import RAFT
 
-from ..utils import region_fill
-from ..utils.Poisson_blend import Poisson_blend
-from ..utils.Poisson_blend_img import Poisson_blend_img
-from .get_flowNN import get_flowNN
-from .get_flowNN_gradient import get_flowNN_gradient
-from ..utils.common_utils import flow_edge
-from .spatial_inpaint import spatial_inpaint
-from .frame_inpaint import DeepFillv1
-from ..edgeconnect.networks import EdgeGenerator_
+from models.FGVC.utils import region_fill
+from models.FGVC.utils.Poisson_blend import Poisson_blend
+from models.FGVC.utils.Poisson_blend_img import Poisson_blend_img
+from models.FGVC.utils.common_utils import flow_edge
+
+from models.FGVC.tool.get_flowNN import get_flowNN
+from models.FGVC.tool.get_flowNN_gradient import get_flowNN_gradient
+from models.FGVC.tool.spatial_inpaint import spatial_inpaint
+from models.FGVC.tool.frame_inpaint import DeepFillv1
+
+
 
 from time import time
 import csv
@@ -100,6 +104,7 @@ def calculate_flow(args, model, video, mode):
         for flow_name in sorted(glob.glob(os.path.join(args.outroot, 'flow', mode + '_flo', '*.flo'))):
             print("Loading {0}".format(flow_name), '\r', end='')
             flow = utils.frame_utils.readFlow(flow_name)
+            print(flow.shape)
             Flow = np.concatenate((Flow, flow[..., None]), axis=-1)
         return Flow
 

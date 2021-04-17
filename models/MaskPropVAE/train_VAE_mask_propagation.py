@@ -14,6 +14,7 @@ import torch.utils.data as data
 from MaskPropagationVAE import VAE
 from transforms import get_transforms
 from datasets import DAVISPairsDataset
+from mask_propagation import propagate_mask_through_video
 
 from FGVC.RAFT import RAFT
 from FGVC.RAFT import utils as RAFT_utils
@@ -158,29 +159,23 @@ def train_vae(model, flow_model, train_loader, optimizer):
     average_reg_loss = 0
 
     for step, batch in enumerate(train_loader):
-        print("<=== getting batch  ===>")
+        # getting batch
         source_frames, source_masks, target_frames, target_masks = [input.to(model.device) for input in batch]
         source_frames, source_masks, target_frames, target_masks = raft_padder.pad(source_frames, 
                                                                                    source_masks, 
                                                                                    target_frames, 
                                                                                    target_masks)
 
-        print("<=== calculating flow ===>")
+        # calculating flow
         flow = calculate_batch_flow(flow_model, source_frames, target_frames)
 
-        print("<=== model forward  ===>")
+        # forward pass
         L_rec, L_reg, bpd = model.forward(source_masks, flow, source_frames, target_masks)
 
-        print("<=== model backward ===>\n")
         # update model
         model.zero_grad()
         bpd.backward()
-        # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
         optimizer.step()
-        
-        # DEBUG
-        # for p in list(filter(lambda p: p.grad is not None, model.parameters())):
-        #     print(p.grad.data.norm(2).item())
 
         # keep a running average
         current = step + 1
@@ -229,9 +224,6 @@ def main(args):
     # Create optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # # # Sample image grid before training starts
-    # sample_and_save(model, 0, summary_writer, 64)
-
     # Tracking variables for finding best model
     best_val_bpd = float('inf')
     best_epoch_idx = 0
@@ -262,33 +254,30 @@ def main(args):
         summary_writer.add_scalars(
             "Negative ELBO", {"train": train_rec_loss + train_reg_loss, "val": val_rec_loss + val_reg_loss}, epoch)
 
-        # if epoch % 5 == 0:
-        #     sample_and_save(model, epoch, summary_writer, 64)
-
         # Saving best model
         if epoch_val_bpd < best_val_bpd:
             best_val_bpd = epoch_val_bpd
             best_epoch_idx = epoch
             torch.save(model.state_dict(), os.path.join(checkpoint_dir, "epoch.pt"))
 
-    # Load best model for test
-    print(f"Best epoch: {best_epoch_idx}. Load model for testing.")
-    model.load_state_dict(torch.load(os.path.join(checkpoint_dir, "epoch.pt")))
+        # errorrrr(
+        # if epoch % 5 == 0:
+        #     for i in range(len(listdir())):
+        #         test_video_dir = 
+        #     propagate_mask_through_video(
+        #         model, args.test_video_dir, args.test_flow_dir, path.join(args.out_dir, epoch), args.initial_mask)
 
-    # Test epoch
-    test_loader = (tqdm(test_loader, desc="Testing", leave=False)
-                   if args.progress_bar else test_loader)
-    test_bpd, _, _ = test_vae(model, test_loader)
-    print(f"Test BPD: {test_bpd}")
-    summary_writer.add_scalars("BPD", {"test": test_bpd}, best_epoch_idx)
+    # # Load best model for test
+    # print(f"Best epoch: {best_epoch_idx}. Load model for testing.")
+    # model.load_state_dict(torch.load(os.path.join(checkpoint_dir, "epoch.pt")))
 
-    # # Manifold generation
-    # if args.z_dim == 2:
-    #     img_grid = visualize_manifold(model.decoder)
-    #     save_image(img_grid, os.path.join(experiment_dir, 'vae_manifold.png'),
-    #                normalize=False)
+    # # Test epoch
+    # test_loader = (tqdm(test_loader, desc="Testing", leave=False)
+    #                if args.progress_bar else test_loader)
+    # test_bpd, _, _ = test_vae(model, test_loader)
+    # print(f"Test BPD: {test_bpd}")
+    # summary_writer.add_scalars("BPD", {"test": test_bpd}, best_epoch_idx)
 
-    # return test_bpd
     return
 
 
@@ -321,8 +310,16 @@ if __name__ == '__main__':
                         help='Directory where data is stored')
     parser.add_argument('--mask_dir', default='datasets/DAVIS/Annotations/480p/', type=str,
                         help='Directory where masks are stored')
+    parser.add_argument('--flow_dir', 'default=datasets/DAVIS/Flow/480p/flo/forward/', type=str,
+                        help='directory where the forward optical flow is stored')
     parser.add_argument('--log_dir', default='results/VAE_logs', type=str,
                         help='Directory where the PyTorch logs should be created.')
+    parser.add_argument('--test_data_dir', default='datasets/DAVIS/JPEGImages/480p_test/', type=str,
+                        help='Directory where data is stored for testing')
+    parser.add_argument('--test_mask_dir', default='datasets/DAVIS/Annotations/480p_test/', type=str,
+                        help='Directory where masks are stored for testing')
+    parser.add_argument('--test_flow_dir', 'default=datasets/DAVIS/Flow/480p_test/flo/forward/', type=str,
+                        help='directory where the forward optical flow is stored for testing')
     parser.add_argument('--progress_bar', action='store_true',
                         help=('Use a progress bar indicator for interactive experimentation. '
                               'Not to be used in conjuction with SLURM jobs'))

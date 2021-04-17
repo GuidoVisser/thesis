@@ -10,7 +10,7 @@ import torch
 from torchvision import transforms
 from torchvision.utils import save_image
 
-from visualisation import create_masked_completion_demo
+from utils.video_utils import create_masked_completion_demo
 
 
 def main(args):
