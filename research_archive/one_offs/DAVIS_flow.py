@@ -5,16 +5,16 @@ from os import path, listdir
 from PIL import Image
 import argparse
 
-from utils import create_dir
+from utils.utils import create_dir
 
-from FGVC.RAFT.utils.flow_viz import flow_to_image
-from FGVC.RAFT import RAFT
-from FGVC.RAFT import utils as RAFT_utils
+from models.RAFT.utils.flow_viz import flow_to_image
+from models.RAFT import RAFT
+from models.RAFT import utils as RAFT_utils
 
 
 def initialize_RAFT(args):
     model = torch.nn.DataParallel(RAFT(args))
-    model.load_state_dict(torch.load(args.vc_model))
+    model.load_state_dict(torch.load(args.RAFT_weights))
 
     model = model.module
     model.to('cuda')
@@ -61,7 +61,7 @@ def calculate_video_flow(args, flow_model, video, padder):
         flow = calculate_batch_flow(flow_model, frame_1, frame_2)
         save_flow(args, flow, "forward", video, i)
         flow = calculate_batch_flow(flow_model, frame_2, frame_1)
-        save_flow(args, flow, "backward", video, i)
+        save_flow(args, flow, "backward", video, i+1)
 
         print(i)
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     parser.add_argument('--data_root', default = "datasets/DAVIS/", help="root directory of data")
 
     # RAFT
-    parser.add_argument('--vc_model', default='FGVC/weight/zip_serialization_false/raft-things.pth', help="restore checkpoint")
+    parser.add_argument('--RAFT_weights', default='models/weights/zip_serialization_false/raft-things.pth', help="restore checkpoint")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')

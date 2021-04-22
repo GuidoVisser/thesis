@@ -34,6 +34,6 @@ class ToTensor(object):
 def get_transforms(train):
     transforms = []
     transforms.append(ToTensor())
-    if train:
-        transforms.append(RandomHorizontalFlip(0.5))
+    # if train:
+    #     transforms.append(RandomHorizontalFlip(0.5))
     return Compose(transforms)

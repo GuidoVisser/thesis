@@ -11,14 +11,14 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import make_grid, save_image
 import torch.utils.data as data
 
-from MaskPropagationVAE import VAE
-from transforms import get_transforms
 from datasets import DAVISPairsDataset
 from mask_propagation import propagate_mask_through_video
+from utils.initialize_models import initialize_RAFT, initialize_MaskPropVAE
+from utils.transforms import get_transforms
+from utils.flow_utils import normalize_optical_flow
+from utils.video_utils import create_masked_video
 
-from FGVC.RAFT import RAFT
-from FGVC.RAFT import utils as RAFT_utils
-from FGVC.RAFT.utils.utils import InputPadder
+from models.RAFT.utils.utils import InputPadder
 
 
 def seed_everything(seed):
@@ -37,7 +37,7 @@ def create_train_and_valid_loaders(args, train=True):
         batch_size (int): batch size for training
         num_workers (int): number of workers on the GPU
     """
-    dataset = DAVISPairsDataset(args.data_dir, args.mask_dir, get_transforms(train=train))
+    dataset = DAVISPairsDataset(args.data_dir, get_transforms(train=train))
 
     train_valid_split = int(0.8 * len(dataset))
 
@@ -104,7 +104,7 @@ def test_vae(model, flow_model, data_loader):
     """
 
     # initialize padder object for RAFT
-    sample_frame, _, _, _ = next(iter(data_loader))
+    sample_frame, _, _, _, _ = next(iter(data_loader))
     raft_padder = InputPadder(sample_frame.size())
     del sample_frame
 
@@ -115,13 +115,16 @@ def test_vae(model, flow_model, data_loader):
     for step, batch in enumerate(data_loader):
         
         # prepare batch
-        source_frames, source_masks, target_frames, target_masks = [input.to('cuda') for input in batch]
+        source_frames, source_masks, target_frames, target_masks, flow = [input.to(model.device) for input in batch]
         source_frames, source_masks, target_frames, target_masks = raft_padder.pad(source_frames, 
                                                                                    source_masks, 
                                                                                    target_frames, 
                                                                                    target_masks)
-        # calculating flow
-        flow = calculate_batch_flow(flow_model, source_frames, target_frames)
+        # prepare optical flow
+        if flow is None:
+            flow = calculate_batch_flow(flow_model, source_frames, target_frames)
+
+        flow = normalize_optical_flow(flow)
 
         # calculating forward pass
         L_rec, L_reg, bpd = model.forward(source_masks, flow, source_frames, target_masks)
@@ -150,7 +153,7 @@ def train_vae(model, flow_model, train_loader, optimizer):
     """
 
     # initialize padder object for RAFT
-    sample_frame, _, _, _ = next(iter(train_loader))
+    sample_frame, _, _, _, _ = next(iter(train_loader))
     raft_padder = InputPadder(sample_frame.size())
     del sample_frame
 
@@ -160,14 +163,17 @@ def train_vae(model, flow_model, train_loader, optimizer):
 
     for step, batch in enumerate(train_loader):
         # getting batch
-        source_frames, source_masks, target_frames, target_masks = [input.to(model.device) for input in batch]
+        source_frames, source_masks, target_frames, target_masks, flow = [input.to(model.device) for input in batch]
         source_frames, source_masks, target_frames, target_masks = raft_padder.pad(source_frames, 
                                                                                    source_masks, 
                                                                                    target_frames, 
                                                                                    target_masks)
 
-        # calculating flow
-        flow = calculate_batch_flow(flow_model, source_frames, target_frames)
+        # prepare optical flow
+        if flow is None:
+            flow = calculate_batch_flow(flow_model, source_frames, target_frames)
+
+        flow = normalize_optical_flow(flow)
 
         # forward pass
         L_rec, L_reg, bpd = model.forward(source_masks, flow, source_frames, target_masks)
@@ -186,6 +192,28 @@ def train_vae(model, flow_model, train_loader, optimizer):
 
     return average_bpd, average_rec_loss, average_reg_loss
 
+@torch.no_grad()
+def demo_model(args, demo_dir, model, epoch):
+    """
+    Run the mask propagation on a full video and create a demo video of the results.
+
+    Args:
+        args (namespace): Namespace containing information on the directories
+        demo_dir (str): directory in which the results will be saved
+        model (nn.Module): Mask propagation VAE that is being trained
+    """
+    video_dir = os.path.join(args.data_dir, "JPEGImages/480p/tennis/")
+    flow_dir = os.path.join(args.data_dir, "Flow/480p/flo/forward/tennis/")
+    initial_mask = os.path.join(args.data_dir, "Annotations/480p/tennis/00000.png")
+
+    out_dir = os.path.join(demo_dir, f"epoch_{epoch}/")
+    os.makedirs(out_dir, exist_ok=True)
+
+    propagate_mask_through_video(model, video_dir, flow_dir, out_dir, initial_mask)
+
+    masked_vid = create_masked_video(video_dir, out_dir, save_path=os.path.join(demo_dir, f"epoch_{epoch}.mp4"))
+
+
 
 def main(args):
     """
@@ -203,23 +231,20 @@ def main(args):
         args.log_dir, datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
     checkpoint_dir = os.path.join(
         experiment_dir, 'checkpoints')
+    demo_dir = os.path.join(
+        experiment_dir, "demo")
     os.makedirs(experiment_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
+    os.makedirs(demo_dir, exist_ok=True)
     summary_writer = SummaryWriter(experiment_dir)
 
     # Load dataset
     train_loader, val_loader = create_train_and_valid_loaders(args)
 
-    # Create model
-    model = VAE(num_filters=args.num_filters, z_dim=args.z_dim)
+    # Create models
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
-
-    RAFT_model = torch.nn.DataParallel(RAFT(args))
-    RAFT_model.load_state_dict(torch.load(args.flow_model))
-    RAFT_model = RAFT_model.module
-    RAFT_model.to(device)
-    RAFT_model.eval()
+    model = initialize_MaskPropVAE(args, device)
+    RAFT_model = initialize_RAFT(args, device)
     
     # Create optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -228,7 +253,7 @@ def main(args):
     best_val_bpd = float('inf')
     best_epoch_idx = 0
     print(f"Using device {device}")
-    epoch_iterator = (trange(1, args.epochs + 1, desc=f"VAE")
+    epoch_iterator = (trange(1, args.epochs + 1, desc=f"MaskPropVAE")
                       if args.progress_bar else range(1, args.epochs + 1))
     for epoch in epoch_iterator:
         if not args.progress_bar:
@@ -260,12 +285,8 @@ def main(args):
             best_epoch_idx = epoch
             torch.save(model.state_dict(), os.path.join(checkpoint_dir, "epoch.pt"))
 
-        # errorrrr(
-        # if epoch % 5 == 0:
-        #     for i in range(len(listdir())):
-        #         test_video_dir = 
-        #     propagate_mask_through_video(
-        #         model, args.test_video_dir, args.test_flow_dir, path.join(args.out_dir, epoch), args.initial_mask)
+        # create a test demo
+        demo_model(args, demo_dir, model, epoch)
 
     # # Load best model for test
     # print(f"Best epoch: {best_epoch_idx}. Load model for testing.")
@@ -295,37 +316,31 @@ if __name__ == '__main__':
     # Optimizer hyperparameters
     parser.add_argument('--lr', default=1e-4, type=float,
                         help='Learning rate to use')
-    parser.add_argument('--batch_size', default=2, type=int,
+    parser.add_argument('--batch_size', default=1, type=int,
                         help='Minibatch size')
 
     # Other hyperparameters
-    parser.add_argument('--epochs', default=10, type=int,
+    parser.add_argument('--epochs', default=100, type=int,
                         help='Max number of epochs')
     parser.add_argument('--seed', default=42, type=int,
                         help='Seed to use for reproducing results')
     parser.add_argument('--num_workers', default=1, type=int,
                         help='Number of workers to use in the data loaders. To have a truly deterministic run, this has to be 0. ' + \
                              'For your assignment report, you can use multiple workers (e.g. 4) and do not have to set it to 0.')
-    parser.add_argument('--data_dir', default='datasets/DAVIS/JPEGImages/480p/', type=str,
-                        help='Directory where data is stored')
-    parser.add_argument('--mask_dir', default='datasets/DAVIS/Annotations/480p/', type=str,
-                        help='Directory where masks are stored')
-    parser.add_argument('--flow_dir', 'default=datasets/DAVIS/Flow/480p/flo/forward/', type=str,
-                        help='directory where the forward optical flow is stored')
-    parser.add_argument('--log_dir', default='results/VAE_logs', type=str,
-                        help='Directory where the PyTorch logs should be created.')
-    parser.add_argument('--test_data_dir', default='datasets/DAVIS/JPEGImages/480p_test/', type=str,
-                        help='Directory where data is stored for testing')
-    parser.add_argument('--test_mask_dir', default='datasets/DAVIS/Annotations/480p_test/', type=str,
-                        help='Directory where masks are stored for testing')
-    parser.add_argument('--test_flow_dir', 'default=datasets/DAVIS/Flow/480p_test/flo/forward/', type=str,
-                        help='directory where the forward optical flow is stored for testing')
     parser.add_argument('--progress_bar', action='store_true',
                         help=('Use a progress bar indicator for interactive experimentation. '
                               'Not to be used in conjuction with SLURM jobs'))
 
+    # directories
+    parser.add_argument('--data_dir', default='datasets/DAVIS_sample_tennis/', type=str,
+                        help='Directory where data is stored')
+    parser.add_argument('--flow_dir', default='datasets/DAVIS_sample_tennis/Flow/480p/flo/', type=str,
+                        help='directory where the forward optical flow is stored')
+    parser.add_argument('--log_dir', default='results/DAVIS_sample_tennis_maskpropvae', type=str,
+                        help='Directory where the PyTorch logs should be created.')
+
     # RAFT 
-    parser.add_argument('--flow_model', default='FGVC/weight/zip_serialization_false/raft-things.pth', 
+    parser.add_argument('--RAFT_weights', default='models/weights/zip_serialization_false/raft-things.pth', 
                         help='restore a RAFT checkpoint')
     parser.add_argument('--small', action='store_true', 
                         help='use small model')

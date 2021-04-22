@@ -12,9 +12,9 @@ from torchvision.utils import save_image
 
 # local modules
 from utils.utils import create_dir
-from utils.define_args import DEFAULT_ARGS
-from utils.video_utils import create_masked_video, load_frame, save_frame, load_flow_frame
-from models.MaskPropagationVAE.MaskPropagationVAE import VAE
+from utils.video_utils import create_masked_video, load_frame, save_frame
+from utils.flow_utils import normalize_optical_flow, load_flow_frame
+from models.MaskPropagationVAE import MaskPropVAE
 
 # RAFT
 from models.RAFT.utils.flow_viz import flow_to_image
@@ -22,6 +22,7 @@ from models.RAFT import RAFT
 from models.RAFT import utils as RAFT_utils
 
 
+@torch.no_grad()
 def propagate_mask_through_video(model, video_dir, flow_dir, out_dir, initial_mask):
     # get filepaths of data
     frames = [path.join(video_dir, frame) for frame in sorted(listdir(video_dir))]
@@ -32,14 +33,14 @@ def propagate_mask_through_video(model, video_dir, flow_dir, out_dir, initial_ma
     for i in range(4 - len(mask.size())):
         mask = mask.unsqueeze(0)
 
-    # save initial mask
-    create_dir(out_dir)
-    save_frame(mask, path.join(out_dir, "00000.png"), ismask=True)
-
     # initialize padder
     padder = RAFT_utils.utils.InputPadder(mask.size())
     mask = padder.pad(mask)[0]
     mask = mask.to(model.device)
+
+    # save initial mask
+    create_dir(out_dir)
+    save_frame(mask, path.join(out_dir, "00000.png"), ismask=True)
 
     for i in range(len(frames)-1):
         # load data
@@ -53,10 +54,10 @@ def propagate_mask_through_video(model, video_dir, flow_dir, out_dir, initial_ma
         frame = frame.to(model.device)
         flow_frame = flow_frame.to(model.device)
 
+        flow_frame = normalize_optical_flow(flow_frame)
+
         # predict next mask
         next_mask = model.predict_next_mask(mask, flow_frame, frame)
-
-        print(next_mask)
         
         # save next mask
         save_frame(next_mask, path.join(out_dir, f"{i+1:05d}.png"), ismask=True)

@@ -6,13 +6,15 @@ import random
 from PIL import Image
 from os import path, listdir
 
+from models.RAFT.utils.frame_utils import readFlow
+
 
 class DAVISPairsDataset(object):
-    def __init__(self, frame_root, mask_root, transforms, device='cuda', max_distance=1):
-        self.frame_root = frame_root
-        self.mask_root = mask_root
+    def __init__(self, data_root, transforms, max_distance=1):
+        self.frame_root = path.join(data_root, "JPEGImages/480p/")
+        self.mask_root = path.join(data_root, "Annotations/480p/")
+        self.flow_root = path.join(data_root, "Flow/480p/flo/")
         self.transforms = transforms
-        self.device = device
         self.max_distance = max_distance
         self.frames = []
         for video in listdir(self.frame_root):
@@ -62,7 +64,17 @@ class DAVISPairsDataset(object):
             source_frame, source_mask = self.transforms(source_frame, source_mask)
             target_frame, target_mask = self.transforms(target_frame, target_mask)
         
-        return source_frame, source_mask, target_frame, target_mask
+        # If available also pre-load optical flow
+        if (idx - target_idx) == -1:
+            flow_filepath = path.join(self.flow_root, "forward", path.splitext(self.frames[idx])[0] + ".flo")
+            flow = torch.from_numpy(readFlow(flow_filepath)).permute(2, 0, 1)    
+        elif (idx - target_idx) == 1:
+            flow_filepath = path.join(self.flow_root, "backward", path.splitext(self.frames[idx])[0] + ".flo")
+            flow = torch.from_numpy(readFlow(flow_filepath)).permute(2, 0, 1)  
+        else:
+            flow = None
+
+        return source_frame, source_mask, target_frame, target_mask, flow
 
     def __len__(self):
         return len(self.frames)

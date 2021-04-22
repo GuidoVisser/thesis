@@ -82,7 +82,7 @@ def initialize_RAFT(args):
     """Initializes the RAFT model.
     """
     model = torch.nn.DataParallel(RAFT(args))
-    model.load_state_dict(torch.load(args.vc_model))
+    model.load_state_dict(torch.load(args.RAFT_weights))
 
     model = model.module
     model.to('cuda')
@@ -660,7 +660,7 @@ if __name__ == '__main__':
     parser.add_argument('--Nonlocal', dest='Nonlocal', default=False, type=bool)
 
     # RAFT
-    parser.add_argument('--vc_model', default='../weight/zip_serialization_false/raft-things.pth', help="restore checkpoint")
+    parser.add_argument('--RAFT_weights', default='../weight/zip_serialization_false/raft-things.pth', help="restore checkpoint")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')

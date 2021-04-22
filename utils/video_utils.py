@@ -7,24 +7,29 @@ import json
 from PIL import Image
 from moviepy.editor import ImageSequenceClip, CompositeVideoClip, concatenate_videoclips, VideoFileClip
 
+from torchvision.transforms.functional import to_tensor
+from torchvision.utils import save_image
 
-def load_flow_frame(filepath):
-    return torch.from_numpy(RAFT_utils.frame_utils.readFlow(filepath)).permute(2, 0, 1).unsqueeze(0)    
 
 def load_frame(filepath, ismask=False):
     if ismask:
-        return torch.from_numpy(np.array(Image.open(filepath)).astype(np.uint8)).float()
+        return to_tensor(np.array(Image.open(filepath)).astype(np.uint8))
     else:
-        return torch.from_numpy(np.array(Image.open(filepath)).astype(np.uint8)).permute(2, 0, 1).float().unsqueeze(0)
+        return to_tensor(np.array(Image.open(filepath)).astype(np.uint8)).unsqueeze(0)
 
 def save_frame(frame, filepath, ismask=False):
-   
-    if ismask:
-        img = Image.fromarray(frame[0][0].cpu().detach().numpy()).convert('L')
-    else:
-        img = Image.fromarray(frame[0].cpu().permute(1, 2, 0).detach().numpy()).convert('RGB')
-    
-    img.save(filepath)
+
+    save_image(frame[0], filepath)
+
+    # print(frame.size())
+
+    # if ismask:
+    #     img = Image.fromarray(frame[0].cpu().detach().numpy()).convert('RGB')
+    # else:
+    #     img = Image.fromarray(frame[0].cpu().permute(1, 2, 0).detach().numpy()).convert('RGB')
+    # print(img.mode)
+    # print(np.max(img))
+    # img.save(filepath)
 
 def folder_to_video(dir_path, save_path=None, fps=24):
     """
@@ -111,7 +116,7 @@ def create_masked_video(video_folder, mask_folder, save_path=None, fps=24, mask_
 
     masked_clip = CompositeVideoClip([clip, mask])
     if save_path is not None:
-        masked_clip.write_gif(save_path, fps=fps)
+        masked_clip.write_videofile(save_path, fps=fps)
 
     return masked_clip
 

@@ -455,7 +455,7 @@ class Decoder(nn.Module):
 
 
 
-class VAE(nn.Module):
+class MaskPropVAE(nn.Module):
 
     def __init__(self, num_filters, z_dim):
         """
@@ -487,13 +487,10 @@ class VAE(nn.Module):
 
         # obtain mean and log std from encoder network
         mean_z, log_std_z = self.encoder.forward(input_mask_batch, flow_batch, frame_batch)
-        
-        # print(torch.sum(mean_z), torch.sum(log_std_z))
 
-        print(mean_z.max(), log_std_z.max())
         # use reparameterization trick to sample a latent vector
         z = self.sample_reparameterize(mean_z, torch.exp(log_std_z))
-        print(z.max())
+        
         # use decoder to reconstruct image from latent vector
         self.decoder.residuals = self.encoder.residuals
         next_mask_predictions = self.decoder.forward(z)
@@ -520,14 +517,11 @@ class VAE(nn.Module):
         # use reparameterization trick to sample a latent vector
         z = self.sample_reparameterize(mean_z, torch.exp(log_std_z))
 
-        # print("1")
-        # print(z)
-
         # use decoder to reconstruct image from latent vector
         self.decoder.residuals = self.encoder.residuals
-        # print("2")
-        # print(self.decoder.residuals)
+
         next_mask_prediction = self.decoder.forward(z)
+        next_mask_prediction = nn.Sigmoid()(next_mask_prediction)
 
         return next_mask_prediction
 
