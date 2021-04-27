@@ -16,7 +16,7 @@ pip install moviepy
 #Copy input file to scratch
 cp -RT $HOME/thesis/datasets/DAVIS_sample_tennis $TMPDIR/data
 cp -RT $HOME/thesis/models/weights/zip_serialization_false/ $TMPDIR/weights
-models/weights/zip_serialization_false
+
 #Create output directory on scratch
 mkdir $TMPDIR/output_dir
 
