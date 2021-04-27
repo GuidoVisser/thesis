@@ -11,6 +11,7 @@ module load Python
 
 # instasll dependencies
 pip install --user --upgrade tensorboard && pip install --upgrade torch
+pip install moviepy
 
 #Copy input file to scratch
 cp -RT $HOME/thesis/datasets/DAVIS_sample_tennis $TMPDIR/data
