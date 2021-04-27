@@ -161,7 +161,10 @@ class ModelTrainer(object):
         """
         Create a demo of the models performance
         """
-        return self.demo_function(self.data_dir, self.demo_dir, self.model, epoch)
+        if len(self.extra_models) > 0:
+            return self.demo_function(self.data_dir, self.demo_dir, self.model, self.extra_models, epoch)
+        else:
+            return self.demo_function(self.data_dir, self.demo_dir, self.model, epoch)
 
 
 if __name__ == "__main__":

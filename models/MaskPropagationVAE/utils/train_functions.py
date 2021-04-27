@@ -133,7 +133,7 @@ def train_vae(model, extra_models, train_loader, optimizer):
 
 
 @torch.no_grad()
-def demo_model(data_dir, demo_dir, model, epoch):
+def demo_model(data_dir, demo_dir, model, extra_models, epoch):
     """
     Run the mask propagation on a full video and create a demo video of the results.
 
