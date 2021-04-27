@@ -7,28 +7,30 @@ class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
 
-    def __call__(self, image, target):
+    def __call__(self, inputs):
         for t in self.transforms:
-            image, target = t(image, target)
-        return image, target
+            output = t(inputs)
+        return output
 
 
 class RandomHorizontalFlip(object):
     def __init__(self, prob):
         self.prob = prob
 
-    def __call__(self, image, target):
+    def __call__(self, inputs):
+        output = []
         if random.random() < self.prob:
-            image = image.flip(-1)
-            target = target.flip(-1)
-        return image, target
+            for input in inputs:
+                output.append(input.flip(-1))
+        return output
 
 
 class ToTensor(object):
-    def __call__(self, image, target):
-        image = F.to_tensor(image)
-        target = F.to_tensor(target)
-        return image, target
+    def __call__(self, inputs):
+        output = []
+        for input in inputs:
+            output.append(F.to_tensor(input))
+        return output
 
     
 def get_transforms(train):
