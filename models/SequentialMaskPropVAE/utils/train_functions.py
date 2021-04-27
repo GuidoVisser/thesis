@@ -127,7 +127,7 @@ def train_vae(model, extra_models, train_loader, optimizer):
         current_mask = raft_padder.pad(current_mask.squeeze(2))[0]
 
         # discard first frame
-        frames = [:1]
+        frames = frames[1:]
 
         count = 1
         while frames.size()[2] > 1:
