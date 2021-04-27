@@ -2,8 +2,8 @@
 
 #SBATCH -n 1
 #SBATCH -t 3:00:00
-#SBATCH -p gpu
-#SBATCH --gpus-per-node=gtx1080ti:4
+#SBATCH -p gpu_short
+#SBATCH --gpus-per-node=gtx1080ti:1
 
 # load modules
 module load 2020

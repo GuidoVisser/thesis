@@ -80,7 +80,7 @@ class DAVISPairsDataset(object):
         return len(self.frames)
 
 class DAVISSequenceDataset(object):
-    def __init__(self, data_root, transforms, seq_length=5):
+    def __init__(self, data_root, transforms, seq_length=3):
         self.frame_root = path.join(data_root, "JPEGImages/480p/")
         self.mask_root = path.join(data_root, "Annotations/480p/")
         self.flow_root = path.join(data_root, "Flow/480p/flo/")

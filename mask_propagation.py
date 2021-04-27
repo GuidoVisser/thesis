@@ -1,20 +1,17 @@
 # python built-ins
 import glob
-from os import path, makedirs, listdir
+from os import path, listdir
 
 # libraries
 import torch
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-from skimage.transform import warp
-from torchvision.utils import save_image
 
 # local modules
 from utils.utils import create_dir
 from utils.video_utils import create_masked_video, load_frame, save_frame
 from utils.flow_utils import normalize_optical_flow, load_flow_frame
-from models.MaskPropagationVAE import MaskPropVAE
 
 # RAFT
 from models.RAFT.utils.flow_viz import flow_to_image

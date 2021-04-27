@@ -10,26 +10,23 @@ module load 2020
 module load Python
 
 # instasll dependencies
-pip install tqdm
 pip install --upgrade tensorboard && pip install --upgrade torch
 
 #Copy input file to scratch
-cp -RT $HOME/code/datasets/DAVIS/JPEGImages/480p "$TMPDIR/data"
-cp -RT $HOME/code/datasets/DAVIS/Annotation/480p "$TMPDIR/masks"
-cp -RT $HOME/code/FGVC/weight/zip_serialization_false/ "$TMPDIR/weight"
+cp -RT $HOME/thesis/datasets/DAVIS $TMPDIR/data
+cp -RT $HOME/thesis/models/weights/zip_serialization_false/ $TMPDIR/weights
 
 #Create output directory on scratch
-mkdir "$TMPDIR"/output_dir
+mkdir $TMPDIR/output_dir
 
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "Start: $(date)" >> $HOME/job_logs/vae_train.log
-python $HOME/code/VAE_mask_propagation.py \
+python $HOME/thesis/train_sequential_VAE_mask_propagation.py \
             --data_dir $TMPDIR/data \
-            --mask_dir $TMPDIR/masks \
             --log_dir $TMPDIR/output_dir \
-            --flow_model $TMPDIR/weight/raft-things.pth \
+            --RAFT_weights $TMPDIR/weights
             --epochs 10
-echo "End: $(date)" >> $HOME/job_logs/vae_train.log
+echo "End: $(date)" >> $HOME/thesis/job_logs/SeqMaskPropVAE.log
 
 #Copy output directory from scratch to home
-cp -r "$TMPDIR"/output_dir $HOME/code/results/
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/SeqMaskPropVAE
