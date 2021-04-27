@@ -27,7 +27,7 @@ python $HOME/thesis/train_sequentail_VAE_mask_propagation.py \
             --log_dir $TMPDIR/output_dir \
             --RAFT_weights $TMPDIR/weights/raft-things.pth \
             --epochs 10 \
-            --seq_length 10
+            --seq_length 6
 echo "End: $(date)" >> $HOME/thesis/job_logs/SeqMaskPropVAE.log
 
 #Copy output directory from scratch to home
