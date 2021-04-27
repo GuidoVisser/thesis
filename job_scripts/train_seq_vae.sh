@@ -21,7 +21,7 @@ mkdir $TMPDIR/output_dir
 
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "Start: $(date)" >> $HOME/thesis/job_logs/SeqMaskPropVAE.log
-python $HOME/thesis/train_sequential_VAE_mask_propagation.py \
+python $HOME/thesis/train_sequentail_VAE_mask_propagation.py \
             --data_dir $TMPDIR/data \
             --log_dir $TMPDIR/output_dir \
             --RAFT_weights $TMPDIR/weights \
