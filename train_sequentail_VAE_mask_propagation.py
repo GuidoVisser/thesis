@@ -26,7 +26,7 @@ def main(args):
         seed_all(args.seed)
 
     # create dataset
-    dataset = DAVISSequenceDataset(args.data_dir, get_transforms(train=True))
+    dataset = DAVISSequenceDataset(args.data_dir, get_transforms(train=True), seq_length=args.seq_length)
 
     # Create models
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -74,6 +74,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', default=1, type=int,
                         help='Number of workers to use in the data loaders. To have a truly deterministic run, this has to be 0. ' + \
                              'For your assignment report, you can use multiple workers (e.g. 4) and do not have to set it to 0.')
+    parser.add_argument('--seq_length', default=3, type=int,
+                        help='sequence length for training')
 
     # directories
     parser.add_argument('--data_dir', default='datasets/DAVIS_sample_tennis/', type=str,
