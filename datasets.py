@@ -79,7 +79,6 @@ class DAVISPairsDataset(object):
     def __len__(self):
         return len(self.frames)
 
-# TODO  Create dataset class that runs through video's sequentially
 class DAVISSequenceDataset(object):
     def __init__(self, data_root, transforms, seq_length=5):
         self.frame_root = path.join(data_root, "JPEGImages/480p/")
