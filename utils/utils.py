@@ -20,7 +20,6 @@ def create_dirs(dir_paths):
 def collate_fn(batch):
     return tuple(zip(*batch))
 
-
 def seed_all(seed):
     random.seed(seed)
     np.random.seed(seed)

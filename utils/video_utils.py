@@ -17,19 +17,11 @@ def load_frame(filepath, ismask=False):
     else:
         return to_tensor(np.array(Image.open(filepath)).astype(np.uint8)).unsqueeze(0)
 
+
 def save_frame(frame, filepath, ismask=False):
 
     save_image(frame[0], filepath)
 
-    # print(frame.size())
-
-    # if ismask:
-    #     img = Image.fromarray(frame[0].cpu().detach().numpy()).convert('RGB')
-    # else:
-    #     img = Image.fromarray(frame[0].cpu().permute(1, 2, 0).detach().numpy()).convert('RGB')
-    # print(img.mode)
-    # print(np.max(img))
-    # img.save(filepath)
 
 def folder_to_video(dir_path, save_path=None, fps=24):
     """
@@ -143,26 +135,3 @@ if __name__ == "__main__":
         "\n\t- load_frame" \
         "\n\t- save_frame" \
         "\n\t- load_flow_frame")
-    
-    # masked_video = create_masked_video(
-    #     "datasets/DAVIS/JPEGImages/480p/lucia",
-    #     "datasets/DAVIS/generated_masks/480p/lucia/combined",
-    #     "results/VIS_FGVC/DAVIS/480plucia/lucia_masked.mp4"
-    # )
-
-    # video = "dog-agility"
-
-    # demo_clip = create_masked_completion_demo(
-    #     f"datasets/DAVIS/JPEGImages/480p/{video}",
-    #     f"datasets/DAVIS/generated_masks/480p/{video}/combined",
-    #     f"results/VIS_FGVC/DAVIS/480p{video}/frame_seamless_comp_final",
-    #     f"results/VIS_FGVC/DAVIS/480p{video}/demo.gif"
-    # )
-
-    # dir_path = "datasets/flow_vid/"
-    # vids = [vid for vid in os.listdir(dir_path) if vid[-4:] == ".mp4"]
-    # for video in vids:
-    #     video_to_folder(video, dir_path)
-    # video_to_folder("full video Guido ikea lowres.mp4", dir_path)
-
-    # folder_to_video("results/flow_vid/frame_comp_final", "results/flow_vid/completed.mp4", fps=25)

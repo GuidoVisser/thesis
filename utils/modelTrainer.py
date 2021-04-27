@@ -6,8 +6,8 @@ import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
 
-
 from utils.utils import create_dirs
+
 
 class ModelTrainer(object):
 
