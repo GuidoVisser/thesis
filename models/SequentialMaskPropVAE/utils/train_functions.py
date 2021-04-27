@@ -46,13 +46,16 @@ def test_vae(model, extra_models, data_loader):
         current_mask, masks = torch.split(masks, [1, masks.size()[2]-1], dim=2)
         current_mask = raft_padder.pad(current_mask.squeeze(2))[0]
 
+        # discard first frame
+        frames = frames[1:]
+
         count = 1
         while frames.size()[2] > 1:
             
-            current_frame, frames = torch.split(frames, [1, frames.size()[2]-1], dim=2)
+            next_frame, frames = torch.split(frames, [1, frames.size()[2]-1], dim=2)
             next_mask, masks = torch.split(masks, [1, masks.size()[2]-1], dim=2)
 
-            current_frame = raft_padder.pad(current_frame.squeeze(2))[0]
+            next_frame = raft_padder.pad(next_frame.squeeze(2))[0]
             next_mask = raft_padder.pad(next_mask.squeeze(2))[0]
 
             # prepare optical flow
@@ -60,15 +63,15 @@ def test_vae(model, extra_models, data_loader):
                 current_flow, flow = torch.split(flow, [1, flow.size()[2]-1], dim=2)
                 current_flow = current_flow.squeeze(2)
             else:
-                current_flow = calculate_batch_flow(flow_model, current_frame, next_frame)
+                current_flow = calculate_batch_flow(flow_model, next_frame, next_frame)
 
             current_flow = normalize_optical_flow(current_flow)
 
             # forward pass
             if count == 1:
-                L_rec, L_reg, bpd, mask_prediction = model.forward(current_mask, current_flow, current_frame, next_mask)
+                L_rec, L_reg, bpd, mask_prediction = model.forward(current_mask, current_flow, next_frame, next_mask)
             else:
-                L_rec_increment, L_reg_increment, bpd_increment, mask_prediction = model.forward(current_mask, current_flow, current_frame, next_mask)
+                L_rec_increment, L_reg_increment, bpd_increment, mask_prediction = model.forward(current_mask, current_flow, next_frame, next_mask)
                 L_rec = L_rec + L_rec_increment * 1./count
                 L_reg = L_reg + L_reg_increment * 1./count
                 bpd = bpd + bpd_increment * 1./count
@@ -123,13 +126,16 @@ def train_vae(model, extra_models, train_loader, optimizer):
         current_mask, masks = torch.split(masks, [1, masks.size()[2]-1], dim=2)
         current_mask = raft_padder.pad(current_mask.squeeze(2))[0]
 
+        # discard first frame
+        frames = [:1]
+
         count = 1
         while frames.size()[2] > 1:
             
-            current_frame, frames = torch.split(frames, [1, frames.size()[2]-1], dim=2)
+            next_frame, frames = torch.split(frames, [1, frames.size()[2]-1], dim=2)
             next_mask, masks = torch.split(masks, [1, masks.size()[2]-1], dim=2)
 
-            current_frame = raft_padder.pad(current_frame.squeeze(2))[0]
+            next_frame = raft_padder.pad(next_frame.squeeze(2))[0]
             next_mask = raft_padder.pad(next_mask.squeeze(2))[0]
 
             # prepare optical flow
@@ -137,15 +143,15 @@ def train_vae(model, extra_models, train_loader, optimizer):
                 current_flow, flow = torch.split(flow, [1, flow.size()[2]-1], dim=2)
                 current_flow = current_flow.squeeze(2)
             else:
-                current_flow = calculate_batch_flow(flow_model, current_frame, next_frame)
+                current_flow = calculate_batch_flow(flow_model, next_frame, next_frame)
 
             current_flow = normalize_optical_flow(current_flow)
 
             # forward pass
             if count == 1:
-                L_rec, L_reg, bpd, mask_prediction = model.forward(current_mask, current_flow, current_frame, next_mask)
+                L_rec, L_reg, bpd, mask_prediction = model.forward(current_mask, current_flow, next_frame, next_mask)
             else:
-                L_rec_increment, L_reg_increment, bpd_increment, mask_prediction = model.forward(current_mask, current_flow, current_frame, next_mask)
+                L_rec_increment, L_reg_increment, bpd_increment, mask_prediction = model.forward(current_mask, current_flow, next_frame, next_mask)
                 L_rec = L_rec + L_rec_increment * 1./count
                 L_reg = L_reg + L_reg_increment * 1./count
                 bpd = bpd + bpd_increment * 1./count
