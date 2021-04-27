@@ -25,7 +25,7 @@ echo "Start: $(date)" >> $HOME/thesis/job_logs/SeqMaskPropVAE.log
 python $HOME/thesis/train_sequentail_VAE_mask_propagation.py \
             --data_dir $TMPDIR/data \
             --log_dir $TMPDIR/output_dir \
-            --RAFT_weights $TMPDIR/weights \
+            --RAFT_weights $TMPDIR/weights/raft-things.pth \
             --epochs 10
 echo "End: $(date)" >> $HOME/thesis/job_logs/SeqMaskPropVAE.log
 
