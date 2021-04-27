@@ -79,6 +79,78 @@ class DAVISPairsDataset(object):
     def __len__(self):
         return len(self.frames)
 
+# TODO  Create dataset class that runs through video's sequentially
+class DAVISSequenceDataset(object):
+    def __init__(self, data_root, transforms, seq_length=1):
+        self.frame_root = path.join(data_root, "JPEGImages/480p/")
+        self.mask_root = path.join(data_root, "Annotations/480p/")
+        self.flow_root = path.join(data_root, "Flow/480p/flo/")
+        self.transforms = transforms
+        self.seq_length = seq_length
+        self.frames = []
+        for video in listdir(self.frame_root):
+            self.frames.extend([path.join(video, frame) 
+                                for frame 
+                                in list(sorted(listdir(path.join(self.frame_root, video))))
+            ])
+
+    def __getitem__(self, idx):
+
+        # Get path to frame and corresponding mask
+        source_frame_path = path.join(self.frame_root, self.frames[idx])
+        source_mask_path = path.join(self.mask_root, self.frames[idx])
+        
+        # get video title
+        p = pathlib.Path(self.frames[idx])
+        video = p.parts[0]
+
+        # get index of current, first and last frame in directory
+        idx_in_dir = int(p.parts[1][:-4])
+        first_frame = 0
+        last_frame = len(listdir(path.join(self.frame_root, video))) - 1
+
+        # get the path of the other frame and corresponding mask
+        candidates = list(range(
+                        max(first_frame, idx_in_dir - self.max_distance), 
+                        min(last_frame, idx_in_dir + self.max_distance) + 1
+                    ))
+        candidates.remove(idx_in_dir)
+        candidates = [i - idx_in_dir for i in candidates]
+        target_idx = idx + random.choice(candidates)
+        
+        target_frame_path = path.join(self.frame_root, self.frames[target_idx])
+        target_mask_path = path.join(self.mask_root, self.frames[target_idx])
+
+        # DAVIS images are .jpg but masks are .png; change extension accordingly
+        source_mask_path = path.splitext(source_mask_path)[0] + ".png"
+        target_mask_path = path.splitext(target_mask_path)[0] + ".png"
+
+        # load images
+        source_frame = np.array(Image.open(source_frame_path).convert("RGB"))
+        target_frame = np.array(Image.open(target_frame_path).convert("RGB"))
+        source_mask = np.array(Image.open(source_mask_path).convert("L"))
+        target_mask = np.array(Image.open(target_mask_path).convert("L"))
+
+        if self.transforms is not None:
+            source_frame, source_mask = self.transforms(source_frame, source_mask)
+            target_frame, target_mask = self.transforms(target_frame, target_mask)
+        
+        # If available also pre-load optical flow
+        if (idx - target_idx) == -1:
+            flow_filepath = path.join(self.flow_root, "forward", path.splitext(self.frames[idx])[0] + ".flo")
+            flow = torch.from_numpy(readFlow(flow_filepath)).permute(2, 0, 1)    
+        elif (idx - target_idx) == 1:
+            flow_filepath = path.join(self.flow_root, "backward", path.splitext(self.frames[idx])[0] + ".flo")
+            flow = torch.from_numpy(readFlow(flow_filepath)).permute(2, 0, 1)  
+        else:
+            flow = None
+
+        return source_frame, source_mask, target_frame, target_mask, flow
+
+    def __len__(self):
+        return len(self.frames)
+
+
 
 class PennFudanDataset(object):
     def __init__(self, root, transforms):
