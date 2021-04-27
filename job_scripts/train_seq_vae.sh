@@ -10,7 +10,7 @@ module load 2020
 module load Python
 
 # instasll dependencies
-pip install --upgrade tensorboard && pip install --upgrade torch
+pip install --user --upgrade tensorboard && pip install --upgrade torch
 
 #Copy input file to scratch
 cp -RT $HOME/thesis/datasets/DAVIS_sample_tennis $TMPDIR/data
@@ -24,7 +24,7 @@ echo "Start: $(date)" >> $HOME/job_logs/vae_train.log
 python $HOME/thesis/train_sequential_VAE_mask_propagation.py \
             --data_dir $TMPDIR/data \
             --log_dir $TMPDIR/output_dir \
-            --RAFT_weights $TMPDIR/weights
+            --RAFT_weights $TMPDIR/weights \
             --epochs 10
 echo "End: $(date)" >> $HOME/thesis/job_logs/SeqMaskPropVAE.log
 
