@@ -15,12 +15,12 @@ pip install --user --upgrade tensorboard && pip install --upgrade torch
 #Copy input file to scratch
 cp -RT $HOME/thesis/datasets/DAVIS_sample_tennis $TMPDIR/data
 cp -RT $HOME/thesis/models/weights/zip_serialization_false/ $TMPDIR/weights
-
+models/weights/zip_serialization_false
 #Create output directory on scratch
 mkdir $TMPDIR/output_dir
 
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
-echo "Start: $(date)" >> $HOME/job_logs/vae_train.log
+echo "Start: $(date)" >> $HOME/thesis/job_logs/SeqMaskPropVAE.log
 python $HOME/thesis/train_sequential_VAE_mask_propagation.py \
             --data_dir $TMPDIR/data \
             --log_dir $TMPDIR/output_dir \
