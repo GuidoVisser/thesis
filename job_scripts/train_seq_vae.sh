@@ -13,7 +13,7 @@ module load Python
 pip install --upgrade tensorboard && pip install --upgrade torch
 
 #Copy input file to scratch
-cp -RT $HOME/thesis/datasets/DAVIS $TMPDIR/data
+cp -RT $HOME/thesis/datasets/DAVIS_sample_tennis $TMPDIR/data
 cp -RT $HOME/thesis/models/weights/zip_serialization_false/ $TMPDIR/weights
 
 #Create output directory on scratch
