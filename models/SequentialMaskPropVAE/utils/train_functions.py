@@ -72,9 +72,9 @@ def test_vae(model, extra_models, data_loader):
                 L_rec, L_reg, bpd, mask_prediction = model.forward(current_mask, current_flow, next_frame, next_mask)
             else:
                 L_rec_increment, L_reg_increment, bpd_increment, mask_prediction = model.forward(current_mask, current_flow, next_frame, next_mask)
-                L_rec = L_rec + L_rec_increment * 1./count
-                L_reg = L_reg + L_reg_increment * 1./count
-                bpd = bpd + bpd_increment * 1./count
+                L_rec = L_rec + L_rec_increment #* 1./count
+                L_reg = L_reg + L_reg_increment #* 1./count
+                bpd = bpd + bpd_increment #* 1./count
 
             # update timestep
             count += 1
