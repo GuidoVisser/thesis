@@ -143,3 +143,6 @@ results/*
 
 # papers directory
 papers/
+
+# slurm files
+slurm*

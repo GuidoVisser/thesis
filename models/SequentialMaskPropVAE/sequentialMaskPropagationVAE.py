@@ -86,7 +86,7 @@ class MaskEncoder(nn.Module):
             nn.Linear(112*num_filters, z_dim)
         )
 
-        self.residuals = []
+        # self.residuals = []
 
     def forward(self, x):
         """
@@ -101,14 +101,14 @@ class MaskEncoder(nn.Module):
         x = self.activation(self.conv1a(x) + x.repeat(1, self.num_filters, 1, 1))
         x = self.activation(self.conv1b(x) + x)
         x = self.activation(self.conv1c(x) + x)
-        self.residuals.append(torch.clone(x))
+        # self.residuals.append(torch.clone(x))
         x = self.pool(x)
         x = self.pad_1(x)
         
         x = self.activation(self.conv2a(x) + x)
         x = self.activation(self.conv2b(x) + x)
         x = self.activation(self.conv2c(x) + x)
-        self.residuals.append(torch.clone(x))
+        # self.residuals.append(torch.clone(x))
         x = self.pool(x)
         x = self.pad_2(x)
         
@@ -285,7 +285,7 @@ class Encoder(nn.Module):
         super().__init__()
 
         self.mask_encoder  =  MaskEncoder(num_filters=num_filters, z_dim=z_dim)
-        self.residuals     =  self.mask_encoder.residuals
+        # self.residuals     =  self.mask_encoder.residuals
         self.flow_encoder  =  FlowEncoder(num_filters=num_filters, z_dim=z_dim)
         self.frame_encoder = FrameEncoder(num_filters=num_filters, z_dim=z_dim)
 
@@ -343,7 +343,7 @@ class Decoder(nn.Module):
         """
         super().__init__()
 
-        self.residuals = []
+        # self.residuals = []
 
         self.conv1a = nn.Conv2d(num_filters, num_filters, kernel_size=3, stride=1, padding=1)
         self.conv1b = nn.Conv2d(num_filters, num_filters, kernel_size=3, stride=1, padding=1)
@@ -395,8 +395,8 @@ class Decoder(nn.Module):
         # Inverser Average Pool
         x = F.interpolate(x, scale_factor=4)
 
-        # First residual connection
-        x = x + self.residuals.pop()
+        # # First residual connection
+        # x = x + self.residuals.pop()
 
         # Conv layers
         x = self.activation(self.conv2a(x) + x)
@@ -409,8 +409,8 @@ class Decoder(nn.Module):
         # Inverser Average Pool
         x = F.interpolate(x, scale_factor=4)
 
-        # second residual connection
-        x = x + self.residuals.pop()
+        # # second residual connection
+        # x = x + self.residuals.pop()
 
         # Conv layers
         x = self.activation(self.conv3a(x) + x)
@@ -492,7 +492,7 @@ class SeqMaskPropVAE(nn.Module):
         z = self.sample_reparameterize(mean_z, torch.exp(log_std_z))
         
         # use decoder to reconstruct image from latent vector
-        self.decoder.residuals = self.encoder.residuals
+        # self.decoder.residuals = self.encoder.residuals
         next_mask_predictions = self.decoder.forward(z)
         
         # compute the losses
@@ -519,7 +519,7 @@ class SeqMaskPropVAE(nn.Module):
         z = self.sample_reparameterize(mean_z, torch.exp(log_std_z))
 
         # use decoder to reconstruct image from latent vector
-        self.decoder.residuals = self.encoder.residuals
+        # self.decoder.residuals = self.encoder.residuals
 
         next_mask_prediction = self.decoder.forward(z)
         next_mask_prediction = nn.Sigmoid()(next_mask_prediction)

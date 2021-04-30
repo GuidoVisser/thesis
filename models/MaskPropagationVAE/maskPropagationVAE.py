@@ -101,6 +101,8 @@ class MaskEncoder(nn.Module):
         x = self.activation(self.conv1a(x) + x.repeat(1, self.num_filters, 1, 1))
         x = self.activation(self.conv1b(x) + x)
         x = self.activation(self.conv1c(x) + x)
+
+        # NOTE clone detaches the gradient from the computational graph
         self.residuals.append(torch.clone(x))
         x = self.pool(x)
         x = self.pad_1(x)
