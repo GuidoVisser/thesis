@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 1:00:00
-#SBATCH -p gpu_short
+#SBATCH -t 12:00:00
+#SBATCH -p gpu_shared
 #SBATCH --gpus-per-node=gtx1080ti:1
 
 # load modules
@@ -26,7 +26,7 @@ python $HOME/thesis/train_sequentail_VAE_mask_propagation.py \
             --data_dir $TMPDIR/data \
             --log_dir $TMPDIR/output_dir \
             --RAFT_weights $TMPDIR/weights/raft-things.pth \
-            --epochs 10 \
+            --epochs 50 \
             --seq_length 6
 echo "End: $(date)" >> $HOME/thesis/job_logs/SeqMaskPropVAE.log
 
