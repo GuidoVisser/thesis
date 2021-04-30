@@ -501,13 +501,14 @@ class SeqMaskPropVAE(nn.Module):
         neg_elbo = L_rec + L_reg
         bpd = self.neg_elbo_to_bpd(neg_elbo, input_mask_batch.shape)
         
+        scaled_mask_predictions = nn.Sigmoid()(next_mask_predictions)
         
         # print(f"reconstruction loss: {L_rec.item()}")
         # print(f"regularization loss: {L_reg.item()}")
         # print(f"           neg_elbo: {neg_elbo.item()}")
         # print(f" bits per dimension: {bpd.item()}")
 
-        return L_rec, L_reg, bpd, next_mask_predictions
+        return L_rec, L_reg, bpd, scaled_mask_predictions
 
 
     def predict_next_mask(self, current_mask, flow, frame):
