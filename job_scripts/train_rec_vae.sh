@@ -10,7 +10,7 @@ module load 2020
 module load Python
 
 # instasll dependencies
-pip install --user --upgrade tensorboard && pip install --upgrade torch
+pip install --user --upgrade tensorboard && pip install --user --upgrade torch && pip install --user --upgrade torchvision
 pip install moviepy
 
 #Copy input file to scratch
