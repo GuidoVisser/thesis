@@ -24,7 +24,7 @@ echo "Start: $(date)" >> $HOME/thesis/job_logs/RecMaskPropVAE.log
 python $HOME/thesis/train_recurrent_VAE_mask_propagation.py \
             --data_dir $TMPDIR/data \
             --log_dir $TMPDIR/output_dir \
-            --epochs 10 \
+            --epochs 150 \
             --batch_size 1 \
             --seq_length 8
 echo "End: $(date)" >> $HOME/thesis/job_logs/RecMaskPropVAE.log
