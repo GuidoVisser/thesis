@@ -95,6 +95,7 @@ class DAVISSequenceDataset(object):
                                 if i + seq_length < len(listdir(path.join(self.frame_root, video)))
             ])
 
+
     def __getitem__(self, idx):
         
         # get the path to the video directory and the index of the frame in that video
@@ -112,14 +113,14 @@ class DAVISSequenceDataset(object):
         # load images
         frames = [np.array(Image.open(frame).convert("RGB")) for frame in frame_sequence]
         masks = [np.array(Image.open(mask).convert("L")) for mask in mask_sequence]
-        flows = torch.stack([torch.from_numpy(readFlow(flow)).permute(2, 0, 1) for flow in flow_sequence], 1)
+        flows = torch.stack([torch.from_numpy(readFlow(flow)).permute(2, 0, 1) for flow in flow_sequence], 0)
 
         if self.transforms is not None:
             frames = self.transforms(frames)
             masks = self.transforms(masks)
 
-        frames = torch.stack(frames, 1)
-        masks = torch.stack(masks, 1)
+        frames = torch.stack(frames, 0)
+        masks = torch.stack(masks, 0)
 
         return frames, masks, flows
 

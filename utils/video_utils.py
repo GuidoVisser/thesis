@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import torch
-import moviepy
 import cv2
 import json
 from PIL import Image
@@ -124,14 +123,3 @@ def create_masked_completion_demo(video_dir, mask_dir, completed_dir, save_path=
         final.write_gif(save_path, fps=fps)
     
     return final
-
-
-if __name__ == "__main__":
-    print("Video utils: " \
-        "\n\t- folder_to_video" \
-        "\n\t- video_to_folder" \
-        "\n\t- create_masked_video" \
-        "\n\t- create_masked_completion_demo"
-        "\n\t- load_frame" \
-        "\n\t- save_frame" \
-        "\n\t- load_flow_frame")

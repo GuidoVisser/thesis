@@ -9,8 +9,8 @@ class Compose(object):
 
     def __call__(self, inputs):
         for t in self.transforms:
-            output = t(inputs)
-        return output
+            inputs = t(inputs)
+        return inputs
 
 
 class RandomHorizontalFlip(object):
@@ -32,8 +32,16 @@ class ToTensor(object):
             output.append(F.to_tensor(input))
         return output
 
+class ImagePadder(object):
+    def __call__(self, inputs):
+        output = []
+        for input in inputs:
+            output.append(F.pad(input, (1,0)))
+        return output
+
     
-def get_transforms(train):
+def get_transforms(img_size):
     transforms = []
     transforms.append(ToTensor())
+    transforms.append(ImagePadder())
     return Compose(transforms)

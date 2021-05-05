@@ -29,11 +29,6 @@ def test_vae(model, extra_models, data_loader):
     """
     flow_model = extra_models[0]
 
-    # initialize padder object for RAFT
-    sample_frame, _, _ = next(iter(data_loader))
-    raft_padder = InputPadder(sample_frame.size())
-    del sample_frame
-
     average_bpd = 0
     average_rec_loss = 0
     average_reg_loss = 0
@@ -43,24 +38,24 @@ def test_vae(model, extra_models, data_loader):
        # getting batch
         frames, masks, flow = [input.to(model.device) for input in batch]
 
-        current_mask, masks = torch.split(masks, [1, masks.size()[2]-1], dim=2)
-        current_mask = raft_padder.pad(current_mask.squeeze(2))[0]
+        current_mask, masks = torch.split(masks, [1, masks.size()[1]-1], dim=2)
+        current_mask = raft_padder.pad(current_mask.squeeze(1))[0]
 
         # discard first frame
-        frames = frames[:,:,1:,:,:]
+        frames = frames[:,1:,:,:,:]
 
         count = 1
-        while frames.size()[2] > 1:
+        while frames.size()[1] > 1:
             
-            next_frame, frames = torch.split(frames, [1, frames.size()[2]-1], dim=2)
-            next_mask, masks = torch.split(masks, [1, masks.size()[2]-1], dim=2)
+            next_frame, frames = torch.split(frames, [1, frames.size()[1]-1], dim=2)
+            next_mask, masks = torch.split(masks, [1, masks.size()[1]-1], dim=2)
 
-            next_frame = raft_padder.pad(next_frame.squeeze(2))[0]
-            next_mask = raft_padder.pad(next_mask.squeeze(2))[0]
+            next_frame = raft_padder.pad(next_frame.squeeze(1))[0]
+            next_mask = raft_padder.pad(next_mask.squeeze(1))[0]
 
             # prepare optical flow
             if flow is not None:
-                current_flow, flow = torch.split(flow, [1, flow.size()[2]-1], dim=2)
+                current_flow, flow = torch.split(flow, [1, flow.size()[1]-1], dim=2)
                 current_flow = current_flow.squeeze(2)
             else:
                 current_flow = calculate_batch_flow(flow_model, next_frame, next_frame)
@@ -110,11 +105,6 @@ def train_vae(model, extra_models, train_loader, optimizer):
     """
     flow_model = extra_models[0]
 
-    # initialize padder object for RAFT
-    sample_frame, _, _ = next(iter(train_loader))
-    raft_padder = InputPadder(sample_frame.size()[1:])
-    del sample_frame
-
     average_bpd = 0
     average_rec_loss = 0
     average_reg_loss = 0
@@ -123,25 +113,25 @@ def train_vae(model, extra_models, train_loader, optimizer):
         # getting batch
         frames, masks, flow = [input.to(model.device) for input in batch]
 
-        current_mask, masks = torch.split(masks, [1, masks.size()[2]-1], dim=2)
-        current_mask = raft_padder.pad(current_mask.squeeze(2))[0]
+        current_mask, masks = torch.split(masks, [1, masks.size()[1]-1], dim=2)
+        current_mask = raft_padder.pad(current_mask.squeeze(1))[0]
 
         # discard first frame
 
-        frames = frames[:,:,1:,:,:]
+        frames = frames[:,1:,:,:,:]
 
         count = 1
         while frames.size()[2] > 1:
             
-            next_frame, frames = torch.split(frames, [1, frames.size()[2]-1], dim=2)
-            next_mask, masks = torch.split(masks, [1, masks.size()[2]-1], dim=2)
+            next_frame, frames = torch.split(frames, [1, frames.size()[1]-1], dim=2)
+            next_mask, masks = torch.split(masks, [1, masks.size()[1]-1], dim=2)
 
-            next_frame = raft_padder.pad(next_frame.squeeze(2))[0]
-            next_mask = raft_padder.pad(next_mask.squeeze(2))[0]
+            next_frame = raft_padder.pad(next_frame.squeeze(1))[0]
+            next_mask = raft_padder.pad(next_mask.squeeze(1))[0]
 
             # prepare optical flow
             if flow is not None:
-                current_flow, flow = torch.split(flow, [1, flow.size()[2]-1], dim=2)
+                current_flow, flow = torch.split(flow, [1, flow.size()[1]-1], dim=2)
                 current_flow = current_flow.squeeze(2)
             else:
                 current_flow = calculate_batch_flow(flow_model, next_frame, next_frame)
