@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 0:10:00
-#SBATCH -p gpu_short
+#SBATCH -t 4:00:00
+#SBATCH -p gpu_shared
 #SBATCH --gpus-per-node=gtx1080ti:1
 
 # load modules
