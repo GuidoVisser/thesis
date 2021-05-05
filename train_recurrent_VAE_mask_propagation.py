@@ -12,8 +12,6 @@ from datasets import DAVISSequenceDataset
 from utils.transforms import get_transforms
 from models.RecurrentMaskPropVAE import initialize_RecurrentMaskPropVAE, train_vae, test_vae, demo_model
 
-import torchvision
-
 def main(args):
     """
     Main Function for the full training & evaluation loop of a VAE model.
@@ -24,10 +22,6 @@ def main(args):
     """
     if args.seed is not None:
         seed_all(args.seed)
-
-    # debugging on lisa
-    print(torchvision.__version__)
-
 
     # create dataset
     dataset = DAVISSequenceDataset(args.data_dir, get_transforms(img_size=(3, 480, 854)), seq_length=args.seq_length)

@@ -25,7 +25,7 @@ python $HOME/thesis/train_recurrent_VAE_mask_propagation.py \
             --data_dir $TMPDIR/data \
             --log_dir $TMPDIR/output_dir \
             --epochs 10 \
-            --seq_length 6
+            --seq_length 5
 echo "End: $(date)" >> $HOME/thesis/job_logs/RecMaskPropVAE.log
 
 #Copy output directory from scratch to home
