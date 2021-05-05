@@ -36,7 +36,7 @@ class ImagePadder(object):
     def __call__(self, inputs):
         output = []
         for input in inputs:
-            output.append(F.pad(input, (1,0)))
+            output.append(F.pad(input, (1,1,0,0)))
         return output
 
     
