@@ -36,12 +36,12 @@ class ImagePadder(object):
     def __call__(self, inputs):
         output = []
         for input in inputs:
-            output.append(F.pad(input, (1,1,0,0)))
+            output.append(F.pad(input, (1,0)))
         return output
 
     
 def get_transforms(img_size):
     transforms = []
-    transforms.append(ToTensor())
     transforms.append(ImagePadder())
+    transforms.append(ToTensor())
     return Compose(transforms)
