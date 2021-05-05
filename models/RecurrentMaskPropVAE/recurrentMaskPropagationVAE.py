@@ -372,7 +372,6 @@ class Decoder(nn.Module):
         # print(f"Decode forward: Shape = {in_shape}\r", end='')
 
         # latent space to 2d tensor
-        print(z.size())
         x = self.linear(z)
         x = x.reshape(x.shape[0], -1, 8, 14)
 
