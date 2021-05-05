@@ -1,5 +1,6 @@
 import random
 
+import torchvision
 from torchvision.transforms import functional as F
 
 
@@ -35,6 +36,7 @@ class ToTensor(object):
 class ImagePadder(object):
     def __call__(self, inputs):
         output = []
+        print(torchvision.__version__)
         for input in inputs:
             output.append(F.pad(input, (1,0)))
         return output
@@ -42,6 +44,6 @@ class ImagePadder(object):
     
 def get_transforms(img_size):
     transforms = []
-    transforms.append(ImagePadder())
     transforms.append(ToTensor())
+    transforms.append(ImagePadder())
     return Compose(transforms)
