@@ -14,7 +14,7 @@ pip install --user --upgrade tensorboard && pip install --user --upgrade torch &
 pip install moviepy
 
 #Copy input file to scratch
-cp -RT $HOME/thesis/datasets/DAVIS_sample_tennis $TMPDIR/data
+cp -RT $HOME/thesis/datasets/DAVIS_sample $TMPDIR/data
 
 #Create output directory on scratch
 mkdir $TMPDIR/output_dir
