@@ -249,9 +249,6 @@ class InferenceCore:
 
         self.prob1[:, idx] = mask
         self.prob2[:, idx] = mask
-        print(mask.size())
-        print(torch.mean(mask[1:]))
-        print(torch.std(mask[1:]))
         key_k, key_v = self.prop_net.memorize(self.get_image_buffered(idx), mask[1:])
 
         print(key_k.size())
