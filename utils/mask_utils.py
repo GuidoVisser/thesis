@@ -39,7 +39,7 @@ def save_error_mask(mask: torch.Tensor, save_path: str) -> None:
     img[1] = mask[mask > 0]
     img[2] = mask[mask < 0]
     
-    save_image(img, path.join(save_path, f"{t:05}.png"))      
+    save_image(img, save_path)      
 
 def next_mask_based_on_flow(mask, flow):
     """

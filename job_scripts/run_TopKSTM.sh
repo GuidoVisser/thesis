@@ -14,7 +14,7 @@ pip install --user --upgrade tensorboard && pip install --user --upgrade torch &
 
 #Copy input file to scratch
 cp -RT $HOME/thesis/datasets/DAVIS_sample $TMPDIR/data
-cp $HOME/models/weights/MiVOS/propagation_model.pth $TMPDIR/weights
+cp $HOME/thesis/models/weights/MiVOS/propagation_model.pth $TMPDIR/weights
 
 #Create output directory on scratch
 mkdir $TMPDIR/output_dir
