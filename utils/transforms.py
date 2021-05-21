@@ -39,9 +39,19 @@ class ImagePadder(object):
             output.append(F.pad(input, (1,0)))
         return output
 
+class Normalize(object):
+    def __call__(self, inputs):
+        output = []
+        for input in inputs:
+            if input.size()[0] == 3:
+                output.append(F.normalize(input, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]))
+            else:
+                output.append(input)
+        return output
     
-def get_transforms(img_size):
+def get_transforms():
     transforms = []
     transforms.append(ToTensor())
-    transforms.append(ImagePadder())
+    # transforms.append(ImagePadder())
+    transforms.append(Normalize())
     return Compose(transforms)

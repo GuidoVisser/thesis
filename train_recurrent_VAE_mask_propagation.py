@@ -60,7 +60,7 @@ if __name__ == '__main__':
     # Optimizer hyperparameters
     parser.add_argument('--lr', default=1e-4, type=float,
                         help='Learning rate to use')
-    parser.add_argument('--batch_size', default=2, type=int,
+    parser.add_argument('--batch_size', default=1, type=int,
                         help='Minibatch size')
 
     # Other hyperparameters
@@ -75,9 +75,9 @@ if __name__ == '__main__':
                         help='sequence length for training')
 
     # directories
-    parser.add_argument('--data_dir', default='datasets/DAVIS_sample_tennis/', type=str,
+    parser.add_argument('--data_dir', default='datasets/DAVIS_sample/', type=str,
                         help='Directory where data is stored')
-    parser.add_argument('--log_dir', default='results/DAVIS_sample_tennis_maskpropvae', type=str,
+    parser.add_argument('--log_dir', default='results/DAVIS_sample_maskpropvae', type=str,
                         help='Directory where the PyTorch logs should be created.')
     
     parser.add_argument("--demo_freq", default=5, type=int,

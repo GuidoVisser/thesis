@@ -7,6 +7,7 @@ from PIL import Image
 from os import path, listdir
 
 from models.RAFT.utils.frame_utils import readFlow
+from models.MiVOS.dataset.range_transform import im_normalization
 
 
 class DAVISPairsDataset(object):
@@ -128,28 +129,54 @@ class DAVISSequenceDataset(object):
         return len(self.frames)
 
 
-class DAVISWithFlowPredictions(object):
-    def __init__(self, root, transforms):
-        self.frame_root = path.join(data_root, "JPEGImages/480p/")
-        self.mask_root = path.join(data_root, "Annotations/480p/")
-        self.flow_root = path.join(data_root, "Flow/480p/flo/")
-        self.transforms = transforms
-        self.seq_length = seq_length
-        self.frames = []
-        self.length = 0
-        for video in listdir(self.frame_root):
-            self.frames.extend([path.join(video, frame) 
-                                for i, frame 
-                                in enumerate(list(sorted(listdir(path.join(self.frame_root, video)))))
-                                if i + seq_length < len(listdir(path.join(self.frame_root, video)))
-            ])
+# class DAVISWithFlowPredictions(object):
+#     def __init__(self, root, transforms):
+#         self.frame_root = path.join(root, "JPEGImages/480p/")
+#         self.mask_root = path.join(droot, "Annotations/480p/")
+#         self.flow_root = path.join(root, "Flow/480p/flo/")
+#         self.transforms = transforms
+#         self.seq_length = seq_length
+#         self.frames = []
+#         self.length = 0
+#         for video in listdir(self.frame_root):
+#             self.frames.extend([path.join(video, frame) 
+#                                 for i, frame 
+#                                 in enumerate(list(sorted(listdir(path.join(self.frame_root, video)))))
+#                                 if i + seq_length < len(listdir(path.join(self.frame_root, video)))
+#             ])
     
+#     def __getitem__(self, idx):
+#         return "TODO"
+
+#     def __len__(self):
+#         return len(self.frames)
+
+class DAVISVideo(object):
+
+    def __init__(self, root, video, transforms):
+        self.root = root
+        self.transforms = transforms
+        
+        self.video_dir = path.join(self.root, "JPEGImages/480p", video)
+        self.mask_dir = path.join(self.root, "Annotations/480p", video)
+        
+        self.imgs = list(sorted(listdir(self.video_dir)))
+        self.masks = list(sorted(listdir(self.mask_dir)))
+        
     def __getitem__(self, idx):
-        return "TODO"
+        img_path = path.join(self.video_dir, self.imgs[idx])
+        mask_path = path.join(self.mask_dir, self.masks[idx])
+
+        img = np.array(Image.open(img_path).convert("RGB")) / 255.
+        target = np.array(Image.open(mask_path))
+
+        if self.transforms is not None:
+            img, target = self.transforms((img, target))
+
+        return img.float(), target
 
     def __len__(self):
-        return len(self.frames)
-
+        return len(self.imgs)
 
 
 class PennFudanDataset(object):
