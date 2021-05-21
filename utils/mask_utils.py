@@ -1,4 +1,6 @@
 import torch
+from torchvision.utils import save_image
+from os import path
 
 def generate_error_mask(predicted_mask, gt_mask):
     """
@@ -19,6 +21,25 @@ def generate_error_mask(predicted_mask, gt_mask):
     """
 
     return predicted_mask - gt_mask
+
+def save_error_mask(masks: torch.Tensor, save_dir: str) -> None:
+    """
+    Convert a sequence of error mask to to an RGB image with blue for false postive and
+    red for false negative and save the images
+    
+    Args:
+        masks (torch.Tensor[T, C, H, W]) : sequence of error masks
+        save_dir (str): path to directory in which to save the masks    
+    """
+    T, _, H, W = masks.size()
+
+    for t in range(T):
+        img = torch.zeros(3, H, W)
+        current_mask = masks[t]
+        img[1] = current_mask[current_mask > 0]
+        img[2] = current_mask[current_mask < 0]
+        
+        save_image(img, path.join(save_dir, f"{t:05}.png"))      
 
 def next_mask_based_on_flow(mask, flow):
     """

@@ -14,7 +14,7 @@ pip install --user --upgrade tensorboard && pip install --user --upgrade torch &
 
 #Copy input file to scratch
 cp -RT $HOME/thesis/datasets/DAVIS_sample $TMPDIR/data
-cp $HOME/models/weights/MiVOS/propagation_model.pth $TMPDIR/propagation_model.pth
+cp -RT $HOME/models/weights/MiVOS/ $TMPDIR/weights
 
 #Create output directory on scratch
 mkdir $TMPDIR/output_dir
@@ -24,7 +24,7 @@ echo "Start: $(date)" >> $HOME/thesis/job_logs/run_topkSTM.log
 python $HOME/thesis/propagate_with_topkSTM.py \
             --data_dir $TMPDIR/data \
             --log_dir $TMPDIR/output_dir \
-            --model_path $TMPDIR/propagation_model.pth
+            --model_path $TMPDIR/weights/propagation_model.pth
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_topkSTM.log
 
 #Copy output directory from scratch to home
