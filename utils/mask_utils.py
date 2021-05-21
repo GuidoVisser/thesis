@@ -1,6 +1,8 @@
 import torch
+import numpy as np
+from PIL import Image
 from torchvision.utils import save_image
-from os import path
+from os import path, listdir
 
 def generate_error_mask(predicted_mask, gt_mask):
     """
@@ -22,24 +24,22 @@ def generate_error_mask(predicted_mask, gt_mask):
 
     return predicted_mask - gt_mask
 
-def save_error_mask(masks: torch.Tensor, save_dir: str) -> None:
+def save_error_mask(mask: torch.Tensor, save_path: str) -> None:
     """
-    Convert a sequence of error mask to to an RGB image with blue for false postive and
+    Convert an error mask to to an RGB image with blue for false postive and
     red for false negative and save the images
     
     Args:
-        masks (torch.Tensor[T, C, H, W]) : sequence of error masks
-        save_dir (str): path to directory in which to save the masks    
+        mask (torch.Tensor[C, H, W]) : sequence of error mask
+        save_path (str): path to which to save the mask
     """
-    T, _, H, W = masks.size()
+    _, H, W = mask.size()
 
-    for t in range(T):
-        img = torch.zeros(3, H, W)
-        current_mask = masks[t]
-        img[1] = current_mask[current_mask > 0]
-        img[2] = current_mask[current_mask < 0]
-        
-        save_image(img, path.join(save_dir, f"{t:05}.png"))      
+    img = torch.zeros(3, H, W)
+    img[1] = mask[mask > 0]
+    img[2] = mask[mask < 0]
+    
+    save_image(img, path.join(save_path, f"{t:05}.png"))      
 
 def next_mask_based_on_flow(mask, flow):
     """
@@ -109,17 +109,16 @@ def fill_holes_in_mask(mask):
     return
 
 if __name__ == "__main__":
-    mask = torch.zeros(2,1,5,5)
-    flow = torch.zeros(2,2,5,5)
-    mask[0, :, 1:4, 1:4] = 1
-    mask[1, :, 0:2, 0:2] = 1
-    flow[0, 0, :, :] = 2
-    flow[0, 1, :, :] = 1
-    flow[1, 0, :, :] = -1
-    flow[1, 1, :, :] = -1
 
-    print("Mask: ")
-    print(mask)
-    print("\nFlow: ")
-    print(flow)
-    print(next_mask_based_on_flow(mask, flow))
+    mask_pred_path = ""
+    mask_gt_path = ""
+    mask_error_path = ""
+
+    gt_masks = listdir(mask_gt_path)
+
+    for fname in gt_masks:
+        mask_pred = torch.tensor(np.array(Image.open(path.join(mask_pred_path, fname))).astype(np.uint8))
+        mask_gt = torch.tensor(np.array(Image.open(path.join(mask_gt_path, fname))).astype(np.uint8))
+
+        error_mask = generate_error_mask(mask_pred, mask_gt)
+        save_error_mask(error_mask, path.join(mask_error_path, fname))
