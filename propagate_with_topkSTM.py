@@ -78,7 +78,7 @@ def main(args):
         keys[:, :, m_front:m_front+1] = new_k
         values[:, :, m_front:m_front+1] = new_v
 
-    create_masked_video(f"{args.data_dir}/480p/JPEGImages/{args.video}", results_dir, save_path=path.join(results_dir, "demo.mp4"))
+    create_masked_video(f"{args.data_dir}/JPEGImages/480p/{args.video}", results_dir, save_path=path.join(results_dir, "demo.mp4"))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
