@@ -52,6 +52,7 @@ def main(args):
     # Pre-allocate keys/values memory
     keys = torch.empty((K, CK, total_m, H, W), dtype=torch.float32, device=device)
     values = torch.empty((K, CV, total_m, H, W), dtype=torch.float32, device=device)
+    query = None
 
     m_front = 1
     keys[:, :, :m_front] = key
