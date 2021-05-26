@@ -20,6 +20,8 @@ def main(args):
     results_dir = path.join(args.log_dir, datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
     create_dir(results_dir)
 
+    print(torch.cuda.device_count())
+
     model = PropagationNetwork(top_k=args.top_k)
     model.load_state_dict(torch.load(args.model_path))
     model = torch.nn.DataParallel(model)
