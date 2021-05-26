@@ -12,6 +12,7 @@ from utils.transforms import get_transforms
 from utils.utils import create_dir
 from utils.video_utils import create_masked_video
 
+@torch.no_grad()
 def main(args):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -57,7 +58,8 @@ def main(args):
     values[:, :, :m_front] = value
 
     for i, (frame, _) in enumerate(dataloader):
-    
+        del key, value, query
+
         if i == 0:
             continue
 
