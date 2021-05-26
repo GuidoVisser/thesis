@@ -64,18 +64,28 @@ def main(args):
         print(i)
 
         frame = frame.to(device)
+
+        print(i, "to(divice)")
         frame, _ = pad_divide_by(frame, 16)
 
+        print(i, "pad_divide")
+
         key = keys[:, :, :m_front]
+
+        print(i, "key =")
         value = values[:, :, :m_front]
+        print(i, "value=")
         query = model.get_query_values(frame)
+        print(i, "query=")
 
         mask_pred = model.segment_with_query(key, value, *query)
+        print(i, "segnent_with_query")
         mask_pred = aggregate_wbg(mask_pred)
+        print(i, "aggregate_wbg")
 
         save_image(mask_pred, path.join(results_dir, f"{i:05}.png"))
 
-        print(i, "; 2")
+        print(i, "saved mask")
 
         new_k, new_v = model.memorize(frame, mask_pred)
         if (i+1) % mem_freq == 0:
