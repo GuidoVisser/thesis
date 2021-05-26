@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 00:05:00
+#SBATCH -t 00:01:00
 #SBATCH -p gpu_short
 #SBATCH --gpus-per-node=gtx1080ti:1
 
