@@ -20,8 +20,6 @@ def main(args):
     create_dir(results_dir)
 
     model = PropagationNetwork(top_k=args.top_k).to(device)
-    print(listdir(args.model_path))
-    raise NotImplementedError
     model.load_state_dict(torch.load(args.model_path))
 
     dataset = DAVISVideo(args.data_dir, args.video, get_transforms())
