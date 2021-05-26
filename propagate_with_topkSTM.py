@@ -40,7 +40,7 @@ def main(args):
     mask, _ = pad_divide_by(mask, 16)
     print(torch.mean(mask))
     print(torch.std(mask))
-
+    print(0)
 
     key, value = model.memorize(frame, mask)
 
@@ -56,6 +56,7 @@ def main(args):
     values[:, :, :m_front] = value
 
     for i, (frame, _) in enumerate(dataloader):
+        print(i)
     
         if i == 0:
             continue
