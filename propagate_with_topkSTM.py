@@ -21,6 +21,7 @@ def main(args):
 
     model = PropagationNetwork(top_k=args.top_k).to(device)
     model.load_state_dict(torch.load(args.model_path))
+    model.eval()
 
     dataset = DAVISVideo(args.data_dir, args.video, get_transforms())
     dataloader = torch.utils.data.DataLoader(
@@ -56,10 +57,11 @@ def main(args):
     values[:, :, :m_front] = value
 
     for i, (frame, _) in enumerate(dataloader):
-        print(i)
     
         if i == 0:
             continue
+
+        print(i)
 
         frame = frame.to(device)
         frame, _ = pad_divide_by(frame, 16)
