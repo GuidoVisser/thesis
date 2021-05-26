@@ -75,6 +75,8 @@ def main(args):
 
         save_image(mask_pred, path.join(results_dir, f"{i:05}.png"))
 
+        print(i, "; 2")
+
         new_k, new_v = model.memorize(frame, mask_pred)
         if (i+1) % mem_freq == 0:
             m_front += 1
