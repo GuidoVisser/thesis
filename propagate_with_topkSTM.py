@@ -20,9 +20,11 @@ def main(args):
     results_dir = path.join(args.log_dir, datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
     create_dir(results_dir)
 
-    model = PropagationNetwork(top_k=args.top_k).to(device)
+    model = PropagationNetwork(top_k=args.top_k)
     model.load_state_dict(torch.load(args.model_path))
+    model = torch.nn.DataParallel(model)
     model.eval()
+    model.to(device)
 
     dataset = DAVISVideo(args.data_dir, args.video, get_transforms())
     dataloader = torch.utils.data.DataLoader(
