@@ -52,14 +52,12 @@ def main(args):
     # Pre-allocate keys/values memory
     keys = torch.empty((K, CK, total_m, H, W), dtype=torch.float32, device=device)
     values = torch.empty((K, CV, total_m, H, W), dtype=torch.float32, device=device)
-    query = None
 
     m_front = 1
     keys[:, :, :m_front] = key
     values[:, :, :m_front] = value
 
     for i, (frame, _) in enumerate(dataloader):
-        del key, value, query
 
         if i == 0:
             continue
@@ -68,7 +66,7 @@ def main(args):
 
         frame = frame.to(device)
 
-        print(i, "to(divice)")
+        print(i, "to(device)")
         frame, _ = pad_divide_by(frame, 16)
 
         print(i, "pad_divide")
@@ -79,7 +77,7 @@ def main(args):
         value = values[:, :, :m_front]
         print(i, "value=")
         query = model.get_query_values(frame)
-        print(i, "query=")
+        print(i, "query =")
 
         mask_pred = model.segment_with_query(key, value, *query)
         print(i, "segnent_with_query")
@@ -95,6 +93,8 @@ def main(args):
             m_front += 1
         keys[:, :, m_front:m_front+1] = new_k
         values[:, :, m_front:m_front+1] = new_v
+
+        del key, value, query
 
     create_masked_video(f"{args.data_dir}/JPEGImages/480p/{args.video}", results_dir, save_path=path.join(results_dir, "demo.mp4"))
 
