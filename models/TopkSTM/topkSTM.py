@@ -6,7 +6,6 @@ from .prop_net import PropagationNetwork
 from .utils.utils import pad_divide_by, aggregate_wbg
 
 
-# TODO more memory efficient implementation of key and value memory
 class TopKSTM(nn.Module):
     def __init__(self, mem_size:int, top_k: int=50, mem_freq: int=5):
         super().__init__()
