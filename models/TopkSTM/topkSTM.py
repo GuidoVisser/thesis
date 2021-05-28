@@ -2,20 +2,22 @@ from typing import Union
 import torch
 from torch import nn
 
-from .prop_net import PropagationNetwork
+from .modules.prop_net import PropagationNetwork
 from .utils.utils import pad_divide_by, aggregate_wbg
 
 
 # TODO make the class compatible with DataParallel
 class TopKSTM(nn.Module):
-    def __init__(self, mem_size:int, top_k: int=50, mem_freq: int=5):
+    def __init__(self, memory_size:int, model_device, memory_device: str="cpu", top_k: int=50, mem_freq: int=5):
         super().__init__()
 
-        self.prop_net = PropagationNetwork(top_k)
+        self.device = model_device
+
+        self.prop_net = PropagationNetwork(top_k).to(model_device)
         self.mem_freq = mem_freq
         
-        self.key_memory = Memory(mem_size)
-        self.val_memory = Memory(mem_size)
+        self.key_memory = Memory(memory_size, memory_device, model_device)
+        self.val_memory = Memory(memory_size, memory_device, model_device)
 
     def predict_mask_and_memorize(self, frame_idx:int, frame: torch.Tensor, frame_divide_by: int=16) -> torch.Tensor:
         """
@@ -28,15 +30,22 @@ class TopKSTM(nn.Module):
         Returns:
             mask (torch.Tensor[K, B, CM, H, W])
         """
-        frame = pad_divide_by(frame, frame_divide_by)
+        # prepare frame
+        frame = pad_divide_by(frame, frame_divide_by).to(self.device)
 
+        # get keys, values and query
         keys = self.key_memory.get()
         vals = self.val_memory.get()
         query = self.prop_net.get_query_values(frame)
 
+        # generate segmentation
         mask = self.prop_net.segment_with_query(keys, vals, *query)
         mask = aggregate_wbg(mask)
 
+        # free up memory on device
+        del keys, vals, query
+
+        # memorize results
         extend_memory = True if frame_idx % self.mem_freq == 0 else False
         self.add_to_memory(frame, mask, extend_memory)
 
@@ -73,15 +82,16 @@ class TopKSTM(nn.Module):
 
 class Memory(object):
 
-    def __init__(self, size) -> None:
-        # TODO set up an efficient way to define on what device all the tensors live
+    def __init__(self, size: int, memory_device: str, model_device: str) -> None:
         super().__init__()
         self.front_pointer = 0
         self.data = None
         self.size = size
+        self.memory_device = memory_device
+        self.model_device = model_device
 
     def get(self):
-        return self.data[:, :, :self.front_pointer+1]
+        return self.data[:, :, :self.front_pointer+1].to(self.model_device)
 
     def add_entry(self, entry: torch.Tensor, extend_memory: bool=False) -> None:
         if len(entry.size()) != 5:
@@ -89,23 +99,16 @@ class Memory(object):
 
         if self.data == None:
             B, C, _, H, W = entry.size()
-            self.data = torch.empty((B, C, self.size, H, W))
+            self.data = torch.empty((B, C, self.size, H, W), dtype=torch.float32, device=self.memory_device)
             
-        self[self.front_pointer] = entry
+        # self[self.front_pointer] = entry.to(self.memory_device)
+        self._data[:, :, self.front_pointer] = entry.to(self.memory_device)
 
         if extend_memory:
             self.front_pointer += 1
 
     def reset(self) -> None:
-        self.data = torch.empty(self.data.size())
-
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        return self.data[:, :, idx]
-
-    def __setitem__(self, idx: int, value: torch.Tensor) -> None:
-        if idx > self.size:
-            raise IndexError(f"Index {idx} is out of bounds for memory of size {self.size}")
-        self._data[:, :, idx] = value
+        self.data = torch.empty(self.data.size()).to(self.memory_device)
 
     def __len__(self) -> int:
         if self.data == None:

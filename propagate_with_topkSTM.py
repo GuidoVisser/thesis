@@ -5,7 +5,7 @@ from datetime import datetime
 
 from torchvision.utils import save_image
 
-from models.TopkSTM.prop_net import PropagationNetwork
+from models.TopkSTM.modules.prop_net import PropagationNetwork
 from models.TopkSTM.utils.utils import pad_divide_by, aggregate_wbg
 from datasets import DAVISVideo
 from utils.transforms import get_transforms
