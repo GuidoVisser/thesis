@@ -8,7 +8,7 @@ from .utils.utils import pad_divide_by, aggregate_wbg
 
 # TODO make the class compatible with DataParallel
 class TopKSTM(nn.Module):
-    def __init__(self, memory_size:int, model_device, memory_device: str="cpu", top_k: int=50, mem_freq: int=5):
+    def __init__(self, memory_size:int, model_device, memory_device: str="cpu", top_k: int=50, mem_freq: int=5, frame_divide_by: int=16):
         super().__init__()
 
         self.device = model_device
@@ -19,7 +19,9 @@ class TopKSTM(nn.Module):
         self.key_memory = Memory(memory_size, memory_device, model_device)
         self.val_memory = Memory(memory_size, memory_device, model_device)
 
-    def predict_mask_and_memorize(self, frame_idx:int, frame: torch.Tensor, frame_divide_by: int=16) -> torch.Tensor:
+        self.frame_divide_by = frame_divide_by
+
+    def predict_mask_and_memorize(self, frame_idx:int, frame: torch.Tensor) -> torch.Tensor:
         """
         Predict the mask of a frame given the memory that has already been acccumulated and add this mask to the memory
 
@@ -31,7 +33,8 @@ class TopKSTM(nn.Module):
             mask (torch.Tensor[K, B, CM, H, W])
         """
         # prepare frame
-        frame = pad_divide_by(frame, frame_divide_by).to(self.device)
+        frame, _ = pad_divide_by(frame, self.frame_divide_by)
+        frame = frame.to(self.device)
 
         # get keys, values and query
         keys = self.key_memory.get()
@@ -67,6 +70,12 @@ class TopKSTM(nn.Module):
             mask (torch.Tensor[B, K, CM, H, W])
             extend_memory (bool): denotes whether to replace the last entry in memory or extend the memory
         """
+
+        # prepare frame
+        frame, _ = pad_divide_by(frame, self.frame_divide_by)
+        mask, _ = pad_divide_by(mask, self.frame_divide_by)
+
+        frame, mask = frame.to(self.device), mask.to(self.device)
        
         # get new key and val from frame and mask
         new_key, new_val = self.prop_net.memorize(frame, mask)
@@ -79,14 +88,17 @@ class TopKSTM(nn.Module):
         self.key_memory.reset()
         self.val_memory.reset()
 
+    def load_pretrained(self, model_path: str) -> None:
+        self.prop_net.load_state_dict(torch.load(model_path))
+
 
 class Memory(object):
 
     def __init__(self, size: int, memory_device: str, model_device: str) -> None:
         super().__init__()
-        self.front_pointer = 0
         self.data = None
         self.size = size
+        self.front_pointer = 0
         self.memory_device = memory_device
         self.model_device = model_device
 
@@ -99,10 +111,11 @@ class Memory(object):
 
         if self.data == None:
             B, C, _, H, W = entry.size()
+            print(entry.size())
             self.data = torch.empty((B, C, self.size, H, W), dtype=torch.float32, device=self.memory_device)
             
         # self[self.front_pointer] = entry.to(self.memory_device)
-        self._data[:, :, self.front_pointer] = entry.to(self.memory_device)
+        self._data[:, :, self.front_pointer:self.front_pointer+1] = entry.to(self.memory_device)
 
         if extend_memory:
             self.front_pointer += 1
