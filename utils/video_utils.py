@@ -94,10 +94,10 @@ def create_masked_video(video_folder, mask_folder, save_path=None, fps=24, mask_
         mask_folder (str): path to masks
         save_path (str): path to save location of generated video
     """
-    frame_files = [video_folder+'/'+frame for frame in sorted(os.listdir(video_folder)) if frame.endswith(".png")] + \
-                  [video_folder+'/'+frame for frame in sorted(os.listdir(video_folder)) if frame.endswith(".jpg")]
-    mask_files = [mask_folder+'/'+frame for frame in sorted(os.listdir(mask_folder)) if frame.endswith(".png")] +\
-                 [mask_folder+'/'+frame for frame in sorted(os.listdir(mask_folder)) if frame.endswith(".jpg")]
+    frame_files = [os.path.join(video_folder, frame) for frame in sorted(os.listdir(video_folder)) if frame.endswith(".png")] + \
+                  [os.path.join(video_folder, frame) for frame in sorted(os.listdir(video_folder)) if frame.endswith(".jpg")]
+    mask_files = [os.path.join(mask_folder, frame) for frame in sorted(os.listdir(mask_folder)) if frame.endswith(".png")] +\
+                 [os.path.join(mask_folder, frame) for frame in sorted(os.listdir(mask_folder)) if frame.endswith(".jpg")]
 
     assert len(frame_files) == len(mask_files), f"Expected video and masks to have same amount of frames. Got {len(frame_files)} and {len(mask_files)}"
 

@@ -11,13 +11,18 @@ from datasets import DAVISVideo
 from utils.transforms import get_transforms
 from utils.utils import create_dir
 from utils.video_utils import create_masked_video
+from utils.mask_utils import generate_error_mask, save_error_mask
 
 @torch.no_grad()
 def main(args):
 
     # set up result directory
     results_dir = path.join(args.log_dir, datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+    mask_results_dir = path.join(results_dir, "masks")
+    frame_results_dir = path.join(results_dir, "frames")
     create_dir(results_dir)
+    create_dir(mask_results_dir)
+    create_dir(frame_results_dir)
 
     # set up data iterable
     dataset = DAVISVideo(args.data_dir, args.video, get_transforms())
@@ -46,24 +51,33 @@ def main(args):
     # set up memory with first frame and ground truth mask
     frame, mask = next(iter(dataloader))
     model.add_to_memory(frame, mask, extend_memory=True)
+    mask, _ = pad_divide_by(mask, 16)
+    frame, _ = pad_divide_by(frame, 16)
+    save_image(mask, path.join(mask_results_dir, f"00000.png"))
+    save_image(frame, path.join(frame_results_dir, f"00000.png"))
 
     # loop through video and propagate mask, skipping first frame
-    for i, (frame, _) in enumerate(dataloader, 1):
+    for i, (frame, _) in enumerate(dataloader):
+
+        if i == 0:
+            continue
 
         # predict of frame based on memory and append features of current frame to memory
         mask_pred = model.predict_mask_and_memorize(i, frame)
 
         # save mask as image
-        save_image(mask_pred, path.join(results_dir, f"{i:05}.png"))
+        save_image(mask_pred, path.join(mask_results_dir, f"{i:05}.png"))
+        frame, _ = pad_divide_by(frame, 16)
+        save_image(frame, path.join(frame_results_dir, f"{i:05}.png"))
 
     # create video with propagated mask as overlay
-    create_masked_video(f"{args.data_dir}/JPEGImages/480p/{args.video}", results_dir, save_path=path.join(results_dir, "demo.mp4"))
+    create_masked_video(frame_results_dir, mask_results_dir, save_path=path.join(results_dir, "demo.mp4"), mask_opacity=0.6)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data_dir", type=str, default="datasets/DAVIS_sample")
-    parser.add_argument("--video", type=str, default="tennis")
+    parser.add_argument("--data_dir", type=str, default="datasets/DAVIS")
+    parser.add_argument("--video", type=str, default="parkour")
     parser.add_argument("--log_dir", type=str, default="results/topkSTM")
     parser.add_argument("--model_path", type=str, default="models/weights/MiVOS/propagation_model.pth")
 

@@ -111,7 +111,6 @@ class Memory(object):
 
         if self.data == None:
             B, C, _, H, W = entry.size()
-            print(entry.size())
             self.data = torch.empty((B, C, self.size, H, W), dtype=torch.float32, device=self.memory_device)
             
         # self[self.front_pointer] = entry.to(self.memory_device)
