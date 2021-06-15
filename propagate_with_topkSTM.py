@@ -3,14 +3,12 @@ import argparse
 from os import path, listdir
 from datetime import datetime
 
-from torchvision.utils import save_image
-
 from models.TopkSTM import TopKSTM
 from models.TopkSTM.utils import aggregate_wbg, pad_divide_by
 from datasets import DAVISVideo
 from utils.transforms import get_transforms
 from utils.utils import create_dir
-from utils.video_utils import create_masked_video
+from utils.video_utils import create_masked_video, save_frame
 from utils.mask_utils import generate_error_mask, save_error_mask
 
 @torch.no_grad()
@@ -53,8 +51,8 @@ def main(args):
     model.add_to_memory(frame, mask, extend_memory=True)
     mask, _ = pad_divide_by(mask, 16)
     frame, _ = pad_divide_by(frame, 16)
-    save_image(mask, path.join(mask_results_dir, f"00000.png"))
-    save_image(frame, path.join(frame_results_dir, f"00000.png"))
+    save_frame(mask, path.join(mask_results_dir, f"00000.png"))
+    save_frame(frame[0], path.join(frame_results_dir, f"00000.png"), denormalize=True)
 
     # loop through video and propagate mask, skipping first frame
     for i, (frame, _) in enumerate(dataloader):
@@ -66,9 +64,9 @@ def main(args):
         mask_pred = model.predict_mask_and_memorize(i, frame)
 
         # save mask as image
-        save_image(mask_pred, path.join(mask_results_dir, f"{i:05}.png"))
+        save_frame(mask_pred, path.join(mask_results_dir, f"{i:05}.png"))
         frame, _ = pad_divide_by(frame, 16)
-        save_image(frame, path.join(frame_results_dir, f"{i:05}.png"))
+        save_frame(frame[0], path.join(frame_results_dir, f"{i:05}.png"), denormalize=True)
 
     # create video with propagated mask as overlay
     create_masked_video(frame_results_dir, mask_results_dir, save_path=path.join(results_dir, "demo.mp4"), mask_opacity=0.6)

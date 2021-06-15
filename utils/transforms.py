@@ -1,4 +1,5 @@
 import random
+from moviepy.decorators import outplace
 
 from torchvision.transforms import functional as F
 
@@ -45,6 +46,16 @@ class Normalize(object):
         for input in inputs:
             if input.size()[0] == 3:
                 output.append(F.normalize(input, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]))
+            else:
+                output.append(input)
+        return output
+
+class DeNormalize(object):
+    def __call__(self, inputs):
+        output = []
+        for input in inputs:
+            if input.size()[0] == 3:
+                output.append(F.normalize(input, [-0.485/0.229, -0.456/0.224, -0.406/0.225], [1/0.229, 1/0.224, 1/0.225]))
             else:
                 output.append(input)
         return output

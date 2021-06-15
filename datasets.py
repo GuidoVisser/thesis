@@ -253,3 +253,131 @@ class TestVideoDataset(object):
 
     def __len__(self):
         return len(self.imgs)
+
+
+class SyntheticCOCOVideo(object):
+    """
+    A data set that generates 3 frame videos from static images by applying random affine transformations
+    """
+    def __init__(self, root) -> None:
+        super().__init__()
+        self.root = root
+        self.transfroms = "TODO"
+        self.images = "TODO"
+        self.masks = "TODO"
+
+    def __getitem__(self, idx):
+        raise NotImplementedError
+
+    def __len__(self):
+        return len(self.images)
+
+
+class DAVISTriplets(object):
+    """
+    A data set that selectes three frames from a video separated by a maximum distance and returns them in order
+    """
+    def __init__(self, data_root, transforms, max_distance=3):
+        self.frame_root = path.join(data_root, "JPEGImages/480p/")
+        self.mask_root = path.join(data_root, "Annotations/480p/")
+        self.transforms = transforms
+        self.max_distance = max_distance
+        self.frames = []
+        for video in listdir(self.frame_root):
+            self.frames.extend([path.join(video, frame) 
+                                for frame 
+                                in list(sorted(listdir(path.join(self.frame_root, video))))
+            ])
+
+    def __getitem__(self, idx):
+
+        # get indices with random distances between them within same video
+        indices = self.get_frame_indices(idx)
+
+        # load frames and masks as np.ndarray
+        frames, masks = self.load_images_and_masks(indices)
+
+        # perform transforms and convert to Tensors
+        if self.transforms is not None:
+            frames = self.transforms(frames)
+            masks = self.transforms(masks)
+
+        return frames, masks
+
+    def __len__(self):
+        return len(self.frames)
+
+    @property
+    def max_distance(self) -> int:
+        return self._max_distance
+
+    @max_distance.setter
+    def max_distance(self, value: int) -> None:
+        self._max_distance = value
+
+    def get_frame_indices(self, idx: int) -> list:
+        """
+        Given some index, return the indices of a sequence of frames no more than 
+        {self.max_frames} apart
+
+        Args:
+            idx (int)
+        
+        Returns:
+            indices (list)
+        """
+        # get video title
+        p = pathlib.Path(self.frames[idx])
+        video = p.parts[0]
+
+        # get index of current, first and last frame in directory
+        idx_in_dir = int(p.parts[1][:-4])
+        length_video = len(listdir(path.join(self.frame_root, video))) - 1
+
+        # make sure the video is long enough to avoid indexing errors
+        if 2 * self.max_distance >= length_video:
+            raise ValueError(f"Maximum distance between frames {self.max_distance} is too big for video ({video}) with {length_video} frames")
+
+        # get random choices for frame distance
+        second_idx = random.randint(1, self.max_distance)
+        third_idx = random.randint(1, self.max_distance)
+
+        # get indices of three frames from the current video
+        if idx_in_dir + second_idx > length_video:
+            indices = [idx - second_idx - third_idx, 
+                       idx - second_idx, 
+                       idx]
+        elif idx_in_dir + second_idx + third_idx > length_video:
+            indices = [idx - third_idx, 
+                       idx, 
+                       idx + second_idx]
+        else:
+            indices = [idx, 
+                       idx + second_idx, 
+                       idx + second_idx + third_idx]
+        print(indices)
+        return indices
+
+    def load_images_and_masks(self, indices: list) -> tuple:
+        """
+        Load the frames and masks as np.ndarray
+
+        Args:
+            indices (list): list of indices denoting the locations of the frames in self.frames
+
+        Returns:
+            frames (list): list of ndarrays with rgb data
+            masks (list): list of ndarrays with mask data
+        """
+
+        frame_paths = [path.join(self.frame_root, self.frames[target_idx]) for target_idx in indices]
+        mask_paths = [path.join(self.mask_root, self.frames[target_idx]) for target_idx in indices]
+
+        # DAVIS images are .jpg but masks are .png; change extension accordingly
+        mask_paths = [path.splitext(mask_path)[0] + ".png" for mask_path in mask_paths]
+
+        # load images
+        frames = [np.array(Image.open(frame_path).convert("RGB")) for frame_path in frame_paths]
+        masks = [np.array(Image.open(mask_path).convert("L")) for mask_path in mask_paths]
+
+        return frames, masks
