@@ -113,7 +113,6 @@ class Memory(object):
             B, C, _, H, W = entry.size()
             self.data = torch.empty((B, C, self.size, H, W), dtype=torch.float32, device=self.memory_device)
             
-        # self[self.front_pointer] = entry.to(self.memory_device)
         self._data[:, :, self.front_pointer:self.front_pointer+1] = entry.to(self.memory_device)
 
         if extend_memory:
