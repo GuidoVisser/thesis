@@ -26,6 +26,20 @@ def save_frame(frame, filepath, ismask=False, denormalize=False):
     save_image(frame[0], filepath)
 
 
+def opencv_folder_to_video(dir_path, save_path, fps=24):
+    image_files = [dir_path+'/'+img for img in sorted(os.listdir(dir_path)) if img.endswith(".png")] + \
+                  [dir_path+'/'+img for img in sorted(os.listdir(dir_path)) if img.endswith(".jpg")]
+
+    img = cv2.imread(image_files[0])
+
+    out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (img.shape[1], img.shape[0]))
+
+    for img_path in image_files:
+        img = cv2.imread(img_path)
+        out.write(img)
+    out.release()
+
+
 def folder_to_video(dir_path, save_path=None, fps=24):
     """
     generate a video from a folder containing images
@@ -37,6 +51,7 @@ def folder_to_video(dir_path, save_path=None, fps=24):
     """
     image_files = [dir_path+'/'+img for img in sorted(os.listdir(dir_path)) if img.endswith(".png")] + \
                   [dir_path+'/'+img for img in sorted(os.listdir(dir_path)) if img.endswith(".jpg")]
+
     clip = ImageSequenceClip(image_files, fps=fps)
 
     if save_path is not None:

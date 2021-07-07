@@ -75,7 +75,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--data_dir", type=str, default="datasets/DAVIS")
-    parser.add_argument("--video", type=str, default="parkour")
+    parser.add_argument("--video", type=str, default="tennis")
     parser.add_argument("--log_dir", type=str, default="results/topkSTM")
     parser.add_argument("--model_path", type=str, default="models/weights/MiVOS/propagation_model.pth")
 
