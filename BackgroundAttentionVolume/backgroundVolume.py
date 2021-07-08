@@ -45,7 +45,6 @@ class BackgroundVolume(object):
 
         self.spatial_noise = np.random.uniform(low=0., high=255., size=(self.ymax - self.ymin, self.xmax - self.xmin, 3))
         
-
     def create_demo_noise(self):
         """
         Create a demo spatial noise to more easily investigate properties of the homographies
@@ -53,7 +52,6 @@ class BackgroundVolume(object):
         w = self.xmax - self.xmin
         h = self.ymax - self.ymin
         self.spatial_noise = np.stack([np.linspace(np.arange(w)/w, np.arange(w)/w, h)]*3, axis=2)
-
 
     def calculate_homography_between_two_frames(self, source: int, target: int) -> np.array:
         """
@@ -374,7 +372,6 @@ class BackgroundVolume(object):
 
         transformation_matrix = np.linalg.inv(Ht @ homography)
 
-        # spatial_noise = self.draw_frame_border(self.create_demo_noise(), Ht, homography)
         warped_noise = cv2.warpPerspective(self.spatial_noise, transformation_matrix, (self.frame_size[0], self.frame_size[1]))
         return warped_noise
 
