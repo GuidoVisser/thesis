@@ -35,6 +35,7 @@ def opencv_folder_to_video(dir_path, save_path, fps=24):
     out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (img.shape[1], img.shape[0]))
 
     for img_path in image_files:
+        print(img_path)
         img = cv2.imread(img_path)
         out.write(img)
     out.release()
