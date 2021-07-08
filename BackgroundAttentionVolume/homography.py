@@ -17,6 +17,3 @@ def extract_homography(coords: list) -> list:
         homographies.append(homography)
         
     return homographies
-
-
-
