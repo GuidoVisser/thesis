@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def get_corresponding_coordinates(keypoint_matches: list) -> list:
+def get_matching_coordinates(keypoint_matches: list) -> list:
     """
     Given a set of keypoints in a pair of frames, return two sets of coordinates of the keypoints. 
     Keypoints that have been matched to each other are connected to each other by having the same index in the arrays

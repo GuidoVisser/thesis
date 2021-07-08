@@ -129,28 +129,6 @@ class DAVISSequenceDataset(object):
         return len(self.frames)
 
 
-# class DAVISWithFlowPredictions(object):
-#     def __init__(self, root, transforms):
-#         self.frame_root = path.join(root, "JPEGImages/480p/")
-#         self.mask_root = path.join(droot, "Annotations/480p/")
-#         self.flow_root = path.join(root, "Flow/480p/flo/")
-#         self.transforms = transforms
-#         self.seq_length = seq_length
-#         self.frames = []
-#         self.length = 0
-#         for video in listdir(self.frame_root):
-#             self.frames.extend([path.join(video, frame) 
-#                                 for i, frame 
-#                                 in enumerate(list(sorted(listdir(path.join(self.frame_root, video)))))
-#                                 if i + seq_length < len(listdir(path.join(self.frame_root, video)))
-#             ])
-    
-#     def __getitem__(self, idx):
-#         return "TODO"
-
-#     def __len__(self):
-#         return len(self.frames)
-
 class DAVISVideo(object):
 
     def __init__(self, root, video, transforms):
