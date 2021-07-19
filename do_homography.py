@@ -7,7 +7,7 @@ import numpy as np
 
 if __name__ == "__main__":
 
-    davis_video = "dance-jump"
+    davis_video = "horsejump-high"
     dataset = "DAVIS"
     frame = 20
     save_dir = f"datasets/{dataset}/BackgroundVolumes/480p/{davis_video}"

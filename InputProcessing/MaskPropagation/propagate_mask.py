@@ -1,25 +1,24 @@
 import torch
 import argparse
-from os import path, listdir
+from os import path
 from datetime import datetime
 
 from models.TopkSTM import TopKSTM
-from models.TopkSTM.utils import aggregate_wbg, pad_divide_by
+from models.TopkSTM.utils import pad_divide_by
 from datasets import DAVISVideo
 from utils.transforms import get_transforms
 from utils.utils import create_dir
 from utils.video_utils import create_masked_video, save_frame
 
 @torch.no_grad()
-def main(args):
-
-    # set up result directory
-    results_dir = path.join(args.log_dir, datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
-    mask_results_dir = path.join(results_dir, "masks")
-    frame_results_dir = path.join(results_dir, "frames")
-    create_dir(results_dir)
-    create_dir(mask_results_dir)
-    create_dir(frame_results_dir)
+def propagate_mask(video_dir: str,
+                   output_dir: str,
+                   initial_mask:str,
+                   memory_frequency: int,
+                   top_k: int,
+                   model_device: str,
+                   memory_device: str,
+                   model_weights: str):
 
     # set up data iterable
     dataset = DAVISVideo(args.data_dir, args.video, get_transforms())

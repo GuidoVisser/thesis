@@ -156,7 +156,7 @@ class BackgroundVolume(object):
 
         return frames, frame_tensors
 
-    def get_masks(self, binary_threshold: float = 0.7) -> list:
+    def get_masks(self, binary_threshold: float = 0.9) -> list:
         """
         Load all object masks of the frames that are being considered and construct a single global
         mask for all foreground objects 
@@ -278,6 +278,7 @@ class BackgroundVolume(object):
         for frame in frames:
             assert frame.shape == noise.shape, f"The shape of the image and the noise should be the same. Got {frame.shape} (image) and {noise.shape} (noise)"
 
+            # NOTE fix the threshold
             _, mask = cv2.threshold(frame, 0, 1, cv2.THRESH_BINARY_INV)
             frame = frame + noise * mask
             processed_frames.append(frame)

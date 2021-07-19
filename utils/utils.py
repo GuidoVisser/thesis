@@ -61,6 +61,11 @@ def generate_image_pairs(video: str, outfile: str) -> None:
 
     return
 
+# TODO implement padder
+class Padder(object):
+    def __init__(self, divide_by: int) -> None:
+        super().__init__()
+
 if __name__ == "__main__":
     DAVIS_vids = os.listdir("datasets/DAVIS/JPEGImages/480p")
     for vid in DAVIS_vids:

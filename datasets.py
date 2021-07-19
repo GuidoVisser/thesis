@@ -157,6 +157,26 @@ class DAVISVideo(object):
         return len(self.imgs)
 
 
+class Video(object):
+    def __init__(self, root, transforms) -> None:
+        super().__init__()
+
+        self.root = root
+        self.transforms = transforms
+
+        self.frames = [path.join(root, frame) for frame in sorted(listdir(path.join(root)))]
+
+    def __getitem__(self, idx):
+        img = np.array(Image.open(self.frames[idx]).convert("RGB")) / 255.
+
+        if self.transforms is not None:
+            img = self.transforms([img])
+
+        return img[0].float()
+
+    def __len__(self):
+        return len(self.frames)
+
 class PennFudanDataset(object):
     def __init__(self, root, transforms):
         self.root = root
