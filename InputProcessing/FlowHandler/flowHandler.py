@@ -38,7 +38,6 @@ class FlowHandler(object):
         """
 
         for i in range(len(self.frame_iterator) - 1):
-            x = self.frame_iterator[i]
             image0 = cv2.cvtColor(self.frame_iterator[i], cv2.COLOR_BGR2RGB)
             image0 = torch.from_numpy(image0).permute(2, 0, 1).float().unsqueeze(0).to(self.device)
 
@@ -51,7 +50,6 @@ class FlowHandler(object):
 
             writeFlow(path.join(self.output_dir, "flow", f"{i:05}.flo"), flow)
             cv2.imwrite(path.join(self.output_dir, "png", f"{i:05}.png"), flow_to_image(flow, convert_to_bgr=True))
-
 
     def load_flow_image(self, frame_idx):
         img = cv2.imread(path.join(self.output_dir, "png", f"{frame_idx:05}.png"))
