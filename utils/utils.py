@@ -11,7 +11,7 @@ def create_dir(dir_path):
     """
     os.makedirs(dir_path, exist_ok=True)
 
-def create_dirs(dir_paths):
+def create_dirs(*dir_paths):
     """
     Creates a directory for all given paths
     """

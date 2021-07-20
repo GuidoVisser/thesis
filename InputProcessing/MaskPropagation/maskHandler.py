@@ -16,8 +16,9 @@ class MaskHandler(object):
     def __init__(self,
                  img_dir: str,
                  mask_dir: str,
+                 initial_mask: str,
                  frame_size: list,
-                 binary_threshold: float = 0.9) -> None:
+                 binary_threshold: float = 0.7) -> None:
         super().__init__()
 
         self.img_dir = img_dir
@@ -27,6 +28,8 @@ class MaskHandler(object):
         self.size = frame_size
 
         self.binary_threshold = binary_threshold
+
+        self.propagate(initial_mask, 50, 10, "cuda", "cuda", "models/weights/MiVOS/propagation_model.pth")
          
     @torch.no_grad()
     def propagate(self, initial_mask, top_k, mem_freq, model_device, memory_device, model_weights):
@@ -40,7 +43,7 @@ class MaskHandler(object):
             pin_memory=True
         )
 
-        total_m = (len(frame_iterator) - 1) // self.mem_freq + 2 # +1 for first frame, +1 for zero start indexing
+        total_m = (len(frame_iterator) - 1) // mem_freq + 2 # +1 for first frame, +1 for zero start indexing
 
         propagation_model = TopKSTM(
             total_m, 
@@ -65,7 +68,8 @@ class MaskHandler(object):
         save_frame(mask, path.join(self.mask_dir, f"00000.png"))
 
         # loop through video and propagate mask, skipping first frame
-        for i, frame in enumerate(self.frame_iterator):
+        for i, frame in enumerate(frame_iterator):
+            print(f"Propagating Mask: {i} / {len(frame_iterator)-1}")
 
             if i == 0:
                 continue
@@ -83,8 +87,13 @@ class MaskHandler(object):
 
         mask_path = path.join(self.mask_dir, f"{idx:05}.png")
         mask = cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.size)
-        _, mask = cv2.threshold(mask, self.binary_threshold, 1, cv2.THRESH_BINARY)
+        _, mask = cv2.threshold(mask, self.binary_threshold*255, 1, cv2.THRESH_BINARY)
 
         mask = np.minimum(mask, np.ones(mask.shape))
 
+        return mask
+
+    def get_alpha_mask(self, idx):
+        mask_path = path.join(self.mask_dir, f"{idx:05}.png")
+        mask = cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.size)
         return mask

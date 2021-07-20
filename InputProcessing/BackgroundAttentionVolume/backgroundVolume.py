@@ -43,7 +43,10 @@ class BackgroundVolume(object):
         self.homographies = self.get_homographies()
         self.xmin, self.ymin, self.xmax, self.ymax = self.get_outer_borders()
 
-        self.spatial_noise = np.random.uniform(low=0., high=255., size=(self.ymax - self.ymin, self.xmax - self.xmin, 3))
+        try:
+            self.spatial_noise = np.random.uniform(low=0., high=255., size=(self.ymax - self.ymin, self.xmax - self.xmin, 3))
+        except Exception(e):
+            print(e)
         
     def create_demo_noise(self):
         """

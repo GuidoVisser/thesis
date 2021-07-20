@@ -4,7 +4,7 @@ import numpy as np
 from numpy.core.numeric import outer
 
 
-def align_two_frames(source_frame: np.array, target_frame: np.array, homography: np.array) -> Tuple[np.array, np.array, np.array]:
+def align_two_frames(target_frame: np.array, source_frame: np.array, homography: np.array) -> Tuple[np.array, np.array, np.array]:
     """
     Warp a frame using a homography matrix
 
@@ -48,12 +48,4 @@ def align_two_frames(source_frame: np.array, target_frame: np.array, homography:
     combined = warped_frame.copy()
     combined[t[1]:ht+t[1], t[0]:wt+t[0]] = target_frame
 
-    # draw corners on image
-    for corner in warped_corners:
-        xc, yc = np.round(corner[0])
-        xc = int(xc)
-        yc = int(yc)
-        cv2.circle(warped_frame, (xc-xmin, yc-ymin), 3, (0,255,0))
-        cv2.circle(combined, (xc-xmin, yc-ymin), 3, (255,0,0))
-
-    return warped_frame, source_padded, combined
+    return warped_frame, source_padded, combined, t

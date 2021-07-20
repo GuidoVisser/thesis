@@ -104,7 +104,6 @@ class ModelTrainer(object):
         """
         Train the model
         """
-        
 
         # Tracking variables for finding best model
         best_epoch_performance = float('inf')

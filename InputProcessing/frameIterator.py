@@ -17,7 +17,7 @@ class FrameIterator(object):
         self.frame_size = frame_size
 
     def __getitem__(self, idx):
-        img = cv2.resize(cv2.imread(self.images[idx]), self.size)
+        img = cv2.resize(cv2.imread(self.images[idx]), self.frame_size)
         return img
     
     def __len__(self):
