@@ -1,7 +1,7 @@
 import torch
 import cv2
 import numpy as np
-from os import path, listdir
+from os import path
 
 from utils.video_utils import opencv_folder_to_video
 from .BackgroundAttentionVolume.backgroundVolume import BackgroundVolume
@@ -40,7 +40,7 @@ class InputProcessor(object):
 
         noise = self.background_volume.get_frame_noise(frame_idx).astype(np.uint8)
 
-        flow = self.flow_handler.calculate_flow_between_stabalized_frames(frame_idx)
+        flow, conf = self.flow_handler.calculate_flow_between_frames(frame_idx)
         flow_img = self.flow_handler.convert_flow_to_image(flow, bgr=True)
         flow_matte = self.get_flow_matte(flow, mask)
         flow_matte_img = self.flow_handler.convert_flow_to_image(flow_matte, bgr=True)

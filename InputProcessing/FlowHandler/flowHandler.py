@@ -3,6 +3,8 @@ import numpy as np
 import torch
 import cv2
 
+from torch.nn.functional import grid_sample
+
 from utils.utils import create_dirs
 from InputProcessing.BackgroundAttentionVolume.align_frames import align_two_frames
 from InputProcessing.FlowHandler.utils import RaftNameSpace
@@ -41,9 +43,9 @@ class FlowHandler(object):
         for i in range(len(self.frame_iterator) - 1):
             
             if stabalized:
-                flow = self.calculate_flow_between_stabalized_frames(i)
+                flow, _ = self.calculate_flow_between_stabilized_frames(i)
             else:
-                flow = self.calculate_flow_between_frames(i)
+                flow, _ = self.calculate_flow_between_frames(i)
 
             writeFlow(path.join(self.output_dir, "flow", f"{i:05}.flo"), flow)
             cv2.imwrite(path.join(self.output_dir, "png", f"{i:05}.png"), flow_to_image(flow, convert_to_bgr=True))
@@ -58,14 +60,29 @@ class FlowHandler(object):
         image1 = self.get_image(frame_idx + 1)
         image1 = self.prepare_image_for_raft(image1)
 
-        _, flow = self.raft(image0, image1, iters=self.iters, test_mode=True)
+        _, forward_flow = self.raft(image0, image1, iters=self.iters, test_mode=True)
+        _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
 
-        flow = flow[0].permute(1, 2, 0).cpu().numpy()
+        conf = self.get_flow_confidence(forward_flow, backward_flow)
 
-        return flow
+        conf = conf.permute(1, 2, 0).cpu().numpy()
+        flow = forward_flow[0].permute(1, 2, 0).cpu().numpy()
+
+        forward_flow = forward_flow[0].permute(1, 2, 0).cpu().numpy()
+        backward_flow = backward_flow[0].permute(1, 2, 0).cpu().numpy()
+
+        cv2.imshow("flow", flow_to_image(flow, convert_to_bgr=True))
+        cv2.imshow("forward", flow_to_image(forward_flow, convert_to_bgr=True))
+        cv2.imshow("backward", flow_to_image(backward_flow, convert_to_bgr=True))
+        cv2.imshow("confidence", conf)
+
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        return flow, conf
 
 
-    def calculate_flow_between_stabalized_frames(self, frame_idx):
+    def calculate_flow_between_stabilized_frames(self, frame_idx):
         """
         Calculate the forward flow between the frame at `frame_idx` and the next after being stabalized using 
         a perspective warp with the homography
@@ -83,15 +100,59 @@ class FlowHandler(object):
         padder = InputPadder(image0.shape)
         image0, image1 = padder.pad(image0, image1)
 
-        _, flow = self.raft(image0, image1, iters=self.iters, test_mode=True)
+        _, forward_flow = self.raft(image0, image1, iters=self.iters, test_mode=True)
+        _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
 
-        flow = padder.unpad(flow)
+        conf = self.get_flow_confidence(forward_flow, backward_flow)
+
+        flow = padder.unpad(forward_flow)
+        conf = padder.unpad(conf)
         flow = flow[:, :, translation[1]:h+translation[1], translation[0]:w+translation[0]]
+        conf = conf[:, translation[1]:h+translation[1], translation[0]:w+translation[0]]
 
         flow = flow[0].permute(1, 2, 0).cpu().numpy()
+        conf = conf.permute(1, 2, 0).cpu().numpy()
 
-        return flow
-            
+        forward_flow = forward_flow[0].permute(1, 2, 0).cpu().numpy()
+        backward_flow = backward_flow[0].permute(1, 2, 0).cpu().numpy()
+
+        cv2.imshow("flow", flow_to_image(flow, convert_to_bgr=True))
+        cv2.imshow("forward", flow_to_image(forward_flow, convert_to_bgr=True))
+        cv2.imshow("backward", flow_to_image(backward_flow, convert_to_bgr=True))
+        cv2.imshow("confidence", conf)
+
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        return flow, conf
+        
+    def get_flow_confidence(self, forward, backward):
+        """
+        Calculate the forward backward flow error using the euclidian distance 
+        and use this to produce a confidence measurement for the optical flow
+        """
+
+        error = self.get_forward_backward_error(forward, backward)
+
+        ones = torch.ones(error.size(), device=self.device)
+        zeros = torch.zeros(error.size(), device=self.device)
+
+        conf = torch.maximum(10*ones - error, zeros)
+
+        del ones, zeros
+
+        return conf
+
+
+    def get_forward_backward_error(self, forward, backward):
+        
+        backward = grid_sample(backward, forward.permute(0, 2, 3, 1) * -1.)
+        diff = forward + backward
+        
+        error = torch.sqrt(torch.sum(torch.square(diff), dim=1))
+
+        return error
+
     def get_image(self, frame_idx):
         return cv2.cvtColor(self.frame_iterator[frame_idx], cv2.COLOR_BGR2RGB)
     

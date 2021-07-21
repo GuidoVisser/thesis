@@ -45,7 +45,7 @@ class BackgroundVolume(object):
 
         try:
             self.spatial_noise = np.random.uniform(low=0., high=255., size=(self.ymax - self.ymin, self.xmax - self.xmin, 3))
-        except Exception(e):
+        except Exception as e:
             print(e)
         
     def create_demo_noise(self):
