@@ -1,5 +1,4 @@
 import random
-from moviepy.decorators import outplace
 
 from torchvision.transforms import functional as F
 

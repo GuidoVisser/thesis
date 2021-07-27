@@ -6,7 +6,7 @@ from os import listdir
 
 if __name__ == "__main__":
     
-    video = "tennis"
+    video = "bus"
     img_dir =  f"datasets/DAVIS/JPEGImages/480p/{video}"
     mask_dir = f"results/topkSTM/{video}"
     initial_mask = f"datasets/DAVIS/Annotations/480p/{video}/00000.png"
@@ -16,4 +16,4 @@ if __name__ == "__main__":
     create_dirs(demo_dir, mask_dir)
     
     ip = InputProcessor(img_dir, mask_dir, initial_mask, flow_dir, background_dir)
-    img, flow_img, mask, matte, flow_matte_img, noise = ip.get_frame_input(10)
+    img, flow_img, mask, matte, flow_matte_img, noise = ip.get_frame_input(30)

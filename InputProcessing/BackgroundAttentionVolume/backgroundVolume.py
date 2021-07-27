@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from typing import Union, Tuple
 
-from models.SuperGlue.models.utils import process_resize, frame2tensor
+from models.third_party.SuperGlue.models.utils import process_resize, frame2tensor
 from utils.utils import create_dir
 
 from .feature_matching import get_model_config, extract_and_match_features, get_matching_coordinates

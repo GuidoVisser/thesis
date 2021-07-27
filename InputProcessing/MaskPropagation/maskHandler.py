@@ -1,3 +1,4 @@
+from posix import listdir
 import torch
 import numpy as np
 import cv2
@@ -18,6 +19,7 @@ class MaskHandler(object):
                  mask_dir: str,
                  initial_mask: str,
                  frame_size: list,
+                 batch_size: int,
                  binary_threshold: float = 0.7) -> None:
         super().__init__()
 
@@ -26,6 +28,7 @@ class MaskHandler(object):
         create_dir(self.mask_dir)
 
         self.size = frame_size
+        self.batch_size = batch_size
 
         self.binary_threshold = binary_threshold
 
@@ -84,7 +87,6 @@ class MaskHandler(object):
         """
         Get a binary mask for the frame with index `idx`
         """
-
         mask_path = path.join(self.mask_dir, f"{idx:05}.png")
         mask = cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.size)
         _, mask = cv2.threshold(mask, self.binary_threshold*255, 1, cv2.THRESH_BINARY)
@@ -97,3 +99,17 @@ class MaskHandler(object):
         mask_path = path.join(self.mask_dir, f"{idx:05}.png")
         mask = cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.size)
         return mask
+
+    def __len__(self):
+        return len(listdir(self.mask_dir))
+
+    def __getitem__(self, idx):
+
+        # BUG: Right now the iterator returns a batch of identical images all from time step t
+
+        masks = []
+        for i in range(len(self.batch_size)):
+            masks.append(self.get_alpha_mask(idx))
+
+        return torch.stack(masks, dim=0).unsqueeze(1)
+        

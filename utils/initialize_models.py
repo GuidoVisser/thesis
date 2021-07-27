@@ -1,6 +1,6 @@
 import torch
 
-from models.RAFT import RAFT
+from models.third_party.RAFT import RAFT
 
 
 def initialize_RAFT(args, device, eval=True):

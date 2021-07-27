@@ -6,8 +6,8 @@ import random
 from PIL import Image
 from os import path, listdir
 
-from models.RAFT.utils.frame_utils import readFlow
-from models.MiVOS.dataset.range_transform import im_normalization
+from models.third_party.RAFT.utils.frame_utils import readFlow
+from research_archive.models.third_party.MiVOS.dataset.range_transform import im_normalization
 
 
 class DAVISPairsDataset(object):

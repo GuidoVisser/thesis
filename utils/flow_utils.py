@@ -1,7 +1,7 @@
 from math import sqrt
 import torch
 
-from models.RAFT.utils.frame_utils import readFlow
+from models.third_party.RAFT.utils.frame_utils import readFlow
 
 def normalize_optical_flow(flow):
     """

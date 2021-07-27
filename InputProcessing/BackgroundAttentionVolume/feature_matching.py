@@ -5,8 +5,8 @@ import torch
 from os import path
 from typing import Union
 
-from models.SuperGlue.models.matching import Matching
-from models.SuperGlue.models.utils import make_matching_plot, AverageTimer, read_image
+from models.third_party.SuperGlue.models.matching import Matching
+from models.third_party.SuperGlue.models.utils import make_matching_plot, AverageTimer, read_image
 
 from utils.utils import create_dirs
 torch.set_grad_enabled(False)
