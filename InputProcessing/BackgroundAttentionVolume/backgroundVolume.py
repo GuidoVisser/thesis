@@ -16,7 +16,7 @@ class BackgroundVolume(object):
 
     def __init__(self,
                  image_dir: str,
-                 mask_dirs: Union[str, list],
+                 mask_dir: str,
                  device: str,
                  interval: int = 1,
                  save_dir: Union[str, None] = None,
@@ -27,10 +27,8 @@ class BackgroundVolume(object):
                                in enumerate(sorted(listdir(image_dir))) 
                                if i % interval == 0]
         
-        if isinstance(mask_dirs, str):
-            self.mask_dirs = [mask_dirs]
-        else:
-            self.mask_dirs = mask_dirs
+        
+        self.mask_dirs = [path.join(mask_dir, dir) for dir in sorted(listdir(mask_dir))]
         
         self.save_dir = save_dir
         if self.save_dir is not None:

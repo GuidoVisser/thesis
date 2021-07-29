@@ -1,36 +1,148 @@
 import torch
 import torch.nn as nn
-from torch.nn.modules.loss import L1Loss, 
+import torch.nn.functional as F
+from torch.nn.modules.loss import L1Loss
 
-from .compositing import composite
-from .utils import sigmoid_smooting
 
-class RGBReconstructionLoss(nn.Module):
+class DecompositeLoss(nn.Module):
+
+    def __init__(self,
+                 lambda_mask: float = 50.,
+                 lambda_recon_flow: float = 1.,
+                 lambda_recon_warp: float = 0.,
+                 lambda_alpha_warp: float = 0.005,
+                 lambda_alpha_l0: float = 0.005,
+                 lambda_alpha_l1: float = 0.01,
+                 lambda_stabilization: float = 0.001) -> None:
+        super().__init__()
+
+        self.criterion = L1Loss()
+        self.mask_criterion = MaskLoss()
+
+        self.lambda_alpha_l0 = lambda_alpha_l0
+        self.lambda_alpha_l1 = lambda_alpha_l1
+        self.lambda_mask = lambda_mask
+        self.lambda_recon_flow = lambda_recon_flow
+        self.lambda_recon_warp = lambda_recon_warp
+        self.lambda_alpha_warp = lambda_alpha_warp
+        self.lambda_stabilization = lambda_stabilization
+
+
+    def __call__(self, predictions: dict, targets: dict) -> torch.Tensor:
+
+        # Ground truth values
+        flow_gt = targets["flow"]                       # [B, 2, 2, H, W]
+        rgb_gt = targets["rgb"]                         # [B, 2, 3, H, W]
+        masks = targets["masks"]                        # [B, 2, 1, H, W]
+        flow_confidence = targets["flow_confidence"]    # [B, 2, 1, H, W]
+
+        # Main loss values
+        rgba_reconstruction = predictions["rgba_reconstruction"] # [B, 2, 4, H, W]
+        flow_reconstruction = predictions["flow_reconstruction"] # [B, 2, 2, H, w]
+        rgb_reconstruction = rgba_reconstruction[:, :, 3:]
+        alpha_composite = rgba_reconstruction[:, :, :3]
+
+        alpha_layers = predictions["layers_rgba"][:, 3]          # [B, 2, L, 4, H, W]
+
+        rgb_reconstruction_loss = self.calculate_loss(rgb_reconstruction, rgb_gt)
+        flow_reconstruction_loss = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
+        alpha_reg_loss = cal_alpha_reg(alpha_composite * 0.5 + 0.5, self.lambda_alpha_l1, self.lambda_alpha_l0)
+        mask_loss = self.calculate_loss(alpha_layers, masks, mask_loss=True)
+
+        # Loss values for temporal consistency
+        alpha_layers_warped = predictions["layers_alpha_warped"]         # [B, L, 1, H, W]
+        rgb_reconstruction_warped = predictions["reconstruction_warped"] # [B, 2, 4, H, W]
+
+        alpha_warp_loss = self.calculate_loss(alpha_layers_warped, alpha_layers)
+        rgb_reconstruction_warp_loss = self.calculate_loss(rgb_reconstruction_warped, rgb_reconstruction)
+
+        # Loss values to compensate for small errors in camera stabilization
+        # brightness_scale = predictions["brightness_scale"]
+        # background_offset = predictions["background_offset"]
+
+        # brightness_regularization_loss = self.criterion(brightness_scale, torch.ones_like(brightness_scale))
+        # background_offset_loss = background_offset.abs().mean()
+
+        # stabilization_loss = brightness_regularization_loss + background_offset_loss
+
+        loss = rgb_reconstruction_loss + \
+                alpha_reg_loss + \
+                self.lambda_recon_flow * flow_reconstruction_loss + \
+                self.lambda_mask * mask_loss + \
+                self.lambda_alpha_warp * alpha_warp_loss + \
+                self.lambda_recon_warp * rgb_reconstruction_warp_loss #+ \
+                # self.lambda_stabilization * stabilization_loss
+
+        return loss
+
+    def rearrange_t2b(self, tensor):
+        """
+        Rearrange a tensor such that the time dimension is stacked in the batch dimension
+
+        [B, 2, ...] -> [B*2, ...]
+        """
+        assert tensor.size(1) == 2
+        return torch.cat((tensor[:, 0], tensor[:, 1]))
+
+    def calculate_loss(self, prediction, target, t2b=True, mask_loss=False):
+        if t2b:
+            prediction  = self.rearrange_t2b(prediction)
+            target      = self.rearrange_t2b(target)
+        
+        if mask_loss:
+            loss = self.mask_criterion(prediction, target)
+        else:
+            loss = self.criterion(prediction, target)
+        
+        return loss
+
+
+##############################################################################################################
+# Adapted from Omnimatte: https://github.com/erikalu/omnimatte/tree/018e56a64f389075e548966e4547fcc404e98986 #
+##############################################################################################################
+
+class MaskLoss(nn.Module):
+    """Define the loss which encourages the predicted alpha matte to match the mask (trimap)."""
 
     def __init__(self):
         super().__init__()
-        self.l1 = L1Loss()
+        self.loss = L1Loss(reduction='none')
 
-    def __call__(self, layers, frame, layer_order):
-        reconstruction = composite(layers, layer_order)
-        return self.l1(reconstruction, frame)
-            
+    def __call__(self, prediction, target):
+        """Calculate loss given predicted alpha matte and trimap.
 
-class FlowReconstructionLoss(nn.Module):
+        Balance positive and negative regions. Exclude 'unknown' region from loss.
 
-    def __init__(self):
-        super().__init__()
-        self.l1 = L1Loss()
+        Parameters:
+            prediction (tensor) - - predicted alpha
+            target (tensor) - - trimap
 
-    def __call__(self, layers, gt, layer_order, conf):
-        reconstruction = composite(layers, layer_order)
-        return conf * self.l1(reconstruction, gt)
+        Returns: the computed loss
+        """
+        mask_err = self.loss(prediction, target)
+        pos_mask = F.relu(target)
+        neg_mask = F.relu(-target)
+        pos_mask_loss = (pos_mask * mask_err).sum() / (1 + pos_mask.sum())
+        neg_mask_loss = (neg_mask * mask_err).sum() / (1 + neg_mask.sum())
+        loss = .5 * (pos_mask_loss + neg_mask_loss)
+        return loss
 
-class RegularizationLoss(nn.Module):
-    
-    def __init__(self, gamma):
-        super().__init__()
-        self.gamma = gamma
 
-    def __call__(self, layers):
-        return layers
+def cal_alpha_reg(prediction, lambda_alpha_l1, lambda_alpha_l0):
+    """Calculate the alpha regularization term.
+
+    Parameters:
+        prediction (tensor) - - composite of predicted alpha layers
+        lambda_alpha_l1 (float) - - weight for the L1 regularization term
+        lambda_alpha_l0 (float) - - weight for the L0 regularization term
+    Returns the alpha regularization loss term
+    """
+
+    loss = 0.
+    if lambda_alpha_l1 > 0:
+        loss += lambda_alpha_l1 * torch.mean(prediction)
+    if lambda_alpha_l0 > 0:
+        # Pseudo L0 loss using a squished sigmoid curve.
+        l0_prediction = (torch.sigmoid(prediction * 5.0) - 0.5) * 2.0
+        loss += lambda_alpha_l0 * torch.mean(l0_prediction)
+    return loss

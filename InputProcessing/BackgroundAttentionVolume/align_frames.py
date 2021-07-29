@@ -18,7 +18,7 @@ def align_two_frames(target_frame: np.array, source_frame: np.array, homography:
         padded_source (np.array): source frame padded to match the dimensions of the warped source frame
         combined (np.array): the warped source frame with the source frame overlayed on it
     """
-    hs, ws = source_frame.shape[:2]
+    hs, ws, c = source_frame.shape
     source_corners = np.float32([[0, 0], 
                                  [0, hs],
                                  [ws,hs], 
@@ -41,8 +41,12 @@ def align_two_frames(target_frame: np.array, source_frame: np.array, homography:
     Ht = np.array([[1,0,t[0]],[0,1,t[1]],[0,0,1]]) # translate
 
     warped_frame = cv2.warpPerspective(source_frame, Ht.dot(homography), (xmax-xmin, ymax-ymin))
+    
+    # If input is a mask the cv2.warpPerspective removes the channel dimension
+    if c == 1:
+        warped_frame = np.expand_dims(warped_frame, 2)
 
-    source_padded = np.zeros((ymax-ymin, xmax-xmin, 3), dtype=np.uint8)
+    source_padded = np.zeros((ymax-ymin, xmax-xmin, c), dtype=np.uint8)
     source_padded[t[1]:ht+t[1], t[0]:wt+t[0]] = target_frame
     
     combined = warped_frame.copy()
