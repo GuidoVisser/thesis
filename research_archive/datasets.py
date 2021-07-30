@@ -7,8 +7,6 @@ from PIL import Image
 from os import path, listdir
 
 from models.third_party.RAFT.utils.frame_utils import readFlow
-from research_archive.models.third_party.MiVOS.dataset.range_transform import im_normalization
-
 
 class DAVISPairsDataset(object):
     def __init__(self, data_root, transforms, max_distance=1):

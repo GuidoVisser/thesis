@@ -13,11 +13,11 @@ if __name__ == "__main__":
     initial_mask = f"datasets/DAVIS_minisample/Annotations/480p/{video}/00000.png"
     save_dir     = f"{results_dir}/decomposition"
 
-    ip          = InputProcessor(img_dir, results_dir, initial_mask)
-    data_loader = DataLoader(ip)
-    loss_module = DecompositeLoss()
-    network     = LayerDecompositionUNet()
-    model       = LayerDecompositer(data_loader, loss_module, network, learning_rate=0.1, save_dir=save_dir)
+    input_processor = InputProcessor(img_dir, results_dir, initial_mask)
+    data_loader     = DataLoader(input_processor)
+    loss_module     = DecompositeLoss()
+    network         = LayerDecompositionUNet()
+    model           = LayerDecompositer(data_loader, loss_module, network, learning_rate=0.1, save_dir=save_dir)
     model.to("cuda")
 
     model.train(2000)
