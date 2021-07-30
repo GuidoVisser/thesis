@@ -11,8 +11,8 @@ from models.third_party.RAFT.utils.frame_utils import readFlow
 class DAVISPairsDataset(object):
     def __init__(self, data_root, transforms, max_distance=1):
         self.frame_root = path.join(data_root, "JPEGImages/480p/")
-        self.mask_root = path.join(data_root, "Annotations/480p/")
-        self.flow_root = path.join(data_root, "Flow/480p/flo/")
+        self.mask_root  = path.join(data_root, "Annotations/480p/")
+        self.flow_root  = path.join(data_root, "Flow/480p/flo/")
         
         self.transforms   = transforms
         self.max_distance = max_distance
