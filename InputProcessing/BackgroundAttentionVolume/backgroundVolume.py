@@ -29,17 +29,16 @@ class BackgroundVolume(object):
                                if i % interval == 0]
         
         self.mask_dirs = [path.join(mask_dir, dir) for dir in sorted(listdir(mask_dir))]
-        
-        self.save_dir = save_dir
+        self.save_dir  = save_dir
 
-        self.interval = interval
-        self.device = device
+        self.interval   = interval
+        self.device     = device
         self.frame_size = frame_size
 
         self.homographies = self.get_homographies()
         self.xmin, self.ymin, self.xmax, self.ymax = self.get_outer_borders()
 
-        self.spatial_noise = np.random.uniform(low=0., high=1., size=(frame_size[1] // 16, frame_size[0] // 16, in_channels - 3))
+        self.spatial_noise           = np.random.uniform(low=0., high=1., size=(frame_size[1] // 16, frame_size[0] // 16, in_channels - 3))
         self.spatial_noise_upsampled = cv2.resize(self.spatial_noise, self.frame_size, interpolation=cv2.INTER_LINEAR)
 
         torch.save(self.spatial_noise, path.join(save_dir, "spatial_noise.pth"))
@@ -148,9 +147,9 @@ class BackgroundVolume(object):
             frame = cv2.imread(frame_path)
 
             # resize image
-            w, h = frame.shape[1], frame.shape[0]
+            w, h         = frame.shape[1], frame.shape[0]
             w_new, h_new = process_resize(w, h, self.frame_size)
-            frame = cv2.resize(frame, (w_new, h_new))
+            frame        = cv2.resize(frame, (w_new, h_new))
             
             # convert to grayscale for SuperGlue
             frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype('float32')
@@ -174,7 +173,7 @@ class BackgroundVolume(object):
         """
 
         n_masks = len(listdir(self.mask_dirs[0]))//self.interval
-        masks = self._initialize_masks(n_masks, (self.frame_size[1], self.frame_size[0]))
+        masks   = self._initialize_masks(n_masks, (self.frame_size[1], self.frame_size[0]))
         for dir in self.mask_dirs:
 
             mask_paths = [path.join(dir, mask) for mask in sorted(listdir(dir))]
@@ -187,9 +186,9 @@ class BackgroundVolume(object):
                 mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
                 # resize mask
-                w, h = mask.shape[1], mask.shape[0]
+                w, h         = mask.shape[1], mask.shape[0]
                 w_new, h_new = process_resize(w, h, self.frame_size)
-                mask = cv2.resize(mask, (w_new, h_new))
+                mask         = cv2.resize(mask, (w_new, h_new))
                 
                 # ensure that mask is binary
                 _, mask = cv2.threshold(mask, binary_threshold, 1, cv2.THRESH_BINARY)
@@ -210,7 +209,7 @@ class BackgroundVolume(object):
         """
 
         frames, _ = self.get_images()
-        masks = self.get_masks()
+        masks     = self.get_masks()
 
         frames = mask_out_foreground(frames, masks)
 
@@ -392,8 +391,8 @@ class BackgroundVolume(object):
         """
         h, w, _ = self.spatial_noise_upsampled.shape
 
-        u = np.stack([np.linspace(-1, 1, num=h)]*w)
-        v = np.stack([np.linspace(-1, 1, num=w)]*h, axis=1)
+        u  = np.stack([np.linspace(-1, 1, num=h)]*w)
+        v  = np.stack([np.linspace(-1, 1, num=w)]*h, axis=1)
         uv = np.stack((u, v), axis=2)
 
         homography = self.calculate_homography_between_two_frames(0, frame_idx)
