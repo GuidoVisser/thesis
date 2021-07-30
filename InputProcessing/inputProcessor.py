@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 from os import path
 from typing import Union
-from torch.autograd import Variable
 
 from utils.video_utils import opencv_folder_to_video
 from utils.utils import create_dirs
@@ -24,8 +23,8 @@ class InputProcessor(object):
                 ) -> None:
         super().__init__()
 
-        self.device = device
-        self.frame_size = frame_size
+        self.device      = device
+        self.frame_size  = frame_size
         self.in_channels = in_channels
 
         if isinstance(initial_mask, str):
@@ -33,18 +32,18 @@ class InputProcessor(object):
         else:
             self.N_objects = len(initial_mask)
 
-        self.out_root = out_root
-        img_dir = path.join(out_root, "images")
-        mask_dir = path.join(out_root, "masks")
-        flow_dir = path.join(out_root, "flow")
+        img_dir        = path.join(out_root, "images")
+        mask_dir       = path.join(out_root, "masks")
+        flow_dir       = path.join(out_root, "flow")
         background_dir = path.join(out_root, "background")
         create_dirs(img_dir, mask_dir, flow_dir, background_dir)
 
         self.prepare_image_dir(video, img_dir)
-        self.frame_iterator = FrameIterator(img_dir, frame_size, device=self.device)
-        self.mask_handler = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device)
+
+        self.frame_iterator    = FrameIterator(img_dir, frame_size, device=self.device)
+        self.mask_handler      = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device)
         self.background_volume = BackgroundVolume(img_dir, mask_dir, background_dir, self.device, in_channels=in_channels, frame_size=self.frame_size)
-        self.flow_handler = FlowHandler(self.frame_iterator, self.mask_handler, self.background_volume.homographies, flow_dir, device=self.device)
+        self.flow_handler      = FlowHandler(self.frame_iterator, self.mask_handler, self.background_volume.homographies, flow_dir, device=self.device)
 
         self.composite_order = [tuple(range(1, self.N_objects + 1))] * len(self.frame_iterator)
 
@@ -82,21 +81,21 @@ class InputProcessor(object):
         # Get RGB input
         rgb_t0 = self.frame_iterator[idx]
         rgb_t1 = self.frame_iterator[idx + 1]
-        rgb = torch.stack((rgb_t0, rgb_t1)) # [T, C, H, W] = [2, 3, H, W]
+        rgb    = torch.stack((rgb_t0, rgb_t1)) # [T, C, H, W] = [2, 3, H, W]
 
         # Get mask input
         masks_t0 = self.mask_handler[idx]
         masks_t1 = self.mask_handler[idx + 1]
-        masks = torch.stack((masks_t0, masks_t1)) # [T, L-1, C, H, W] = [2, L-1, 1, H, W]
+        masks    = torch.stack((masks_t0, masks_t1)) # [T, L-1, C, H, W] = [2, L-1, 1, H, W]
         
         # Get flow input and confidence
         flow_t0, flow_conf_t0, object_flow_t0, background_flow_t0 = self.flow_handler[idx]
         flow_t1, flow_conf_t1, object_flow_t1, background_flow_t1 = self.flow_handler[idx + 1]
-        flow_t1, flow_conf_t1, object_flow_t1, background_flow_t1 = self.flow_handler[idx + 1]
-        flow = torch.stack((flow_t0, flow_t1)) # [T, C, H, W] = [2, 2, H, W]
-        flow_conf = torch.stack((flow_conf_t0, flow_conf_t1)) # [T, L-1, H, W] = [2, L-1, H, W]
-        object_flow = torch.stack((object_flow_t0, object_flow_t1)) # [T, L-1, C, H, W] = [2, L-1, 2, H, W]
-        background_flow = torch.stack((background_flow_t0, background_flow_t1)) # [T, C, H, W] = [2, 2, H, W]
+        
+        flow            = torch.stack((flow_t0, flow_t1))                       # [T, C, H, W]      = [2, 2, H, W]
+        flow_conf       = torch.stack((flow_conf_t0, flow_conf_t1))             # [T, L-1, H, W]    = [2, L-1, H, W]
+        object_flow     = torch.stack((object_flow_t0, object_flow_t1))         # [T, L-1, C, H, W] = [2, L-1, 2, H, W]
+        background_flow = torch.stack((background_flow_t0, background_flow_t1)) # [T, C, H, W]      = [2, 2, H, W]
         
         # Get noise input
         background_noise = torch.from_numpy(self.background_volume.spatial_noise_upsampled).float().permute(2, 0, 1).to(self.device)
@@ -105,14 +104,14 @@ class InputProcessor(object):
         noise_t0 = torch.from_numpy(np.float32(self.background_volume.get_frame_noise(idx))).permute(2, 0, 1)       
         noise_t1 = torch.from_numpy(np.float32(self.background_volume.get_frame_noise(idx + 1))).permute(2, 0, 1)
         noise = torch.stack((noise_t0, noise_t1)).to(self.device).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
+        
         background_uv_map_t0 = self.background_volume.get_frame_uv(idx)
         background_uv_map_t1 = self.background_volume.get_frame_uv(idx + 1)
         background_uv_map = torch.stack((background_uv_map_t0, background_uv_map_t1))
 
-
         # Get model input
         pids = torch.Tensor(self.composite_order[idx]).view(1, -1, 1, 1, 1).to(self.device) * masks  # [T, L-1, 1, H, W] = [2, L-1, 1, H, W]
-        input_tensor = torch.cat((pids, object_flow, noise), dim=2) # [T, L-1, C, H, W] = [2, L-1, 16, H, W]
+        input_tensor = torch.cat((pids, object_flow, noise), dim=2)                                  # [T, L-1, C, H, W] = [2, L-1, 16, H, W]
         background_input = torch.cat((torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), device=self.device, dtype=torch.float32), background_noise), dim=2)
         input_tensor = torch.cat((background_input, input_tensor), dim=1)
 

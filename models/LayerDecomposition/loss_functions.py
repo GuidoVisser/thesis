@@ -36,35 +36,44 @@ class DecompositeLoss(nn.Module):
         masks = targets["masks"]                        # [B, 2, 1, 1, H, W]
         flow_confidence = targets["flow_confidence"]    # [B, 2, 1, H, W]
 
-        # Main loss values
-        rgba_reconstruction = predictions["rgba_reconstruction"] # [B, 2, 4, H, W]
-        flow_reconstruction = predictions["flow_reconstruction"] # [B, 2, 2, H, w]
-        rgb_reconstruction = rgba_reconstruction[:, :, :3]
-        alpha_composite = rgba_reconstruction[:, :, 3:]
+        ### Main loss
 
-        alpha_layers = predictions["layers_rgba"][..., 3:, :, :]          # [B, 2, L, 1, H, W]
+        # Model predictions
+        rgba_reconstruction = predictions["rgba_reconstruction"]        # [B, 2, 4, H, W]
+        flow_reconstruction = predictions["flow_reconstruction"]        # [B, 2, 2, H, w]
+        rgb_reconstruction  = rgba_reconstruction[:, :, :3]             # [B, 2, 3, H, W]
+        alpha_composite     = rgba_reconstruction[:, :, 3:]             # [B, 2, 1, H, W]
+        alpha_layers        = predictions["layers_rgba"][..., 3:, :, :] # [B, 2, L, 1, H, W]
 
-        rgb_reconstruction_loss = self.calculate_loss(rgb_reconstruction, rgb_gt)
+        # Calculate main loss
+        rgb_reconstruction_loss  = self.calculate_loss(rgb_reconstruction, rgb_gt)
         flow_reconstruction_loss = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
-        alpha_reg_loss = cal_alpha_reg(alpha_composite * 0.5 + 0.5, self.lambda_alpha_l1, self.lambda_alpha_l0)
-        mask_loss = self.calculate_loss(alpha_layers, masks, mask_loss=True)
+        mask_loss                = self.calculate_loss(alpha_layers, masks, mask_loss=True)
+        alpha_reg_loss           = cal_alpha_reg(alpha_composite * 0.5 + 0.5, self.lambda_alpha_l1, self.lambda_alpha_l0)
 
-        # Loss values for temporal consistency
-        alpha_layers_warped = predictions["layers_alpha_warped"]         # [B, L, 1, H, W]
+        ### Temporal consistency loss
+
+        # Model predictions
+        alpha_layers_warped       = predictions["layers_alpha_warped"]   # [B, L, 1, H, W]
         rgb_reconstruction_warped = predictions["reconstruction_warped"] # [B, 2, 4, H, W]
 
-        alpha_warp_loss = self.calculate_loss(alpha_layers_warped, alpha_layers)
+        # Calculate loss for temporal consistency
+        alpha_warp_loss              = self.calculate_loss(alpha_layers_warped, alpha_layers)
         rgb_reconstruction_warp_loss = self.calculate_loss(rgb_reconstruction_warped, rgb_reconstruction[:, 0], t2b=False)
 
-        # Loss values to compensate for small errors in camera stabilization
-        # brightness_scale = predictions["brightness_scale"]
+        # ### Adjust for camera stabilization errors
+
+        # # Model predictions
+        # brightness_scale  = predictions["brightness_scale"]
         # background_offset = predictions["background_offset"]
 
+        # # Calculate loss for camera adjustment
         # brightness_regularization_loss = self.criterion(brightness_scale, torch.ones_like(brightness_scale))
-        # background_offset_loss = background_offset.abs().mean()
+        # background_offset_loss         = background_offset.abs().mean()
 
         # stabilization_loss = brightness_regularization_loss + background_offset_loss
 
+        # Combine loss values
         loss = rgb_reconstruction_loss + \
                 alpha_reg_loss + \
                 self.lambda_recon_flow * flow_reconstruction_loss + \
@@ -85,10 +94,13 @@ class DecompositeLoss(nn.Module):
         return torch.cat((tensor[:, 0], tensor[:, 1]))
 
     def calculate_loss(self, prediction, target, t2b=True, mask_loss=False):
+        
+        # Rearrange time dimension into batch dimension
         if t2b:
             prediction  = self.rearrange_t2b(prediction)
             target      = self.rearrange_t2b(target)
         
+        # Calculate loss value
         if mask_loss:
             loss = self.mask_criterion(prediction, target)
         else:

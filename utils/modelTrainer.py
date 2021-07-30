@@ -39,27 +39,24 @@ class ModelTrainer(object):
         """
 
         self.train_function = train_function
-        self.test_function = test_function
-        self.demo_function = demo_function
+        self.test_function  = test_function
+        self.demo_function  = demo_function
 
-        self.model = model
+        self.model        = model
         self.extra_models = extra_models
-        self.optimizer = optimizer
+        self.optimizer    = optimizer
 
-        self.epochs = args.epochs
-        self.batch_size = args.batch_size
+        self.epochs      = args.epochs
+        self.batch_size  = args.batch_size
         self.num_workers = args.num_workers
         self.create_dataloaders(dataset)
 
         # initialize logging
-        self.data_dir = args.data_dir
+        self.data_dir       = args.data_dir
         self.demo_frequency = args.demo_freq
-        self.experiment_dir = os.path.join(
-            args.log_dir, datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
-        self.checkpoint_dir = os.path.join(
-            self.experiment_dir, 'checkpoints')
-        self.demo_dir = os.path.join(
-            self.experiment_dir, "demo")
+        self.experiment_dir = os.path.join(args.log_dir, datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+        self.checkpoint_dir = os.path.join(self.experiment_dir, 'checkpoints')
+        self.demo_dir       = os.path.join(self.experiment_dir, "demo")
         create_dirs([self.experiment_dir, self.checkpoint_dir, self.demo_dir])
         self.summary_writer = SummaryWriter(self.experiment_dir)
 

@@ -34,11 +34,11 @@ class TopKSTM(nn.Module):
         """
         # prepare frame
         frame, _ = pad_divide_by(frame, self.frame_divide_by)
-        frame = frame.to(self.device)
+        frame    = frame.to(self.device)
 
         # get keys, values and query
-        keys = self.key_memory.get()
-        vals = self.val_memory.get()
+        keys  = self.key_memory.get()
+        vals  = self.val_memory.get()
         query = self.prop_net.get_query_values(frame)
 
         # generate segmentation
@@ -73,7 +73,7 @@ class TopKSTM(nn.Module):
 
         # prepare frame
         frame, _ = pad_divide_by(frame, self.frame_divide_by)
-        mask, _ = pad_divide_by(mask, self.frame_divide_by)
+        mask, _  = pad_divide_by(mask, self.frame_divide_by)
 
         frame, mask = frame.to(self.device), mask.to(self.device)
        
@@ -100,7 +100,7 @@ class Memory(object):
         self.size = size
         self.front_pointer = 0
         self.memory_device = memory_device
-        self.model_device = model_device
+        self.model_device  = model_device
 
     def get(self):
         return self.data[:, :, :self.front_pointer+1].to(self.model_device)

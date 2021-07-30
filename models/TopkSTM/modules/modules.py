@@ -1,12 +1,9 @@
 """
 Modifed from the original STM code https://github.com/seoungwugoh/STM
 """
-import math
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.model_zoo as model_zoo
 from torchvision import models
 
 from .mod_resnet import resnet50
@@ -40,9 +37,9 @@ class MaskRGBEncoder(nn.Module):
         super().__init__()
 
         resnet = resnet50(pretrained=True, extra_chan=2)
-        self.conv1 = resnet.conv1
-        self.bn1 = resnet.bn1
-        self.relu = resnet.relu  # 1/2, 64
+        self.conv1   = resnet.conv1
+        self.bn1     = resnet.bn1
+        self.relu    = resnet.relu  # 1/2, 64
         self.maxpool = resnet.maxpool
 
         self.layer1 = resnet.layer1 # 1/4, 256
@@ -68,23 +65,23 @@ class RGBEncoder(nn.Module):
     def __init__(self):
         super().__init__()
         resnet = models.resnet50(pretrained=True)
-        self.conv1 = resnet.conv1
-        self.bn1 = resnet.bn1
-        self.relu = resnet.relu  # 1/2, 64
+        self.conv1   = resnet.conv1
+        self.bn1     = resnet.bn1
+        self.relu    = resnet.relu  # 1/2, 64
         self.maxpool = resnet.maxpool
 
-        self.res2 = resnet.layer1 # 1/4, 256
+        self.res2   = resnet.layer1 # 1/4, 256
         self.layer2 = resnet.layer2 # 1/8, 512
         self.layer3 = resnet.layer3 # 1/16, 1024
 
     def forward(self, f):
-        x = self.conv1(f) 
-        x = self.bn1(x)
-        x = self.relu(x)   # 1/2, 64
-        x = self.maxpool(x)  # 1/4, 64
-        f4 = self.res2(x)   # 1/4, 256
-        f8 = self.layer2(f4) # 1/8, 512
-        f16 = self.layer3(f8) # 1/16, 1024
+        x   = self.conv1(f) 
+        x   = self.bn1(x)
+        x   = self.relu(x)     # 1/2, 64
+        x   = self.maxpool(x)  # 1/4, 64
+        f4  = self.res2(x)     # 1/4, 256
+        f8  = self.layer2(f4)  # 1/8, 512
+        f16 = self.layer3(f8)  # 1/16, 1024
 
         return f16, f8, f4
 
@@ -94,7 +91,8 @@ class UpsampleBlock(nn.Module):
         super().__init__()
         self.skip_conv1 = nn.Conv2d(skip_c, up_c, kernel_size=3, padding=1)
         self.skip_conv2 = ResBlock(up_c, up_c)
-        self.out_conv = ResBlock(up_c, out_c)
+        self.out_conv   = ResBlock(up_c, out_c)
+        
         self.scale_factor = scale_factor
 
     def forward(self, skip_f, up_f):

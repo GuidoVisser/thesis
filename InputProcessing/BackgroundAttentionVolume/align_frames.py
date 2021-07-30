@@ -1,8 +1,6 @@
 from typing import Tuple
 import cv2
 import numpy as np
-from numpy.core.numeric import outer
-
 
 def align_two_frames(target_frame: np.array, source_frame: np.array, homography: np.array) -> Tuple[np.array, np.array, np.array]:
     """
@@ -37,8 +35,11 @@ def align_two_frames(target_frame: np.array, source_frame: np.array, homography:
     [xmin, ymin] = np.int32(all_corners.min(axis=0).ravel() - 0.5)
     [xmax, ymax] = np.int32(all_corners.max(axis=0).ravel() + 0.5)
 
+    # Translation matrix
     t = [-xmin, -ymin]
-    Ht = np.array([[1,0,t[0]],[0,1,t[1]],[0,0,1]]) # translate
+    Ht = np.array([[1, 0, t[0]],
+                   [0, 1, t[1]],
+                   [0, 0,   1]]) 
 
     warped_frame = cv2.warpPerspective(source_frame, Ht.dot(homography), (xmax-xmin, ymax-ymin))
     

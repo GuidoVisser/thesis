@@ -1,4 +1,3 @@
-from pathlib import Path
 import numpy as np
 import matplotlib.cm as cm
 import torch
@@ -6,7 +5,7 @@ from os import path
 from typing import Union
 
 from models.third_party.SuperGlue.models.matching import Matching
-from models.third_party.SuperGlue.models.utils import make_matching_plot, AverageTimer, read_image
+from models.third_party.SuperGlue.models.utils import make_matching_plot, AverageTimer
 
 from utils.utils import create_dirs
 
@@ -61,7 +60,7 @@ def extract_and_match_features(frames: list,
         # Perform the matching.
         pred = matching({'image0': image0, 'image1': image1})
         pred = {k: v[0].cpu().numpy() for k, v in pred.items()}
-        kpts0, kpts1 = pred['keypoints0'], pred['keypoints1']
+        kpts0, kpts1  = pred['keypoints0'], pred['keypoints1']
         matches, conf = pred['matches0'], pred['matching_scores0']
         timer.update('feature matching')
 
@@ -82,10 +81,10 @@ def extract_and_match_features(frames: list,
             viz_path = path.join(output_dir, f"{i*interval:05}_{(i+1)*interval:05}_matches.png")
 
             # Keep the matching keypoints.
-            valid = matches > -1
+            valid  = matches > -1
             mkpts0 = kpts0[valid]
             mkpts1 = kpts1[matches[valid]]
-            mconf = conf[valid]
+            mconf  = conf[valid]
 
             # Visualize the matches.
             color = cm.jet(mconf)

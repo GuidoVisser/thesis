@@ -2,11 +2,9 @@ from os import path, listdir
 import cv2
 import numpy as np
 import torch
-import torch.nn.functional as F
-from typing import Union, Tuple
+from typing import Tuple
 
 from models.third_party.SuperGlue.models.utils import process_resize, frame2tensor
-from utils.utils import create_dir
 
 from .feature_matching import get_model_config, extract_and_match_features, get_matching_coordinates
 from .homography import extract_homography
@@ -132,13 +130,13 @@ class BackgroundVolume(object):
         Images are converted to grayscale and then to torch.Tensors for SuperGlue
 
         Args:
-            img_dir (str): path to directory where images are stored 
-            device (str): device for the SuperGlue model
-            resize (list[int]): size to which frames are rescaled before being processed
+            img_dir  (str): path to directory where images are stored 
+            device   (str): device for the SuperGlue model
+            resize   (list[int]): size to which frames are rescaled before being processed
             interval (int): interval between images
         
         Returns:
-            frames (list[np.array]) = list of frames
+            frames        (list[np.array]) = list of frames
             frame_tensors (list[np.array]) = list of tensors usable by SuperGlue model
         """
 
@@ -276,7 +274,7 @@ class BackgroundVolume(object):
 
         Args:
             frames (list[np.array]): list of frames
-            noise (np.array): spatial noise, should be of the same dimensions as the frames
+            noise  (np.array): spatial noise, should be of the same dimensions as the frames
 
         Returns:
             processed_frames (list): list of frames with the random noise added
@@ -300,7 +298,7 @@ class BackgroundVolume(object):
         size of the masks that will be initialized
 
         Args:
-            n_masks (int): number of masks that need to be initialized
+            n_masks  (int): number of masks that need to be initialized
             interval (int): shape of the masks
 
         Returns:

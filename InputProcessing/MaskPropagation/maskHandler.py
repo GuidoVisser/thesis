@@ -25,7 +25,7 @@ class MaskHandler(object):
         super().__init__()
 
         # set hyperparameters
-        self.size = frame_size
+        self.size             = frame_size
         self.binary_threshold = binary_threshold
 
         # set up directories and correct input for masks
@@ -33,9 +33,9 @@ class MaskHandler(object):
             initial_masks = [initial_masks]
         
         self.N_objects = len(initial_masks)
-        self.img_dir = img_dir
-        self.mask_dir = mask_dir
-        self.device = device
+        self.img_dir   = img_dir
+        self.mask_dir  = mask_dir
+        self.device    = device
 
         # propagate each object mask through video
         for i in range(self.N_objects):
@@ -91,9 +91,6 @@ class MaskHandler(object):
             mask_pred = propagation_model.predict_mask_and_memorize(i, frame)
 
             # resize to correct output size
-            # size = list(mask_pred.shape[-2:])
-            # size[-2] = self.size[1]
-            # size[-1] = self.size[0]
             mask_pred = F.interpolate(mask_pred, (self.size[1], self.size[0]), mode="bilinear")
 
             # save mask as image

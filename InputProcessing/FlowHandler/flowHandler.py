@@ -1,11 +1,9 @@
-from os import path, listdir
+from os import path
 import numpy as np
-from numpy.core.shape_base import stack
 import torch
 import cv2
 
 from torch.nn.functional import grid_sample, l1_loss
-from InputProcessing import frameIterator
 
 from utils.utils import create_dirs
 from InputProcessing.BackgroundAttentionVolume.align_frames import align_two_frames
@@ -31,13 +29,12 @@ class FlowHandler(object):
         super().__init__()
         
         self.device = device
-        self.iters = iters
+        self.iters  = iters
         self.forward_backward_threshold = forward_backward_threshold
-        self.photometric_threshold = photometric_threshold
+        self.photometric_threshold      = photometric_threshold
         self.raft = self.initialize_raft()
 
         self.output_dir= output_dir
-        
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
                     path.join(self.output_dir, "forward", "png"),
                     path.join(self.output_dir, "backward", "flow"),
@@ -45,46 +42,9 @@ class FlowHandler(object):
                     path.join(self.output_dir, "confidence"))
 
         self.frame_iterator = frame_iterator
-        self.mask_iterator = mask_iterator
-        self.homographies = homographies
-        self.padder = InputPadder(self.frame_iterator.frame_size)
-
-    def calculate_flow_for_video(self, stabalized=False):
-        """
-        Calculate the optical flow for the entire video
-        """
-
-        for i in range(len(self.frame_iterator) - 1):
-            
-            if stabalized:
-                flow, _ = self.calculate_flow_between_stabilized_frames(i)
-            else:
-                flow, _ = self.calculate_flow_between_frames(i)
-
-            writeFlow(path.join(self.output_dir, "flow", f"{i:05}.flo"), flow)
-            cv2.imwrite(path.join(self.output_dir, "png", f"{i:05}.png"), flow_to_image(flow, convert_to_bgr=True))
-
-    def calculate_flow_between_frames(self, frame_idx):
-        """
-        Calculate the forward flow between two subsequent frames
-        """
-        # Define images
-        image0 = self.get_image(frame_idx)
-        image1 = self.get_image(frame_idx + 1)
-        
-        # Prepare images for use with RAFT
-        image0 = self.prepare_image_for_raft(image0)
-        image1 = self.prepare_image_for_raft(image1)
-
-        # Calculate forward and backward optical flow
-        _, forward_flow = self.raft(image0, image1, iters=self.iters, test_mode=True)
-        _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
-
-        # Get the flow confidence
-        object_mask = self.mask_iterator[frame_idx]
-        conf = self.get_confidence(image0, image1, forward_flow, backward_flow, object_mask)
-
-        return forward_flow, conf
+        self.mask_iterator  = mask_iterator
+        self.homographies   = homographies
+        self.padder         = InputPadder(self.frame_iterator.frame_size)
 
     @torch.no_grad()
     def __getitem__(self, frame_idx):
@@ -93,6 +53,7 @@ class FlowHandler(object):
         a perspective warp with the homography
         """
 
+        # Get object masks
         mask = self.mask_iterator.get_binary_masks(frame_idx)
         object_masks = torch.from_numpy(mask).to(self.device)
 
@@ -121,7 +82,7 @@ class FlowHandler(object):
             image0, image1 = padder.pad(image0, image1)
 
             # Calculate forward and backward optical flow
-            _, forward_flow = self.raft(image0, image1, iters=self.iters, test_mode=True)
+            _, forward_flow  = self.raft(image0, image1, iters=self.iters, test_mode=True)
             _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
 
             # Get the flow confidence
@@ -134,13 +95,14 @@ class FlowHandler(object):
 
             # Recover original perspective
             forward_flow = padder.unpad(forward_flow)
-            conf = padder.unpad(conf)
+            conf         = padder.unpad(conf)
+
             forward_flow = forward_flow[:, translation[1]:h+translation[1], translation[0]:w+translation[0]]
-            conf = conf[translation[1]:h+translation[1], translation[0]:w+translation[0]]
+            conf         = conf[translation[1]:h+translation[1], translation[0]:w+translation[0]]
 
             # save results
             forward_flow_copy = torch.clone(forward_flow).permute(1, 2, 0).cpu().numpy()
-            conf_copy = torch.clone(conf).cpu().numpy()
+            conf_copy         = torch.clone(conf).cpu().numpy()
 
             writeFlow(path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo"), forward_flow_copy)
             cv2.imwrite(path.join(self.output_dir, f"forward/png/{frame_idx:05}.png"), flow_to_image(forward_flow_copy))
@@ -185,13 +147,7 @@ class FlowHandler(object):
 
         # Calculate the different confidence terms
         forward_backward_conf = self.calculate_forward_backward_confidence(forward, backward)
-        photometric_conf = self.calculate_photometric_confidence(image0, image1, forward)
-
-        # N_objects, _, _ = object_masks.size()
-
-        # # Stack confidence terms in layer dimension
-        # forward_backward_conf = torch.stack([forward_backward_conf]*N_objects, dim=0)
-        # photometric_conf = torch.stack([photometric_conf]*N_objects, dim=0)
+        photometric_conf      = self.calculate_photometric_confidence(image0, image1, forward)
 
         # return pixelwise weights for flow reconstruction confidence
         return forward_backward_conf * photometric_conf #* object_masks
@@ -223,9 +179,9 @@ class FlowHandler(object):
         photometric_error = photometric_error[0]
 
         # Construct a mask based on the photometric error and threshold
-        ones = torch.ones_like(photometric_error)
+        ones  = torch.ones_like(photometric_error)
         zeros = torch.zeros_like(photometric_error)
-        mask =  torch.where(photometric_error < self.photometric_threshold, ones, zeros)
+        mask  = torch.where(photometric_error < self.photometric_threshold, ones, zeros)
 
         # delete unnecessary tensors to save memory
         del ones, zeros
@@ -259,9 +215,9 @@ class FlowHandler(object):
         error = error[0]
         
         # define the confidence tensor
-        ones = torch.ones_like(error)
+        ones  = torch.ones_like(error)
         zeros = torch.zeros_like(error)
-        conf = torch.maximum(ones - error / self.forward_backward_threshold, zeros)
+        conf  = torch.maximum(ones - error / self.forward_backward_threshold, zeros)
 
         # delete unnecessary tensors to save memory
         del ones, zeros
@@ -275,7 +231,7 @@ class FlowHandler(object):
         N_objects, _, _ =  masks.shape
 
         stacked_flow = torch.stack([flow]*N_objects)
-        object_flow = stacked_flow * masks
+        object_flow  = stacked_flow * masks
 
         background_mask = 1. - torch.sum(masks, dim=0)
         background_mask = torch.maximum(background_mask, torch.zeros_like(background_mask))
@@ -291,7 +247,7 @@ class FlowHandler(object):
 
         Args:
             tensor (torch.Tensor)
-            flow (torch.Tensor)
+            flow   (torch.Tensor)
 
         Returns:
             tensor (torch.Tensor): the warped input tensor
@@ -301,7 +257,7 @@ class FlowHandler(object):
         # Calculate a base grid that functions as an identity sampler
         horizontal = torch.linspace(-1.0, 1.0, flow.size(3)).view(1, 1, 1, flow.size(3)).expand(flow.size(0), 1, flow.size(2), flow.size(3))
         vertical   = torch.linspace(-1.0, 1.0, flow.size(2)).view(1, 1, flow.size(2), 1).expand(flow.size(0), 1, flow.size(2), flow.size(3))
-        base_grid = torch.cat([horizontal, vertical], dim=1).to(tensor.device)
+        base_grid  = torch.cat([horizontal, vertical], dim=1).to(tensor.device)
 
         # calculate a Delta grid based on the flow that offsets the base grid
         flow_grid = torch.cat([flow[:, 0:1, :, :] / (w - 1.) / 2., 
@@ -311,6 +267,43 @@ class FlowHandler(object):
         grid = (base_grid + flow_grid).permute(0, 2, 3, 1)
 
         return grid_sample(tensor, grid, align_corners=True)
+
+    def calculate_flow_for_video(self, stabalized=False):
+        """
+        Calculate the optical flow for the entire video
+        """
+
+        for i in range(len(self.frame_iterator) - 1):
+            
+            if stabalized:
+                flow, _ = self.calculate_flow_between_stabilized_frames(i)
+            else:
+                flow, _ = self.calculate_flow_between_frames(i)
+
+            writeFlow(path.join(self.output_dir, "flow", f"{i:05}.flo"), flow)
+            cv2.imwrite(path.join(self.output_dir, "png", f"{i:05}.png"), flow_to_image(flow, convert_to_bgr=True))
+
+    def calculate_flow_between_frames(self, frame_idx):
+        """
+        Calculate the forward flow between two subsequent frames
+        """
+        # Define images
+        image0 = self.get_image(frame_idx)
+        image1 = self.get_image(frame_idx + 1)
+        
+        # Prepare images for use with RAFT
+        image0 = self.prepare_image_for_raft(image0)
+        image1 = self.prepare_image_for_raft(image1)
+
+        # Calculate forward and backward optical flow
+        _, forward_flow  = self.raft(image0, image1, iters=self.iters, test_mode=True)
+        _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
+
+        # Get the flow confidence
+        object_mask = self.mask_iterator[frame_idx]
+        conf = self.get_confidence(image0, image1, forward_flow, backward_flow, object_mask)
+
+        return forward_flow, conf
 
     def __len__(self):
         return len(self.frame_iterator)

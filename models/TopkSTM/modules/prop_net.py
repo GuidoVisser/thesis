@@ -6,7 +6,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import models
 
 from .modules import *
 
@@ -15,8 +14,8 @@ class Decoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.compress = ResBlock(1024, 512)
-        self.up_16_8 = UpsampleBlock(512, 512, 256) # 1/16 -> 1/8
-        self.up_8_4 = UpsampleBlock(256, 256, 256) # 1/8 -> 1/4
+        self.up_16_8  = UpsampleBlock(512, 512, 256) # 1/16 -> 1/8
+        self.up_8_4   = UpsampleBlock(256, 256, 256) # 1/8 -> 1/4
 
         self.pred = nn.Conv2d(256, 1, kernel_size=(3,3), padding=(1,1), stride=1)
 
@@ -135,9 +134,9 @@ class PropagationNetwork(nn.Module):
         self.kv_m_f16 = KeyValue(1024, keydim=128, valdim=512)
         self.kv_q_f16 = KeyValue(1024, keydim=128, valdim=512)
 
-        self.memory = EvalMemoryReader(top_k, km=None)
+        self.memory      = EvalMemoryReader(top_k, km=None)
         self.attn_memory = AttentionMemory(top_k)
-        self.decoder = Decoder()
+        self.decoder     = Decoder()
 
     def memorize(self, frame, masks): 
         # print(f"prop_net.memorise() \n\tmask shape: {masks.shape} \n\tmask type: {type(masks)} \n\tframe shape: {frame.shape} \n\tframe type: {type(frame)}\n")
@@ -193,8 +192,8 @@ class PropagationNetwork(nn.Module):
 
         W = self.get_W(mk16, qk16)
 
-        pos_map = (F.interpolate(pos_mask, size=(nh,nw), mode='area').view(b, 1, nh*nw) @ W)
-        neg_map = (F.interpolate(neg_mask, size=(nh,nw), mode='area').view(b, 1, nh*nw) @ W)
+        pos_map  = (F.interpolate(pos_mask, size=(nh,nw), mode='area').view(b, 1, nh*nw) @ W)
+        neg_map  = (F.interpolate(neg_mask, size=(nh,nw), mode='area').view(b, 1, nh*nw) @ W)
         attn_map = torch.cat([pos_map, neg_map], 1)
         attn_map = attn_map.reshape(b, 2, nh, nw)
         attn_map = F.interpolate(attn_map, mode='bilinear', size=(h,w), align_corners=False)

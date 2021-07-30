@@ -74,25 +74,28 @@ class LayerDecompositionUNet(nn.Module):
     def __init__(self, conv_channels=64, in_channels=16, max_frames=200, coarseness=10):
         super().__init__()
         self.encoder = nn.ModuleList([
-            ConvBlock(nn.Conv2d, in_channels, conv_channels, ksize=4, stride=2),
-            ConvBlock(nn.Conv2d, conv_channels, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, activation='leaky'),
-            ConvBlock(nn.Conv2d, conv_channels * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, activation='leaky'),
-            ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, activation='leaky'),
-            ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, activation='leaky'),
+            ConvBlock(nn.Conv2d, in_channels,       conv_channels,     ksize=4, stride=2),
+            ConvBlock(nn.Conv2d, conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),
+            ConvBlock(nn.Conv2d, conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),
+            ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),
+            ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),
             ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),
             ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')])
+        
         self.decoder = nn.ModuleList([
             ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d),
             ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d),
             ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d),
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 2, conv_channels, ksize=4, stride=2, norm=nn.BatchNorm2d),
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 2, conv_channels, ksize=4, stride=2, norm=nn.BatchNorm2d)])
+            ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d),
+            ConvBlock(nn.ConvTranspose2d, conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d)])
+        
         self.final_rgba = ConvBlock(nn.Conv2d, conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock(nn.Conv2d, conv_channels, 2, ksize=4, stride=1, activation='none')
 
-        self.max_frames = max_frames
-        self.bg_offset = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
+        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
+
+        self.max_frames = max_frames
         
     def render(self, x):
         """Pass inputs for a single layer through UNet.
@@ -147,8 +150,9 @@ class LayerDecompositionUNet(nn.Module):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
             rgba, flow = self.render(layer_input)
-            alpha = rgba[:, 3:4] * .5 + 5
+            alpha = self.get_alpha_from_rgba(rgba)
 
+            # Background layer
             if i == 0:
                 composite_rgba = F.grid_sample(rgba, background_uv_map)
                 flow = composite_flow
@@ -156,7 +160,7 @@ class LayerDecompositionUNet(nn.Module):
                 # Temporal consistency 
                 rgba_warped = rgba[:batch_size]
                 composite_warped = rgba_warped[:, :3]
-
+            # Object layers
             else:
                 composite_rgba = rgba * alpha + composite_rgba * (1. - alpha)
                 composite_flow = flow * alpha + composite_flow * (1. - alpha)
@@ -164,7 +168,7 @@ class LayerDecompositionUNet(nn.Module):
                 # Temporal consistency
                 rgba_t1 = rgba[batch_size:]
                 rgba_warped = FlowHandler.apply_flow(rgba_t1, flow[:batch_size])
-                alpha_warped = rgba_warped[:, 3:4] * .5 + .5
+                alpha_warped = self.get_alpha_from_rgba(rgba_warped)
                 composite_warped = rgba_warped[:, :3] * alpha_warped + composite_warped * (1.0 - alpha_warped)
 
             layers_rgba.append(rgba)
@@ -189,3 +193,9 @@ class LayerDecompositionUNet(nn.Module):
             "layers_alpha_warped": layers_alpha_warped      # [B, L, 1, H, W]
         }
         return out
+
+    def get_alpha_from_rgba(rgba):
+        """
+        Get the alpha layer from an rgba tensor that is ready for compositing
+        """
+        return rgba[:, 3:4] * .5 + 5

@@ -110,8 +110,8 @@ def fill_holes_in_mask(mask):
 
 if __name__ == "__main__":
 
-    mask_pred_path = ""
-    mask_gt_path = ""
+    mask_pred_path  = ""
+    mask_gt_path    = ""
     mask_error_path = ""
 
     gt_masks = listdir(mask_gt_path)

@@ -17,7 +17,7 @@ def remove_foreground_features(coords: list, masks: list) -> list:
     adjusted_coords = []
     for i in range(len(coords)):
         coords0, coords1 = coords[i]
-        mask0, mask1 = masks[i], masks[i+1]
+        mask0, mask1     = masks[i], masks[i+1]
 
         adjusted_coords0, adjusted_coords1 = [], []
         for j in range(len(coords0)):
