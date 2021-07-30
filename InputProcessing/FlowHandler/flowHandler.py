@@ -1,5 +1,6 @@
 from os import path, listdir
 import numpy as np
+from numpy.core.shape_base import stack
 import torch
 import cv2
 
@@ -36,7 +37,12 @@ class FlowHandler(object):
         self.raft = self.initialize_raft()
 
         self.output_dir= output_dir
-        create_dirs(path.join(self.output_dir, "flow"), path.join(self.output_dir, "png"))
+        
+        create_dirs(path.join(self.output_dir, "forward", "flow"), 
+                    path.join(self.output_dir, "forward", "png"),
+                    path.join(self.output_dir, "backward", "flow"),
+                    path.join(self.output_dir, "backward", "png"),
+                    path.join(self.output_dir, "confidence"))
 
         self.frame_iterator = frame_iterator
         self.mask_iterator = mask_iterator
@@ -80,53 +86,76 @@ class FlowHandler(object):
 
         return forward_flow, conf
 
-
+    @torch.no_grad()
     def __getitem__(self, frame_idx):
         """
         Calculate the forward flow between the frame at `frame_idx` and the next after being stabalized using 
         a perspective warp with the homography
         """
-        # Define images
-        image0 = self.get_image(frame_idx)
-        image1 = self.get_image(frame_idx + 1)
 
-        mask_t0 = self.mask_iterator.get_binary_mask(frame_idx)
-        mask_t1 = self.mask_iterator.get_binary_mask(frame_idx + 1)
+        mask = self.mask_iterator.get_binary_masks(frame_idx)
+        object_masks = torch.from_numpy(mask).to(self.device)
 
-        h, w, _ = image0.shape
+        N_objects = object_masks.shape[0]
 
-        # Align the frames using the pre-calculated homography
-        image1, image0, _, translation = align_two_frames(image0, image1, self.homographies[frame_idx])
-        mask_t0, mask_t1, _, _ = align_two_frames(np.transpose(mask_t0, (1, 2, 0)), np.transpose(mask_t1, (1, 2, 0)), self.homographies[frame_idx])
-        object_masks = torch.from_numpy(np.stack((np.transpose(mask_t0, (2, 0, 1)), np.transpose(mask_t1, (2, 0, 1))))).to(self.device)
+        frame_path = path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo")
+        if path.exists(frame_path):
+            forward_flow = torch.from_numpy(readFlow(frame_path)).permute(2, 0, 1).to(self.device)
+            conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)).to(self.device)
+        else:
 
-        # Prepare images for use with RAFT
-        image0 = self.prepare_image_for_raft(image0)
-        image1 = self.prepare_image_for_raft(image1)
+            # Define images
+            image0 = self.get_image(frame_idx)
+            image1 = self.get_image(frame_idx + 1)
 
-        padder = InputPadder(image0.shape)
-        image0, image1, object_masks = padder.pad(image0, image1, object_masks)
+            h, w, _ = image0.shape
 
-        # Calculate forward and backward optical flow
-        _, forward_flow = self.raft(image0, image1, iters=self.iters, test_mode=True)
-        _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
+            # Align the frames using the pre-calculated homography
+            image1, image0, _, translation = align_two_frames(image0, image1, self.homographies[frame_idx])
 
-        # Get the flow confidence
-        conf = self.get_confidence(image0, image1, forward_flow, backward_flow, object_masks)
+            # Prepare images for use with RAFT
+            image0 = self.prepare_image_for_raft(image0)
+            image1 = self.prepare_image_for_raft(image1)
 
-        # remove batch dimension from RAFT
-        forward_flow = forward_flow[0]
-        backward_flow = backward_flow[0]
+            padder = InputPadder(image0.shape)
+            image0, image1 = padder.pad(image0, image1)
 
-        # Recover original perspective
-        flow = torch.stack((padder.unpad(forward_flow), padder.unpad(backward_flow)))
-        conf = padder.unpad(conf)
-        flow = flow[:, :, translation[1]:h+translation[1], translation[0]:w+translation[0]]
-        conf = conf[:, :, translation[1]:h+translation[1], translation[0]:w+translation[0]]
+            # Calculate forward and backward optical flow
+            _, forward_flow = self.raft(image0, image1, iters=self.iters, test_mode=True)
+            _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
 
-        return flow, conf
+            # Get the flow confidence
+            conf = self.get_confidence(image0, image1, forward_flow, backward_flow)
+
+            del backward_flow
+
+            # remove batch dimension from RAFT
+            forward_flow = forward_flow[0]
+
+            # Recover original perspective
+            forward_flow = padder.unpad(forward_flow)
+            conf = padder.unpad(conf)
+            forward_flow = forward_flow[:, translation[1]:h+translation[1], translation[0]:w+translation[0]]
+            conf = conf[translation[1]:h+translation[1], translation[0]:w+translation[0]]
+
+            # save results
+            forward_flow_copy = torch.clone(forward_flow).permute(1, 2, 0).cpu().numpy()
+            conf_copy = torch.clone(conf).cpu().numpy()
+
+            writeFlow(path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo"), forward_flow_copy)
+            cv2.imwrite(path.join(self.output_dir, f"forward/png/{frame_idx:05}.png"), flow_to_image(forward_flow_copy))
+            cv2.imwrite(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), np.expand_dims(conf_copy, 2) * 255)
+            
+            del forward_flow_copy
+
+        conf = torch.stack([conf]*N_objects, dim=0) * object_masks
+
+        # get flow of objects and background
+        object_flow, background_flow = self.get_object_and_background_flow(forward_flow, object_masks)
+
+        return forward_flow, conf, object_flow, background_flow
         
-    def get_confidence(self, image0, image1, forward, backward, object_masks):
+    def get_confidence(self, image0, image1, forward, backward):
         """
         Calculate an alhpa mask for every object that serves as a weight for the flow reconstruction
         The alpha mask at timestep t is defined as follows:
@@ -158,14 +187,14 @@ class FlowHandler(object):
         forward_backward_conf = self.calculate_forward_backward_confidence(forward, backward)
         photometric_conf = self.calculate_photometric_confidence(image0, image1, forward)
 
-        _, N_objects, _, _ = object_masks.size()
+        # N_objects, _, _ = object_masks.size()
 
-        # Stack confidence terms in layer dimension
-        forward_backward_conf = torch.stack([forward_backward_conf]*N_objects, dim=0)
-        photometric_conf = torch.stack([photometric_conf]*N_objects, dim=0)
+        # # Stack confidence terms in layer dimension
+        # forward_backward_conf = torch.stack([forward_backward_conf]*N_objects, dim=0)
+        # photometric_conf = torch.stack([photometric_conf]*N_objects, dim=0)
 
         # return pixelwise weights for flow reconstruction confidence
-        return forward_backward_conf * photometric_conf * object_masks
+        return forward_backward_conf * photometric_conf #* object_masks
 
     def calculate_photometric_confidence(self, image0, image1, flow):
         """
@@ -189,6 +218,9 @@ class FlowHandler(object):
         # Calculate the photometric error between I_t and warped I_(t+1)
         photometric_error = l1_loss(image0, image1, reduction="none")
         photometric_error = torch.sum(photometric_error, dim=1)
+
+        # remove batch dimension from RAFT
+        photometric_error = photometric_error[0]
 
         # Construct a mask based on the photometric error and threshold
         ones = torch.ones_like(photometric_error)
@@ -222,6 +254,9 @@ class FlowHandler(object):
 
         # calculate magnitude of resulting difference vector at every pixel
         error = torch.sqrt(torch.sum(torch.square(forward + backward), dim=1))
+
+        # remove RAFT batch dimension
+        error = error[0]
         
         # define the confidence tensor
         ones = torch.ones_like(error)
@@ -232,6 +267,22 @@ class FlowHandler(object):
         del ones, zeros
 
         return conf
+
+    def get_object_and_background_flow(self, flow, masks):
+        """
+        Return the object flow of all objects in the scene
+        """
+        N_objects, _, _ =  masks.shape
+
+        stacked_flow = torch.stack([flow]*N_objects)
+        object_flow = stacked_flow * masks
+
+        background_mask = 1. - torch.sum(masks, dim=0)
+        background_mask = torch.maximum(background_mask, torch.zeros_like(background_mask))
+        background_flow = flow * background_mask
+
+        return object_flow, background_flow
+
 
     @staticmethod
     def apply_flow(tensor: torch.Tensor, flow: torch.Tensor) -> torch.Tensor:

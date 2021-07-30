@@ -1,6 +1,8 @@
 from os import path, listdir
 import cv2
 import numpy as np
+import torch
+import torch.nn.functional as F
 from typing import Union, Tuple
 
 from models.third_party.SuperGlue.models.utils import process_resize, frame2tensor
@@ -9,7 +11,7 @@ from utils.utils import create_dir
 from .feature_matching import get_model_config, extract_and_match_features, get_matching_coordinates
 from .homography import extract_homography
 from .remove_foreground import remove_foreground_features, mask_out_foreground
-from .utils import get_translation_matrix
+from .utils import get_translation_matrix, get_scale_matrix
 
 
 class BackgroundVolume(object):
@@ -17,9 +19,10 @@ class BackgroundVolume(object):
     def __init__(self,
                  image_dir: str,
                  mask_dir: str,
+                 save_dir: str,
                  device: str,
                  interval: int = 1,
-                 save_dir: Union[str, None] = None,
+                 in_channels: int = 16,
                  frame_size: list = [864, 480]) -> None:
         super().__init__()
         self.frame_sequence = [path.join(image_dir, frame) 
@@ -27,12 +30,9 @@ class BackgroundVolume(object):
                                in enumerate(sorted(listdir(image_dir))) 
                                if i % interval == 0]
         
-        
         self.mask_dirs = [path.join(mask_dir, dir) for dir in sorted(listdir(mask_dir))]
         
         self.save_dir = save_dir
-        if self.save_dir is not None:
-            create_dir(self.save_dir)
 
         self.interval = interval
         self.device = device
@@ -41,18 +41,24 @@ class BackgroundVolume(object):
         self.homographies = self.get_homographies()
         self.xmin, self.ymin, self.xmax, self.ymax = self.get_outer_borders()
 
-        try:
-            self.spatial_noise = np.random.uniform(low=0., high=255., size=(self.ymax - self.ymin, self.xmax - self.xmin, 3))
-        except Exception as e:
-            print(e)
-        
+        self.spatial_noise = np.random.uniform(low=0., high=1., size=(frame_size[1] // 16, frame_size[0] // 16, in_channels - 3))
+        self.spatial_noise_upsampled = cv2.resize(self.spatial_noise, self.frame_size, interpolation=cv2.INTER_LINEAR)
+
+        torch.save(self.spatial_noise, path.join(save_dir, "spatial_noise.pth"))
+        torch.save(self.spatial_noise_upsampled, path.join(save_dir, "spatial_noise_upsampled.pth"))
+
     def create_demo_noise(self):
         """
         Create a demo spatial noise to more easily investigate properties of the homographies
         """
         w = self.xmax - self.xmin
         h = self.ymax - self.ymin
-        self.spatial_noise = np.stack([np.linspace(np.arange(w)/w, np.arange(w)/w, h)]*3, axis=2)
+        w, h = self.frame_size[0], self.frame_size[1]
+
+        noise_x = np.stack([np.linspace(np.arange(w)/w, np.arange(w)/w, h)]*2, axis=2)
+        noise_y = np.expand_dims(np.transpose(np.linspace(np.arange(h)/h, np.arange(h)/h, w)), 2)
+
+        self.demo_spatial_noise = np.concatenate([noise_x, noise_y], axis=2)
 
     def calculate_homography_between_two_frames(self, source: int, target: int) -> np.array:
         """
@@ -254,7 +260,7 @@ class BackgroundVolume(object):
         aligned_frames = self.align_frames(frames)
 
         # add static noise to empty regions
-        aligned_frames = self.add_background_noise(aligned_frames, self.spatial_noise)
+        aligned_frames = self.add_background_noise(aligned_frames, self.demo_spatial_noise)
 
         # save results if path is specified
         if self.save_dir is not None:
@@ -371,20 +377,50 @@ class BackgroundVolume(object):
 
         homography = self.calculate_homography_between_two_frames(0, frame_idx)
         Ht = get_translation_matrix(-self.xmin, -self.ymin)
+        Hs = get_scale_matrix(self.xmax - self.xmin, 
+                              self.ymax - self.ymin, 
+                              self.spatial_noise.shape[1], 
+                              self.spatial_noise.shape[0])
+        H = Hs @ Ht
 
-        transformation_matrix = np.linalg.inv(Ht @ homography)
+        transformation_matrix = np.linalg.inv(H @ homography)
 
-        warped_noise = cv2.warpPerspective(self.spatial_noise, transformation_matrix, (self.frame_size[0], self.frame_size[1]))
+        warped_noise = cv2.warpPerspective(self.spatial_noise, transformation_matrix, self.frame_size, borderMode=cv2.BORDER_REPLICATE)
         return warped_noise
+
+    def get_frame_uv(self, frame_idx: int) -> torch.Tensor:
+        """
+        Get a UV map for the homography warping of a frame that can be used by torch.grid_sample()
+        """
+        h, w, _ = self.spatial_noise_upsampled.shape
+
+        u = np.stack([np.linspace(-1, 1, num=h)]*w)
+        v = np.stack([np.linspace(-1, 1, num=w)]*h, axis=1)
+        uv = np.stack((u, v), axis=2)
+
+        homography = self.calculate_homography_between_two_frames(0, frame_idx)
+        Ht = get_translation_matrix(-self.xmin, -self.ymin)
+        Hs = get_scale_matrix(self.xmax - self.xmin, 
+                              self.ymax - self.ymin, 
+                              self.spatial_noise_upsampled.shape[1], 
+                              self.spatial_noise_upsampled.shape[0])
+        H = Hs @ Ht
+
+        transformation_matrix = np.linalg.inv(H @ homography)
+
+        uv_map = cv2.warpPerspective(uv, transformation_matrix, self.frame_size)
+
+        return torch.from_numpy(uv_map).to(self.device).float()
+
 
     def draw_frame_border(self, image, Ht, homography):
         w, h = self.frame_size
         rect = np.float32([[0, 0], 
-                              [0, h],
-                              [w, h], 
-                              [w, 0]]).reshape(-1, 1, 2) 
+                           [0, h],
+                           [w, h], 
+                           [w, 0]]).reshape(-1, 1, 2) 
         rect = cv2.perspectiveTransform(rect, Ht@homography)+0.5
         rect = rect.astype(np.int32)
         
-        image = cv2.polylines(image, [rect], True, (0,0,255), 8)
+        image = cv2.polylines(image, [rect], True, (0,255,0), 8)
         return image

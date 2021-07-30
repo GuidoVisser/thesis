@@ -33,16 +33,16 @@ class DecompositeLoss(nn.Module):
         # Ground truth values
         flow_gt = targets["flow"]                       # [B, 2, 2, H, W]
         rgb_gt = targets["rgb"]                         # [B, 2, 3, H, W]
-        masks = targets["masks"]                        # [B, 2, 1, H, W]
+        masks = targets["masks"]                        # [B, 2, 1, 1, H, W]
         flow_confidence = targets["flow_confidence"]    # [B, 2, 1, H, W]
 
         # Main loss values
         rgba_reconstruction = predictions["rgba_reconstruction"] # [B, 2, 4, H, W]
         flow_reconstruction = predictions["flow_reconstruction"] # [B, 2, 2, H, w]
-        rgb_reconstruction = rgba_reconstruction[:, :, 3:]
-        alpha_composite = rgba_reconstruction[:, :, :3]
+        rgb_reconstruction = rgba_reconstruction[:, :, :3]
+        alpha_composite = rgba_reconstruction[:, :, 3:]
 
-        alpha_layers = predictions["layers_rgba"][:, 3]          # [B, 2, L, 4, H, W]
+        alpha_layers = predictions["layers_rgba"][..., 3:, :, :]          # [B, 2, L, 1, H, W]
 
         rgb_reconstruction_loss = self.calculate_loss(rgb_reconstruction, rgb_gt)
         flow_reconstruction_loss = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
@@ -54,7 +54,7 @@ class DecompositeLoss(nn.Module):
         rgb_reconstruction_warped = predictions["reconstruction_warped"] # [B, 2, 4, H, W]
 
         alpha_warp_loss = self.calculate_loss(alpha_layers_warped, alpha_layers)
-        rgb_reconstruction_warp_loss = self.calculate_loss(rgb_reconstruction_warped, rgb_reconstruction)
+        rgb_reconstruction_warp_loss = self.calculate_loss(rgb_reconstruction_warped, rgb_reconstruction[:, 0], t2b=False)
 
         # Loss values to compensate for small errors in camera stabilization
         # brightness_scale = predictions["brightness_scale"]

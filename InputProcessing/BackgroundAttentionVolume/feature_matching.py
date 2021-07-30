@@ -9,7 +9,6 @@ from models.third_party.SuperGlue.models.matching import Matching
 from models.third_party.SuperGlue.models.utils import make_matching_plot, AverageTimer, read_image
 
 from utils.utils import create_dirs
-torch.set_grad_enabled(False)
 
 def get_model_config(superglue: str = "outdoor",
                      max_keypoints: int = 1024,
@@ -34,7 +33,7 @@ def get_model_config(superglue: str = "outdoor",
     }
     return config
 
-
+@torch.no_grad()
 def extract_and_match_features(frames: list,
                    device: str,
                    model_config: dict,

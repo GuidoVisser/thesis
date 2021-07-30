@@ -17,7 +17,7 @@
 import os
 import sys
 sys.path.append('.')
-from utils import readFlow, numpy2im
+from third_party.Omnimatte.utils import readFlow, numpy2im
 import glob
 from PIL import Image
 import numpy as np

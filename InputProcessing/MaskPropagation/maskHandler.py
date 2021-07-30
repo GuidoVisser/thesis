@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from PIL import Image
 from os import path, listdir
 from typing import Union
+import torch.nn.functional as F
 
 from utils.utils import create_dir
 from utils.video_utils import save_frame
@@ -76,6 +77,7 @@ class MaskHandler(object):
         
         propagation_model.add_to_memory(frame, mask, extend_memory=True)
         mask, _ = pad_divide_by(mask, 16)
+        mask = F.interpolate(mask, (self.size[1], self.size[0]), mode="bilinear")
         save_frame(mask, path.join(save_dir, f"00000.png"))
 
         # loop through video and propagate mask, skipping first frame
@@ -88,12 +90,18 @@ class MaskHandler(object):
             # predict of frame based on memory and append features of current frame to memory
             mask_pred = propagation_model.predict_mask_and_memorize(i, frame)
 
+            # resize to correct output size
+            # size = list(mask_pred.shape[-2:])
+            # size[-2] = self.size[1]
+            # size[-1] = self.size[0]
+            mask_pred = F.interpolate(mask_pred, (self.size[1], self.size[0]), mode="bilinear")
+
             # save mask as image
             save_frame(mask_pred, path.join(save_dir, f"{i:05}.png"))
 
-    def get_binary_mask(self, idx: int) -> list:
+    def get_binary_masks(self, idx: int) -> list:
         """
-        Get a binary mask for the frame with index `idx`
+        Get all binary masks for the frame with index `idx`
         """
         masks = []
 
@@ -104,7 +112,7 @@ class MaskHandler(object):
 
             masks.append(np.minimum(mask, np.ones(mask.shape)))
 
-        return np.stack(masks)
+        return np.float32(np.stack(masks))
 
     def get_alpha_mask(self, idx):
         mask_path = path.join(self.mask_dir, f"{idx:05}.png")
@@ -112,12 +120,8 @@ class MaskHandler(object):
         return mask
 
     def __getitem__(self, idx: int) -> torch.Tensor:
-        mask_t0 = self.get_binary_mask(idx)
-        mask_t1 = self.get_binary_mask(idx + 1)
-
-        out = torch.stack((torch.from_numpy(mask_t0), 
-                           torch.from_numpy(mask_t1)))
-        return out.to(self.device)
+        mask = torch.from_numpy(self.get_binary_masks(idx)).unsqueeze(1).to(self.device)
+        return mask
 
     def __len__(self):
         return len(listdir(path.join(self.mask_dir, "00"))) - 1
