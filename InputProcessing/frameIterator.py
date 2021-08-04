@@ -21,7 +21,7 @@ class FrameIterator(object):
 
     def __getitem__(self, idx):
         img = torch.from_numpy(cv2.resize(np.float32(cv2.imread(self.images[idx])), self.frame_size)).permute(2, 0, 1) / 255.
-        img = F.normalize(img, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        img = img * 2 - 1
         
         return img.to(self.device)
     

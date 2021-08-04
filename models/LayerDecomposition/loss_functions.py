@@ -19,13 +19,15 @@ class DecompositeLoss(nn.Module):
         self.criterion = L1Loss()
         self.mask_criterion = MaskLoss()
 
-        self.lambda_alpha_l0 = lambda_alpha_l0
-        self.lambda_alpha_l1 = lambda_alpha_l1
-        self.lambda_mask = lambda_mask
-        self.lambda_recon_flow = lambda_recon_flow
-        self.lambda_recon_warp = lambda_recon_warp
-        self.lambda_alpha_warp = lambda_alpha_warp
-        self.lambda_stabilization = lambda_stabilization
+        self.lambda_alpha_l0       = lambda_alpha_l0
+        self.lambda_alpha_l1       = lambda_alpha_l1
+        self.lambda_mask_bootstrap = lambda_mask
+        self.lambda_recon_flow     = lambda_recon_flow
+        self.lambda_recon_warp     = lambda_recon_warp
+        self.lambda_alpha_warp     = lambda_alpha_warp
+        self.lambda_stabilization  = lambda_stabilization
+
+        self.bootstrap_threshold = 0.005
 
 
     def __call__(self, predictions: dict, targets: dict) -> torch.Tensor:
@@ -48,8 +50,12 @@ class DecompositeLoss(nn.Module):
         # Calculate main loss
         rgb_reconstruction_loss  = self.calculate_loss(rgb_reconstruction, rgb_gt)
         flow_reconstruction_loss = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
-        mask_loss                = self.calculate_loss(alpha_layers, masks, mask_loss=True)
+        mask_bootstrap_loss      = self.calculate_loss(alpha_layers, masks, mask_loss=True)
         alpha_reg_loss           = cal_alpha_reg(alpha_composite * 0.5 + 0.5, self.lambda_alpha_l1, self.lambda_alpha_l0)
+
+        # Turn off bootstrap loss when loss reaches threshold
+        if mask_bootstrap_loss < self.bootstrap_threshold:
+            self.lambda_mask_bootstrap = 0.
 
         ### Temporal consistency loss
 
@@ -58,7 +64,7 @@ class DecompositeLoss(nn.Module):
         rgb_reconstruction_warped = predictions["reconstruction_warped"] # [B, 2, 4, H, W]
 
         # Calculate loss for temporal consistency
-        alpha_warp_loss              = self.calculate_loss(alpha_layers_warped, alpha_layers)
+        alpha_warp_loss              = self.calculate_loss(alpha_layers_warped, alpha_layers[:, 0], t2b=False)
         rgb_reconstruction_warp_loss = self.calculate_loss(rgb_reconstruction_warped, rgb_reconstruction[:, 0], t2b=False)
 
         # ### Adjust for camera stabilization errors
@@ -77,7 +83,7 @@ class DecompositeLoss(nn.Module):
         loss = rgb_reconstruction_loss + \
                 alpha_reg_loss + \
                 self.lambda_recon_flow * flow_reconstruction_loss + \
-                self.lambda_mask * mask_loss + \
+                self.lambda_mask_bootstrap * mask_bootstrap_loss + \
                 self.lambda_alpha_warp * alpha_warp_loss + \
                 self.lambda_recon_warp * rgb_reconstruction_warp_loss #+ \
                 # self.lambda_stabilization * stabilization_loss

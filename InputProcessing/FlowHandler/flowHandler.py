@@ -54,8 +54,8 @@ class FlowHandler(object):
         """
 
         # Get object masks
-        mask = self.mask_iterator.get_binary_masks(frame_idx)
-        object_masks = torch.from_numpy(mask).to(self.device)
+        _, object_masks = self.mask_iterator[frame_idx]
+        object_masks = object_masks[:, 0]
 
         N_objects = object_masks.shape[0]
 

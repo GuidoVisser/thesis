@@ -71,7 +71,7 @@ class ConvBlock(nn.Module):
         return x
 
 class LayerDecompositionUNet(nn.Module):
-    def __init__(self, conv_channels=64, in_channels=16, max_frames=200, coarseness=10):
+    def __init__(self, conv_channels=64, in_channels=16, max_frames=200, coarseness=10, do_adjustment=True):
         super().__init__()
         self.encoder = nn.ModuleList([
             ConvBlock(nn.Conv2d, in_channels,       conv_channels,     ksize=4, stride=2),
@@ -96,6 +96,7 @@ class LayerDecompositionUNet(nn.Module):
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
 
         self.max_frames = max_frames
+        self.do_adjustment = do_adjustment
         
     def render(self, x):
         """Pass inputs for a single layer through UNet.
@@ -126,6 +127,8 @@ class LayerDecompositionUNet(nn.Module):
         input_tensor = input["input_tensor"]
         background_flow = input["background_flow"]
         background_uv_map = input["background_uv_map"]
+        jitter_grid = input["jitter_grid"]
+        index = input["index"]
 
         batch_size, N_t, N_layers, channels, H, W = input_tensor.shape
 
@@ -144,7 +147,9 @@ class LayerDecompositionUNet(nn.Module):
         layers_alpha_warped = []
         composite_warped = None
 
-        # TODO camera stabilization correction
+        # camera stabilization correction
+        background_offset = self.get_background_offset(jitter_grid)
+        brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
 
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
@@ -154,9 +159,13 @@ class LayerDecompositionUNet(nn.Module):
 
             # Background layer
             if i == 0:
-                composite_rgba = F.grid_sample(rgba, background_uv_map)
+                rgba = F.grid_sample(rgba, background_uv_map)               
+                if self.do_adjustment:
+                    rgba = FlowHandler.apply_flow(rgba, background_offset)
+
+                composite_rgba = rgba
                 flow = composite_flow
-                
+
                 # Temporal consistency 
                 rgba_warped = rgba[:batch_size]
                 composite_warped = rgba_warped[:, :3]
@@ -174,6 +183,16 @@ class LayerDecompositionUNet(nn.Module):
             layers_rgba.append(rgba)
             layers_flow.append(flow)
             layers_alpha_warped.append(rgba_warped[:, 3:4])
+
+        if self.do_adjustment:
+            # map output to [0, 1]
+            composite_rgba = composite_rgba * 0.5 + 0.5
+
+            # adjust for brightness
+            composite_rgba = torch.clamp(brightness_scale * composite_rgba, 0, 1)
+
+            # map back to [-1, 1]
+            composite_rgba = composite_rgba * 2 - 1
 
         # stack in time dimension
         composite_rgba = torch.stack((composite_rgba[:batch_size], composite_rgba[batch_size:]), 1)
@@ -194,8 +213,22 @@ class LayerDecompositionUNet(nn.Module):
         }
         return out
 
-    def get_alpha_from_rgba(rgba):
+    def get_alpha_from_rgba(self, rgba):
         """
         Get the alpha layer from an rgba tensor that is ready for compositing
         """
-        return rgba[:, 3:4] * .5 + 5
+        return rgba[:, 3:4] * .5 + .5
+
+    def get_background_offset(self, jitter_grid):
+        background_offset = F.interpolate(self.bg_offset, (self.max_frames, 4, 7), mode="trilinear")
+        background_offset = background_offset[0, :, ]
+        background_offset = F.grid_sample(background_offset, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+
+        return background_offset
+
+    def get_brightness_scale(self, jitter_grid, index):
+        brightness_scale = F.interpolate(self.brightness_scale, (self.max_frames, 4, 7), mode='trilinear', align_corners=True)
+        brightness_scale = brightness_scale[0, 0, index].unsqueeze(1)
+        brightness_scale = F.grid_sample(brightness_scale, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+
+        return brightness_scale

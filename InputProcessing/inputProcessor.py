@@ -2,6 +2,7 @@ from posix import listdir
 import torch
 import cv2
 import numpy as np
+import torch.nn.functional as F
 from os import path
 from typing import Union
 
@@ -17,15 +18,20 @@ class InputProcessor(object):
                  video: str,
                  out_root: str,
                  initial_mask: Union[str, list],
+                 composite_order_fp: str,
                  in_channels: int = 16,
                  device: str = "cuda",
-                 frame_size: list=[448, 256]
+                 frame_size: list=[448, 256],
+                 do_adjustment: bool = True,
+                 jitter_rate: float = 0.75
                 ) -> None:
         super().__init__()
 
-        self.device      = device
-        self.frame_size  = frame_size
-        self.in_channels = in_channels
+        self.device        = device
+        self.frame_size    = frame_size
+        self.in_channels   = in_channels
+        self.do_adjustment = do_adjustment
+        self.jitter_rate   = jitter_rate
 
         if isinstance(initial_mask, str):
             self.N_objects = 1
@@ -45,7 +51,7 @@ class InputProcessor(object):
         self.background_volume = BackgroundVolume(img_dir, mask_dir, background_dir, self.device, in_channels=in_channels, frame_size=self.frame_size)
         self.flow_handler      = FlowHandler(self.frame_iterator, self.mask_handler, self.background_volume.homographies, flow_dir, device=self.device)
 
-        self.composite_order = [tuple(range(1, self.N_objects + 1))] * len(self.frame_iterator)
+        self.load_composite_order(composite_order_fp)
 
 
     def get_frame_input(self, frame_idx):
@@ -84,10 +90,14 @@ class InputProcessor(object):
         rgb    = torch.stack((rgb_t0, rgb_t1)) # [T, C, H, W] = [2, 3, H, W]
 
         # Get mask input
-        masks_t0 = self.mask_handler[idx]
-        masks_t1 = self.mask_handler[idx + 1]
-        masks    = torch.stack((masks_t0, masks_t1)) # [T, L-1, C, H, W] = [2, L-1, 1, H, W]
-        
+        masks_t0, binary_masks_t0 = self.mask_handler[idx]
+        masks_t1, binary_masks_t1 = self.mask_handler[idx + 1]
+        masks                     = torch.stack((masks_t0, masks_t1))               # [T, L-1, C, H, W] = [2, L-1, 1, H, W]
+        binary_masks              = torch.stack((binary_masks_t0, binary_masks_t1)) # [T, L-1, C, H, W] = [2, L-1, 1, H, W]
+
+        # add background layer in masks
+        masks = torch.cat((torch.zeros_like(masks[:, 0:1]), masks), dim=1)
+
         # Get flow input and confidence
         flow_t0, flow_conf_t0, object_flow_t0, background_flow_t0 = self.flow_handler[idx]
         flow_t1, flow_conf_t1, object_flow_t1, background_flow_t1 = self.flow_handler[idx + 1]
@@ -103,23 +113,61 @@ class InputProcessor(object):
 
         noise_t0 = torch.from_numpy(np.float32(self.background_volume.get_frame_noise(idx))).permute(2, 0, 1)       
         noise_t1 = torch.from_numpy(np.float32(self.background_volume.get_frame_noise(idx + 1))).permute(2, 0, 1)
-        noise = torch.stack((noise_t0, noise_t1)).to(self.device).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
+        noise    = torch.stack((noise_t0, noise_t1)).to(self.device).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
         
         background_uv_map_t0 = self.background_volume.get_frame_uv(idx)
         background_uv_map_t1 = self.background_volume.get_frame_uv(idx + 1)
-        background_uv_map = torch.stack((background_uv_map_t0, background_uv_map_t1))
+        background_uv_map    = torch.stack((background_uv_map_t0, background_uv_map_t1))
 
         # Get model input
-        pids = torch.Tensor(self.composite_order[idx]).view(1, -1, 1, 1, 1).to(self.device) * masks  # [T, L-1, 1, H, W] = [2, L-1, 1, H, W]
-        input_tensor = torch.cat((pids, object_flow, noise), dim=2)                                  # [T, L-1, C, H, W] = [2, L-1, 16, H, W]
-        background_input = torch.cat((torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), device=self.device, dtype=torch.float32), background_noise), dim=2)
-        input_tensor = torch.cat((background_input, input_tensor), dim=1)
+        zeros = torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), device=self.device, dtype=torch.float32)
+        background_input = torch.cat((zeros, background_noise), dim=2)
+        pids = binary_masks * torch.Tensor(self.composite_order[idx]).view(1, -1, 1, 1, 1).to(self.device) # [T, L-1, 1, H, W] = [2, L-1, 1, H, W]
+        
+        input_tensor = torch.cat((pids, object_flow, noise), dim=2)       # [T, L-1, C, H, W] = [2, L-1, 16, H, W]                             
+        input_tensor = torch.cat((background_input, input_tensor), dim=1) # [T, L,   C, H, W] = [2, L,   16, H, W]
+
+        if self.do_adjustment:
+            # get parameters
+            params = self.get_camera_adjustment_parameters()
+            mode = "bilinear"
+            
+            # transform targets
+            rgb       = self.apply_jitter_transform(rgb,       params, mode)
+            flow      = self.apply_jitter_transform(flow,      params, mode)
+            masks     = self.apply_jitter_transform(masks,     params, mode)
+            flow_conf = self.apply_jitter_transform(flow_conf, params, mode)
+
+            # transform inputs
+            input_tensor      = self.apply_jitter_transform(input_tensor,      params, mode)
+            background_flow   = self.apply_jitter_transform(background_flow,   params, mode)
+            background_uv_map = self.apply_jitter_transform(background_uv_map, params, mode)
+
+            # rescale flow values to conform to new image size
+            scale_w = params['jitter size'][1] / self.frame_size[0]
+            scale_h = params['jitter size'][0] / self.frame_size[1]
+
+            flow[:, 0] *= scale_w
+            flow[:, 1] *= scale_h
+            background_flow[:, 0] *= scale_w
+            background_flow[:, 1] *= scale_h
+            input_tensor[:, :, 0] *= scale_w
+            input_tensor[:, :, 1] *= scale_h
+
+            # create jitter grid
+            jitter_grid = self.initialize_jitter_grid()
+            jitter_grid = self.apply_jitter_transform(jitter_grid, params, mode)
+        else:
+            jitter_grid = self.initialize_jitter_grid()
+
 
         targets = {
             "rgb": rgb,
             "flow": flow,
             "masks": masks,
-            "flow_confidence": flow_conf
+            "flow_confidence": flow_conf,
+            "jitter_grid": jitter_grid,
+            "index": torch.Tensor([idx, idx + 1]).long()
         }
 
         model_input = {
@@ -184,7 +232,59 @@ class InputProcessor(object):
         flow = torch.stack([flow]*self.N_objects, 1)
 
         return flow * masks        
+
+    def initialize_jitter_grid(self):
+        u = torch.linspace(-1, 1, steps=self.frame_size[0]).unsqueeze(0).repeat(self.frame_size[1], 1)
+        v = torch.linspace(-1, 1, steps=self.frame_size[1]).unsqueeze(-1).repeat(1, self.frame_size[0])
+        return torch.stack([u, v], 0)
+
+    def apply_jitter_transform(self, input, params, interp_mode='bilinear'):
         
+        tensor_size = params['jitter size'].tolist()
+        crop_pos    = params['crop pos']
+        crop_size   = params['crop size']
+        orig_shape  = input.shape
+
+        if len(orig_shape) < 4:
+            data = F.interpolate(input.unsqueeze(0), size=tensor_size, mode=interp_mode).squeeze(0)
+        else:
+            data = F.interpolate(input, size=tensor_size, mode=interp_mode)
+        
+        data = data[..., crop_pos[0]:crop_pos[0] + crop_size[0], crop_pos[1]:crop_pos[1] + crop_size[1]]
+        
+        return data
+
+    def get_camera_adjustment_parameters(self):
+
+        width, height = self.frame_size
+
+        if self.do_adjustment:
+
+            # get scale
+            if np.random.uniform() > self.jitter_rate:
+                scale = 1.
+            else:
+                scale = np.random.uniform(1, 1.25)
+            
+            # construct jitter
+            jitter_size = (scale * np.array([height, width])).astype(np.int)
+            start_h = np.random.randint(jitter_size[0] - height + 1)
+            start_w = np.random.randint(jitter_size[1] - width  + 1)
+        else:
+            jitter_size = np.array([height, width])
+            start_h = 0
+            start_w = 0
+
+        crop_pos  = np.array([start_h, start_w])
+        crop_size = np.array([height,  width])
+
+        params = {
+            "jitter size": jitter_size, 
+            "crop pos": crop_pos, 
+            "crop size": crop_size
+        }
+        return params
+
     def prepare_image_dir(self, video_dir, out_dir):
 
         frame_paths = [frame for frame in sorted(listdir(video_dir))]
@@ -192,3 +292,9 @@ class InputProcessor(object):
         for frame_path in frame_paths:
             img = cv2.resize(cv2.imread(path.join(video_dir, frame_path)), self.frame_size, interpolation=cv2.INTER_LINEAR)
             cv2.imwrite(path.join(out_dir, frame_path), img)
+
+    def load_composite_order(self, fp):
+        self.composite_order = []
+        with open(fp, "r") as f:
+            for line in f.readlines():
+                self.composite_order.append(tuple([int(i) for i in line.split(" ")]))

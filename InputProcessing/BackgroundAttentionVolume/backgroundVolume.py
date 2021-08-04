@@ -391,16 +391,16 @@ class BackgroundVolume(object):
         """
         h, w, _ = self.spatial_noise_upsampled.shape
 
-        u  = np.stack([np.linspace(-1, 1, num=h)]*w)
-        v  = np.stack([np.linspace(-1, 1, num=w)]*h, axis=1)
+        u  = np.stack([np.linspace(-1, 1, num=w)]*h)
+        v  = np.stack([np.linspace(-1, 1, num=h)]*w, axis=1)
         uv = np.stack((u, v), axis=2)
 
         homography = self.calculate_homography_between_two_frames(0, frame_idx)
         Ht = get_translation_matrix(-self.xmin, -self.ymin)
         Hs = get_scale_matrix(self.xmax - self.xmin, 
                               self.ymax - self.ymin, 
-                              self.spatial_noise_upsampled.shape[1], 
-                              self.spatial_noise_upsampled.shape[0])
+                              w, 
+                              h)
         H = Hs @ Ht
 
         transformation_matrix = np.linalg.inv(H @ homography)

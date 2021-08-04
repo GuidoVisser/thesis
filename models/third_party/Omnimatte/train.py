@@ -52,6 +52,8 @@ def train(model, dataset, visualizer, opt):
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
         model.update_lambdas(epoch)
         for i, data in enumerate(dataset):  # inner loop within one epoch
+            print("########################################################\n\n\n\n\n\n\n\n\n########################################")
+            print(i)
             iter_start_time = time.time()  # timer for computation per iteration
             if i % opt.print_freq == 0:
                 t_data = iter_start_time - iter_data_time

@@ -7,17 +7,19 @@ from models.LayerDecomposition.loss_functions import DecompositeLoss
 from models.LayerDecomposition.modules import LayerDecompositionUNet
 
 if __name__ == "__main__":
-    video        = "tennis"
-    results_dir  = f"results/layer_decomposition/{datetime.now()}"
-    img_dir      = f"datasets/DAVIS_minisample/JPEGImages/480p/{video}"
-    initial_mask = f"datasets/DAVIS_minisample/Annotations/480p/{video}/00000.png"
-    save_dir     = f"{results_dir}/decomposition"
+    video           = "tennis"
+    results_dir     = f"results/layer_decomposition/{datetime.now()}"
+    img_dir         = f"datasets/DAVIS_minisample/JPEGImages/480p/{video}"
+    initial_mask    = f"datasets/DAVIS_minisample/Annotations/480p/{video}/00000.png"
+    composite_order = f"datasets/DAVIS_minisample/Composite_order.txt"
+    save_dir        = f"{results_dir}/decomposition"
+    do_adjustment   = True
 
-    input_processor = InputProcessor(img_dir, results_dir, initial_mask)
+    input_processor = InputProcessor(img_dir, results_dir, initial_mask, composite_order, do_adjustment=do_adjustment)
     data_loader     = DataLoader(input_processor)
     loss_module     = DecompositeLoss()
-    network         = LayerDecompositionUNet()
-    model           = LayerDecompositer(data_loader, loss_module, network, learning_rate=0.1, save_dir=save_dir)
+    network         = LayerDecompositionUNet(do_adjustment=do_adjustment)
+    model           = LayerDecompositer(data_loader, loss_module, network, learning_rate=0.001, save_dir=save_dir)
     model.to("cuda")
 
     model.train(2000)

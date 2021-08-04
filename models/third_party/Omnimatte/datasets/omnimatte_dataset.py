@@ -116,7 +116,7 @@ class OmnimatteDataset(BaseDataset):
         self.init_homographies(os.path.join(opt.dataroot, 'homographies.txt'), n_images)
 
     def __getitem__(self, index):
-        """Return a data point and its metadata information.
+        """Return a data point .to(self.device)and its metadata information.
 
         Parameters:
             index - - a random integer for data indexing

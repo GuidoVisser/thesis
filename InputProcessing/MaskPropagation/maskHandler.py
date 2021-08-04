@@ -21,11 +21,11 @@ class MaskHandler(object):
                  initial_masks: Union[str, list],
                  frame_size: list,
                  device: str = "cuda",
-                 binary_threshold: float = 0.7) -> None:
+                 binary_threshold: float = 0.5) -> None:
         super().__init__()
 
         # set hyperparameters
-        self.size             = frame_size
+        self.frame_size             = frame_size
         self.binary_threshold = binary_threshold
 
         # set up directories and correct input for masks
@@ -77,7 +77,7 @@ class MaskHandler(object):
         
         propagation_model.add_to_memory(frame, mask, extend_memory=True)
         mask, _ = pad_divide_by(mask, 16)
-        mask = F.interpolate(mask, (self.size[1], self.size[0]), mode="bilinear")
+        mask = F.interpolate(mask, (self.frame_size[1], self.frame_size[0]), mode="bilinear")
         save_frame(mask, path.join(save_dir, f"00000.png"))
 
         # loop through video and propagate mask, skipping first frame
@@ -91,34 +91,41 @@ class MaskHandler(object):
             mask_pred = propagation_model.predict_mask_and_memorize(i, frame)
 
             # resize to correct output size
-            mask_pred = F.interpolate(mask_pred, (self.size[1], self.size[0]), mode="bilinear")
+            mask_pred = F.interpolate(mask_pred, (self.frame_size[1], self.frame_size[0]), mode="bilinear")
 
             # save mask as image
             save_frame(mask_pred, path.join(save_dir, f"{i:05}.png"))
 
-    def get_binary_masks(self, idx: int) -> list:
-        """
-        Get all binary masks for the frame with index `idx`
-        """
+    def __getitem__(self, idx: int) -> torch.Tensor:
         masks = []
 
         for i_object in range(self.N_objects):
             mask_path = path.join(self.mask_dir, f"{i_object:02}", f"{idx:05}.png")
-            mask = cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.size)
-            _, mask = cv2.threshold(mask, self.binary_threshold*255, 1, cv2.THRESH_BINARY)
+            masks.append(cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.frame_size))
 
-            masks.append(np.minimum(mask, np.ones(mask.shape)))
+        masks = np.float32(np.stack(masks))
+        masks = torch.from_numpy(masks)
 
-        return np.float32(np.stack(masks))
+        binary_masks = (masks > 0.5).float()
+        masks = masks * 2 - 1
+        
+        trimaps = self.mask2trimap(masks)
 
-    def get_alpha_mask(self, idx):
-        mask_path = path.join(self.mask_dir, f"{idx:05}.png")
-        mask = cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.size)
-        return mask
+        trimaps = trimaps.unsqueeze(1).to(self.device)
+        binary_masks = binary_masks.unsqueeze(1).to(self.device)
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        mask = torch.from_numpy(self.get_binary_masks(idx)).unsqueeze(1).to(self.device)
-        return mask
+        return trimaps, binary_masks
 
     def __len__(self):
         return len(listdir(path.join(self.mask_dir, "00"))) - 1
+
+    def mask2trimap(self, mask: torch.Tensor, trimap_width: int = 20):
+        """Convert binary mask to trimap with values in [-1, 0, 1]."""
+        fg_mask = (mask > 0).float()
+        bg_mask = (mask < 0).float()
+        trimap_width *= bg_mask.shape[-1] / self.frame_size[0]
+        trimap_width = int(trimap_width)
+        bg_mask = cv2.erode(bg_mask.numpy(), kernel=np.ones((trimap_width, trimap_width)), iterations=1)
+        bg_mask = torch.from_numpy(bg_mask)
+        mask = fg_mask - bg_mask
+        return mask
