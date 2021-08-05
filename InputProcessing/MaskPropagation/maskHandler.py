@@ -6,6 +6,7 @@ from PIL import Image
 from os import path, listdir
 from typing import Union
 import torch.nn.functional as F
+from skimage.measure import label
 
 from utils.utils import create_dir
 from utils.video_utils import save_frame
@@ -104,7 +105,7 @@ class MaskHandler(object):
             mask_path = path.join(self.mask_dir, f"{i_object:02}", f"{idx:05}.png")
             masks.append(cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.frame_size))
 
-        masks = np.float32(np.stack(masks))
+        masks = np.float32(np.stack(masks)) / 255.
         masks = torch.from_numpy(masks)
 
         binary_masks = (masks > 0.5).float()
