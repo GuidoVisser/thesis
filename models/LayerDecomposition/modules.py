@@ -148,7 +148,9 @@ class LayerDecompositionUNet(nn.Module):
         composite_warped = None
 
         # camera stabilization correction
-        background_offset = self.get_background_offset(jitter_grid)
+        index = index.transpose(0, 1).reshape(-1)
+        jitter_grid = torch.cat((jitter_grid[:, 0], jitter_grid[:, 1]))
+        background_offset = self.get_background_offset(jitter_grid, index)
         brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
 
         for i in range(N_layers):
@@ -202,6 +204,9 @@ class LayerDecompositionUNet(nn.Module):
         layers_flow = torch.stack(layers_flow, 1)
         layers_flow = torch.stack((layers_flow[:batch_size], layers_flow[batch_size:]), 1)
         layers_alpha_warped = torch.stack(layers_alpha_warped, 1)
+        brightness_scale = torch.stack((brightness_scale[:batch_size], brightness_scale[batch_size:]), 1)
+        background_offset = torch.stack((background_offset[:batch_size], background_offset[batch_size:]), 1)
+
 
         out = {
             "rgba_reconstruction": composite_rgba,          # [B, 2, 4, H, W]
@@ -209,7 +214,9 @@ class LayerDecompositionUNet(nn.Module):
             "reconstruction_warped": composite_warped,      # [B, 3, H, W]
             "layers_rgba": layers_rgba,                     # [B, 2, L, 4, H, W]
             "layers_flow": layers_flow,                     # [B, 2, L, 2, H, W]
-            "layers_alpha_warped": layers_alpha_warped      # [B, L, 1, H, W]
+            "layers_alpha_warped": layers_alpha_warped,     # [B, L, 1, H, W]
+            "brightness_scale": brightness_scale,           # [B, 2, 1, H, W]
+            "background_offset": background_offset          # [B, 2, 2, H, W]
         }
         return out
 
@@ -219,9 +226,9 @@ class LayerDecompositionUNet(nn.Module):
         """
         return rgba[:, 3:4] * .5 + .5
 
-    def get_background_offset(self, jitter_grid):
+    def get_background_offset(self, jitter_grid, index):
         background_offset = F.interpolate(self.bg_offset, (self.max_frames, 4, 7), mode="trilinear")
-        background_offset = background_offset[0, :, ]
+        background_offset = background_offset[0, :, index].transpose(0, 1)
         background_offset = F.grid_sample(background_offset, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
 
         return background_offset

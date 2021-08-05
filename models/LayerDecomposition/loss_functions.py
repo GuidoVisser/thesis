@@ -67,17 +67,17 @@ class DecompositeLoss(nn.Module):
         alpha_warp_loss              = self.calculate_loss(alpha_layers_warped, alpha_layers[:, 0], t2b=False)
         rgb_reconstruction_warp_loss = self.calculate_loss(rgb_reconstruction_warped, rgb_reconstruction[:, 0], t2b=False)
 
-        # ### Adjust for camera stabilization errors
+        ### Adjust for camera stabilization errors
 
-        # # Model predictions
-        # brightness_scale  = predictions["brightness_scale"]
-        # background_offset = predictions["background_offset"]
+        # Model predictions
+        brightness_scale  = predictions["brightness_scale"]
+        background_offset = predictions["background_offset"]
 
-        # # Calculate loss for camera adjustment
-        # brightness_regularization_loss = self.criterion(brightness_scale, torch.ones_like(brightness_scale))
-        # background_offset_loss         = background_offset.abs().mean()
+        # Calculate loss for camera adjustment
+        brightness_regularization_loss = self.calculate_loss(brightness_scale, torch.ones_like(brightness_scale))
+        background_offset_loss         = background_offset.abs().mean()
 
-        # stabilization_loss = brightness_regularization_loss + background_offset_loss
+        stabilization_loss = brightness_regularization_loss + background_offset_loss
 
         # Combine loss values
         loss = rgb_reconstruction_loss + \
@@ -85,8 +85,8 @@ class DecompositeLoss(nn.Module):
                 self.lambda_recon_flow * flow_reconstruction_loss + \
                 self.lambda_mask_bootstrap * mask_bootstrap_loss + \
                 self.lambda_alpha_warp * alpha_warp_loss + \
-                self.lambda_recon_warp * rgb_reconstruction_warp_loss #+ \
-                # self.lambda_stabilization * stabilization_loss
+                self.lambda_recon_warp * rgb_reconstruction_warp_loss + \
+                self.lambda_stabilization * stabilization_loss
 
         return loss
 

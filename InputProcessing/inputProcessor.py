@@ -141,7 +141,8 @@ class InputProcessor(object):
             # transform inputs
             input_tensor      = self.apply_jitter_transform(input_tensor,      params, mode)
             background_flow   = self.apply_jitter_transform(background_flow,   params, mode)
-            background_uv_map = self.apply_jitter_transform(background_uv_map, params, mode)
+            background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params, mode)
+            background_uv_map = background_uv_map.permute(0, 2, 3, 1)
 
             # rescale flow values to conform to new image size
             scale_w = params['jitter size'][1] / self.frame_size[0]
@@ -165,15 +166,15 @@ class InputProcessor(object):
             "rgb": rgb,
             "flow": flow,
             "masks": masks,
-            "flow_confidence": flow_conf,
-            "jitter_grid": jitter_grid,
-            "index": torch.Tensor([idx, idx + 1]).long()
+            "flow_confidence": flow_conf
         }
 
         model_input = {
             "input_tensor": input_tensor,
             "background_flow": background_flow,
-            "background_uv_map": background_uv_map
+            "background_uv_map": background_uv_map,
+            "jitter_grid": jitter_grid,
+            "index": torch.Tensor([idx, idx + 1]).long()
         }
 
         return model_input, targets
@@ -236,20 +237,27 @@ class InputProcessor(object):
     def initialize_jitter_grid(self):
         u = torch.linspace(-1, 1, steps=self.frame_size[0]).unsqueeze(0).repeat(self.frame_size[1], 1)
         v = torch.linspace(-1, 1, steps=self.frame_size[1]).unsqueeze(-1).repeat(1, self.frame_size[0])
-        return torch.stack([u, v], 0)
+        return torch.stack([u, v], 0).unsqueeze(0).repeat(2, 1, 1, 1).to(self.device)
 
     def apply_jitter_transform(self, input, params, interp_mode='bilinear'):
         
         tensor_size = params['jitter size'].tolist()
         crop_pos    = params['crop pos']
         crop_size   = params['crop size']
-        orig_shape  = input.shape
 
-        if len(orig_shape) < 4:
+        # stack time dimension in channel dimension for `F.interpolate()`
+        input = torch.cat((input[0], input[1]), dim=-3)
+
+        if len(input.shape) < 4:
             data = F.interpolate(input.unsqueeze(0), size=tensor_size, mode=interp_mode).squeeze(0)
         else:
             data = F.interpolate(input, size=tensor_size, mode=interp_mode)
         
+        # separate time dimension
+        n_channel = input.size(-3)
+        data = torch.stack((data[..., :n_channel // 2, :, :], 
+                            data[..., n_channel // 2:, :, :]))
+
         data = data[..., crop_pos[0]:crop_pos[0] + crop_size[0], crop_pos[1]:crop_pos[1] + crop_size[1]]
         
         return data
