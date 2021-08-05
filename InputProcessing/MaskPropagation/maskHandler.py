@@ -113,12 +113,6 @@ class MaskHandler(object):
         
         trimaps = self.mask2trimap(masks)
 
-        for i_object in range(self.N_objects):
-            trimap_img = trimaps[i_object].numpy() * 0.5 + 0.5
-            cv2.imshow(f"trimap {i_object}", trimap_img)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-
         trimaps = trimaps.unsqueeze(1).to(self.device)
         binary_masks = binary_masks.unsqueeze(1).to(self.device)
 
