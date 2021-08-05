@@ -303,6 +303,10 @@ class InputProcessor(object):
 
     def load_composite_order(self, fp):
         self.composite_order = []
-        with open(fp, "r") as f:
-            for line in f.readlines():
-                self.composite_order.append(tuple([int(i) for i in line.split(" ")]))
+        if path.exists(fp):
+            with open(fp, "r") as f:
+                for line in f.readlines():
+                    self.composite_order.append(tuple([int(i) for i in line.split(" ")]))
+        else:
+            for _ in range(len(self) + 1):
+                self.composite_order.append(tuple([int(i) for i in range(self.mask_handler.N_objects)]))
