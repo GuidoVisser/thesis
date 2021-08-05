@@ -16,8 +16,8 @@ pip install --user --upgrade torch && pip install --user --upgrade torchvision
 cp -RT $HOME/thesis/datasets/DAVIS_sample/JPEGImages/480p/tennis $TMPDIR/video
 cp -RT $HOME/thesis/datasets/DAVIS_sample/Annotations/480p/tennis/00000.png $TMPDIR/initial_mask.png
 mkdir $TMPDIR/weights
-cp $HOME/thesis/models/third_party/weights/propagation_model.pth $TMPDIR/weights/propagation_model.pth
-cp $HOME/thesis/models/third_party/weights/raft-things.pth $TMPDIR/weigths/flow_model.pth
+cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
+cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weigths/flow_model.pth
 
 #Create output directory on scratch
 mkdir $TMPDIR/output_dir
