@@ -26,7 +26,7 @@ class MaskHandler(object):
         super().__init__()
 
         # set hyperparameters
-        self.frame_size             = frame_size
+        self.frame_size       = frame_size
         self.binary_threshold = binary_threshold
 
         # set up directories and correct input for masks
@@ -112,6 +112,12 @@ class MaskHandler(object):
         
         trimaps = self.mask2trimap(masks)
 
+        for i_object in range(self.N_objects):
+            trimap_img = trimaps[i_object].numpy() * 0.5 + 0.5
+            cv2.imshow(f"trimap {i_object}", trimap_img)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
         trimaps = trimaps.unsqueeze(1).to(self.device)
         binary_masks = binary_masks.unsqueeze(1).to(self.device)
 
@@ -123,10 +129,10 @@ class MaskHandler(object):
     def mask2trimap(self, mask: torch.Tensor, trimap_width: int = 20):
         """Convert binary mask to trimap with values in [-1, 0, 1]."""
         fg_mask = (mask > 0).float()
-        bg_mask = (mask < 0).float()
+        bg_mask = (mask < 0).float()[0]
         trimap_width *= bg_mask.shape[-1] / self.frame_size[0]
         trimap_width = int(trimap_width)
         bg_mask = cv2.erode(bg_mask.numpy(), kernel=np.ones((trimap_width, trimap_width)), iterations=1)
-        bg_mask = torch.from_numpy(bg_mask)
+        bg_mask = torch.from_numpy(bg_mask).unsqueeze(0)
         mask = fg_mask - bg_mask
         return mask
