@@ -46,6 +46,7 @@ def main(args):
     model.train(args.n_epochs)
 
 if __name__ == "__main__":
+    print("started")
     parser = ArgumentParser()
 
     video = "tennis"
@@ -73,3 +74,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+    print("done")

@@ -23,7 +23,7 @@ class InputProcessor(object):
                  flow_model: str,
                  in_channels: int = 16,
                  device: str = "cuda",
-                 frame_size: list=[448, 256],
+                 frame_size: tuple=(448, 256),
                  do_adjustment: bool = True,
                  jitter_rate: float = 0.75
                 ) -> None:
