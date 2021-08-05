@@ -19,6 +19,8 @@ class InputProcessor(object):
                  out_root: str,
                  initial_mask: Union[str, list],
                  composite_order_fp: str,
+                 propagation_model: str,
+                 flow_model: str,
                  in_channels: int = 16,
                  device: str = "cuda",
                  frame_size: list=[448, 256],
@@ -47,9 +49,9 @@ class InputProcessor(object):
         self.prepare_image_dir(video, img_dir)
 
         self.frame_iterator    = FrameIterator(img_dir, frame_size, device=self.device)
-        self.mask_handler      = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device)
+        self.mask_handler      = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
         self.background_volume = BackgroundVolume(img_dir, mask_dir, background_dir, self.device, in_channels=in_channels, frame_size=self.frame_size)
-        self.flow_handler      = FlowHandler(self.frame_iterator, self.mask_handler, self.background_volume.homographies, flow_dir, device=self.device)
+        self.flow_handler      = FlowHandler(self.frame_iterator, self.mask_handler, self.background_volume.homographies, flow_dir, raft_weights=flow_model, device=self.device)
 
         self.load_composite_order(composite_order_fp)
 

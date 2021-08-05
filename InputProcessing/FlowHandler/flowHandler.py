@@ -22,6 +22,7 @@ class FlowHandler(object):
                  mask_iterator: maskHandler,
                  homographies: list,
                  output_dir: str,
+                 raft_weights: str,
                  iters: int = 12,
                  forward_backward_threshold: float = 20.,
                  photometric_threshold: float = 20.,
@@ -32,7 +33,7 @@ class FlowHandler(object):
         self.iters  = iters
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
-        self.raft = self.initialize_raft()
+        self.raft = self.initialize_raft(raft_weights)
 
         self.output_dir= output_dir
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
@@ -326,7 +327,7 @@ class FlowHandler(object):
     def convert_flow_to_image(self, flow, bgr=False):
         return flow_to_image(flow, convert_to_bgr=bgr)
 
-    def initialize_raft(self, small:bool=False, mixed_precision:bool=False, alternate_corr:bool=False):
+    def initialize_raft(self, weights, small:bool=False, mixed_precision:bool=False, alternate_corr:bool=False):
         config = RaftNameSpace(
             small=small, 
             mixed_precision=mixed_precision, 
@@ -334,7 +335,7 @@ class FlowHandler(object):
         )
 
         model = torch.nn.DataParallel(RAFT(config))
-        model.load_state_dict(torch.load("models/third_party/weights/raft-things.pth"))
+        model.load_state_dict(torch.load(weights))
         model = model.module
         model.to(self.device)
         model.eval()

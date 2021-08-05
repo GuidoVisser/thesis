@@ -15,7 +15,7 @@ class LayerDecompositer(nn.Module):
                  loss_module: nn.Module,
                  network: nn.Module,
                  learning_rate: float,
-                 save_dir: str,
+                 results_root: str,
                  batch_size: int):
         super().__init__()
 
@@ -24,7 +24,7 @@ class LayerDecompositer(nn.Module):
         self.net = network
         self.optimizer = Adam(self.net.parameters(), learning_rate)
 
-        self.save_dir = save_dir
+        self.save_dir = f"{results_root}/decomposition"
         self.save_freq = 10
         self.batch_size = batch_size
 
