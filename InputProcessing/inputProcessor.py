@@ -18,7 +18,7 @@ class InputProcessor(object):
                  video: str,
                  out_root: str,
                  initial_mask: Union[str, list],
-                 composite_order_fp: str,
+                 composite_order_fp: Union[str, None],
                  propagation_model: str,
                  flow_model: str,
                  in_channels: int = 16,
@@ -305,10 +305,17 @@ class InputProcessor(object):
 
     def load_composite_order(self, fp):
         self.composite_order = []
-        if path.exists(fp):
-            with open(fp, "r") as f:
-                for line in f.readlines():
-                    self.composite_order.append(tuple([int(i) for i in line.split(" ")]))
+        
+        if fp == None:
+            create_new = True
         else:
+            if path.exists(fp):
+                with open(fp, "r") as f:
+                    for line in f.readlines():
+                        self.composite_order.append(tuple([int(frame_idx) for frame_idx in line.split(" ")]))
+            else:
+                create_new = True
+
+        if create_new:
             for _ in range(len(self) + 1):
-                self.composite_order.append(tuple([int(i) for i in range(self.mask_handler.N_objects)]))
+                self.composite_order.append(tuple([int(i+1) for i in range(self.mask_handler.N_objects)]))

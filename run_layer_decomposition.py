@@ -69,3 +69,7 @@ if __name__ == "__main__":
         help="path to the weights of the mask propagation model")
     parser.add_argument("--flow_model", type=str, default="models/third_party/weights/raft-things.pth",
         help="path to the optical flow estimation model")
+
+    args = parser.parse_args()
+
+    main(args)
