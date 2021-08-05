@@ -17,7 +17,7 @@ cp -RT $HOME/thesis/datasets/DAVIS_sample/JPEGImages/480p/tennis $TMPDIR/video
 cp -RT $HOME/thesis/datasets/DAVIS_sample/Annotations/480p/tennis/00000.png $TMPDIR/initial_mask.png
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
-cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weigths/flow_model.pth
+cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
 
 #Create output directory on scratch
 mkdir $TMPDIR/output_dir
@@ -29,7 +29,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --initial_mask $TMPDIR/initial_mask.png \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
-            --flow_model $TMPDIR/weigths/flow_model.pth \
+            --flow_model $TMPDIR/weights/flow_model.pth \
             --batch_size 7 \
             --n_epochs 1
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
