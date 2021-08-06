@@ -28,7 +28,7 @@ def main(args):
 
     network = LayerDecompositionUNet(
         do_adjustment=args.do_adjustment, 
-        max_frames=len(input_processor) + 1, 
+        max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
     )
 
@@ -52,9 +52,9 @@ if __name__ == "__main__":
     video = "tennis"
     parser.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/{datetime.now()}", 
         help="path to directory where results are saved")
-    parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS_minisample/Annotations/480p/{video}/00000.png", 
+    parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
         help="path to the initial mask")
-    parser.add_argument("--img_dir", type=str, default=f"datasets/DAVIS_minisample/JPEGImages/480p/{video}", 
+    parser.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
     parser.add_argument("--composite_order", type=str, 
         help="path to a text file containing the compositing order of the foreground objects")
