@@ -30,8 +30,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
-            --batch_size 7 \
-            --n_epochs 1
+            --batch_size 5 \
+            --n_epochs 2000
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
