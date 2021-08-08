@@ -91,7 +91,7 @@ class LayerDecompositer(nn.Module):
                 create_dirs(path.join(self.save_dir, f"{epoch:03}/foreground/{l:02}"),
                             path.join(self.save_dir, f"{epoch:03}/alpha/{l:02}"),
                             path.join(self.save_dir, f"{epoch:03}/flow/{l:02}"))
-                foreground_rgb     = torch.clone(rgba_layers[b, t, l, :3]).detach()
+                foreground_rgb     = torch.clone(rgba_layers[b, t, l]).detach()
                 foreground_flow    = torch.clone(flow_layers[b, t, l]).detach()
                 foreground_alpha   = torch.clone(rgba_layers[b, t, l, 3]).detach()
 
@@ -103,4 +103,8 @@ class LayerDecompositer(nn.Module):
                 cv2.imwrite(path.join(self.save_dir, f"{epoch:03}/foreground/{l:02}/{img_name}"), foreground_img)
                 cv2.imwrite(path.join(self.save_dir, f"{epoch:03}/alpha/{l:02}/{img_name}"), alpha_img)
 
-        return
+    
+    def get_rgba_layer_from_rgba(rgba):
+        """
+        Return an rgb image from a  
+        """
