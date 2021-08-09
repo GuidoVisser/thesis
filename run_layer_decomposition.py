@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 from torch.utils.data import DataLoader
 import torch
-from torch.nn.parallel import DistributedDataParallel
+from torch.nn.parallel import DistributedDataParallel, DataParallel
 
 from InputProcessing.inputProcessor import InputProcessor
 from models.LayerDecomposition.layerDecomposition import LayerDecompositer
@@ -41,11 +41,11 @@ def main(args):
     
     loss_module = DecompositeLoss()
 
-    network = LayerDecompositionUNet(
+    network = DataParallel(LayerDecompositionUNet(
         do_adjustment=args.do_adjustment, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
-    )
+    ))
 
     model = LayerDecompositer(
         data_loader, 
