@@ -58,21 +58,24 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    assert args.device in ["cpu", "cuda"], f"{args.device} is an invalid specification for `device`. Please choose from 'cpu' or 'cuda'" 
-    if args.device == "cpu":
-        model.train()
-    elif args.n_gpus == 1:
-        model.to(args.device)
-        model.train(args.device)
-    else:
-        spawn_multiprocessor(
-            distributed_training, 
-            args.n_gpus,
-            model)
+    model.net = DataParallel(model.net.to(args.device))
+    model.train(args.device)
+
+    # assert args.device in ["cpu", "cuda"], f"{args.device} is an invalid specification for `device`. Please choose from 'cpu' or 'cuda'" 
+    # if args.device == "cpu":
+    #     model.train()
+    # elif args.n_gpus == 1:
+    #     model.to(args.device)
+    #     model.train(args.device)
+    # else:
+    #     spawn_multiprocessor(
+    #         distributed_training, 
+    #         args.n_gpus,
+    #         model)
 
 if __name__ == "__main__":
     print("started")
-    print(f"Running model on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
+    print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
 
     video = "tennis"
@@ -90,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate during training")
     parser.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
     parser.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    parser.add_argument("--n_epochs", type=int, default=2000, help="Number of epochs used for training")
+    parser.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
     parser.add_argument("--save_freq", type=int, default=100, help="Frequency at which the intermediate results are saved")
     parser.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
 
