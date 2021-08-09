@@ -112,13 +112,13 @@ class MaskHandler(object):
         
         trimaps = self.mask2trimap(masks)
 
-        trimaps = trimaps.unsqueeze(1).to(self.device)
-        binary_masks = binary_masks.unsqueeze(1).to(self.device)
+        trimaps = trimaps.unsqueeze(1)
+        binary_masks = binary_masks.unsqueeze(1)
 
         return trimaps, binary_masks
 
     def __len__(self):
-        return len(listdir(path.join(self.mask_dir, "00"))) - 1
+        return len(listdir(path.join(self.mask_dir, "00")))
 
     def mask2trimap(self, mask: torch.Tensor, trimap_width: int = 20):
         """Convert binary mask to trimap with values in [-1, 0, 1]."""

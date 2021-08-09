@@ -1,7 +1,5 @@
 from argparse import ArgumentParser
 from datetime import datetime
-from typing import no_type_check_decorator
-from torch.serialization import save
 from torch.utils.data import DataLoader
 import torch
 from torch.nn.parallel import DistributedDataParallel
@@ -74,7 +72,7 @@ def main(args):
 
 if __name__ == "__main__":
     print("started")
-    print(f"Running model on {torch.cuda.device_count()} GPUs")
+    print(f"Running model on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
 
     video = "tennis"

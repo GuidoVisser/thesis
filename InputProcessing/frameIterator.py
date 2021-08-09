@@ -23,10 +23,10 @@ class FrameIterator(object):
         img = torch.from_numpy(cv2.resize(np.float32(cv2.imread(self.images[idx])), self.frame_size)).permute(2, 0, 1) / 255.
         img = img * 2 - 1
         
-        return img.to(self.device)
+        return img
     
     def __len__(self):
-        return len(self.images) - 1 
+        return len(self.images)
 
     def get_np_frame(self, idx):
         img = cv2.resize(cv2.imread(self.images[idx]), self.frame_size)

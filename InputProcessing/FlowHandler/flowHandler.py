@@ -47,6 +47,8 @@ class FlowHandler(object):
         self.homographies   = homographies
         self.padder         = InputPadder(self.frame_iterator.frame_size)
 
+        self.calculate_full_video_flow()
+
     @torch.no_grad()
     def __getitem__(self, frame_idx):
         """
@@ -61,10 +63,21 @@ class FlowHandler(object):
         N_objects = object_masks.shape[0]
 
         frame_path = path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo")
-        if path.exists(frame_path):
-            forward_flow = torch.from_numpy(readFlow(frame_path)).permute(2, 0, 1).to(self.device)
-            conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)).to(self.device)
-        else:
+        flow = torch.from_numpy(readFlow(frame_path)).permute(2, 0, 1)
+        conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE))
+
+        conf = torch.stack([conf]*N_objects, dim=0) * object_masks
+
+        # get flow of objects and background
+        object_flow, background_flow = self.get_object_and_background_flow(flow, object_masks)
+
+        return flow, conf, object_flow, background_flow
+        
+    @torch.no_grad()
+    def calculate_full_video_flow(self):
+
+        for frame_idx in range(len(self.frame_iterator) - 1):
+            print(f"Calculating Optical Flow: {frame_idx} / {len(self.frame_iterator) - 1}")
 
             # Define images
             image0 = self.get_image(frame_idx)
@@ -101,23 +114,12 @@ class FlowHandler(object):
             forward_flow = forward_flow[:, translation[1]:h+translation[1], translation[0]:w+translation[0]]
             conf         = conf[translation[1]:h+translation[1], translation[0]:w+translation[0]]
 
-            # save results
-            forward_flow_copy = torch.clone(forward_flow).permute(1, 2, 0).cpu().numpy()
-            conf_copy         = torch.clone(conf).cpu().numpy()
-
-            writeFlow(path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo"), forward_flow_copy)
-            cv2.imwrite(path.join(self.output_dir, f"forward/png/{frame_idx:05}.png"), flow_to_image(forward_flow_copy))
-            cv2.imwrite(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), np.expand_dims(conf_copy, 2) * 255)
+            forward_flow = forward_flow.permute(1, 2, 0).cpu().numpy()
+            conf         = conf.cpu().numpy()
+            writeFlow(path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo"), forward_flow)
+            cv2.imwrite(path.join(self.output_dir, f"forward/png/{frame_idx:05}.png"), flow_to_image(forward_flow))
+            cv2.imwrite(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), np.expand_dims(conf, 2) * 255)
             
-            del forward_flow_copy
-
-        conf = torch.stack([conf]*N_objects, dim=0) * object_masks
-
-        # get flow of objects and background
-        object_flow, background_flow = self.get_object_and_background_flow(forward_flow, object_masks)
-
-        return forward_flow, conf, object_flow, background_flow
-        
     def get_confidence(self, image0, image1, forward, backward):
         """
         Calculate an alhpa mask for every object that serves as a weight for the flow reconstruction
@@ -307,7 +309,7 @@ class FlowHandler(object):
         return forward_flow, conf
 
     def __len__(self):
-        return len(self.frame_iterator)
+        return len(self.frame_iterator) - 1
 
     def get_image(self, frame_idx):
         return cv2.cvtColor(self.frame_iterator.get_np_frame(frame_idx), cv2.COLOR_BGR2RGB)

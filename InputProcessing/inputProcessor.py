@@ -110,21 +110,21 @@ class InputProcessor(object):
         background_flow = torch.stack((background_flow_t0, background_flow_t1)) # [T, C, H, W]      = [2, 2, H, W]
         
         # Get noise input
-        background_noise = torch.from_numpy(self.background_volume.spatial_noise_upsampled).float().permute(2, 0, 1).to(self.device)
+        background_noise = torch.from_numpy(self.background_volume.spatial_noise_upsampled).float().permute(2, 0, 1)
         background_noise = background_noise.unsqueeze(0).unsqueeze(0).repeat(2, 1, 1, 1, 1)
 
         noise_t0 = torch.from_numpy(np.float32(self.background_volume.get_frame_noise(idx))).permute(2, 0, 1)       
         noise_t1 = torch.from_numpy(np.float32(self.background_volume.get_frame_noise(idx + 1))).permute(2, 0, 1)
-        noise    = torch.stack((noise_t0, noise_t1)).to(self.device).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
+        noise    = torch.stack((noise_t0, noise_t1)).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
         
         background_uv_map_t0 = self.background_volume.get_frame_uv(idx)
         background_uv_map_t1 = self.background_volume.get_frame_uv(idx + 1)
         background_uv_map    = torch.stack((background_uv_map_t0, background_uv_map_t1))
 
         # Get model input
-        zeros = torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), device=self.device, dtype=torch.float32)
+        zeros = torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)
         background_input = torch.cat((zeros, background_noise), dim=2)
-        pids = binary_masks * torch.Tensor(self.composite_order[idx]).view(1, -1, 1, 1, 1).to(self.device) # [T, L-1, 1, H, W] = [2, L-1, 1, H, W]
+        pids = binary_masks * torch.Tensor(self.composite_order[idx]).view(1, -1, 1, 1, 1) # [T, L-1, 1, H, W] = [2, L-1, 1, H, W]
         
         input_tensor = torch.cat((pids, object_flow, noise), dim=2)       # [T, L-1, C, H, W] = [2, L-1, 16, H, W]                             
         input_tensor = torch.cat((background_input, input_tensor), dim=1) # [T, L,   C, H, W] = [2, L,   16, H, W]
@@ -164,25 +164,25 @@ class InputProcessor(object):
             jitter_grid = self.initialize_jitter_grid()
 
 
-        targets = Input({
+        targets = {
             "rgb": rgb,
             "flow": flow,
             "masks": masks,
             "flow_confidence": flow_conf
-        })
+        }
 
-        model_input = Input({
+        model_input = {
             "input_tensor": input_tensor,
             "background_flow": background_flow,
             "background_uv_map": background_uv_map,
             "jitter_grid": jitter_grid,
             "index": torch.Tensor([idx, idx + 1]).long()
-        })
+        }
 
         return model_input, targets
 
     def __len__(self):
-        return len(self.frame_iterator) - 1
+        return len(self.frame_iterator) - 2
 
     def input_demo(self, directory):
         """
@@ -239,7 +239,7 @@ class InputProcessor(object):
     def initialize_jitter_grid(self):
         u = torch.linspace(-1, 1, steps=self.frame_size[0]).unsqueeze(0).repeat(self.frame_size[1], 1)
         v = torch.linspace(-1, 1, steps=self.frame_size[1]).unsqueeze(-1).repeat(1, self.frame_size[0])
-        return torch.stack([u, v], 0).unsqueeze(0).repeat(2, 1, 1, 1).to(self.device)
+        return torch.stack([u, v], 0).unsqueeze(0).repeat(2, 1, 1, 1)
 
     def apply_jitter_transform(self, input, params, interp_mode='bilinear'):
         
@@ -320,16 +320,16 @@ class InputProcessor(object):
             for _ in range(len(self) + 1):
                 self.composite_order.append(tuple([int(i+1) for i in range(self.mask_handler.N_objects)]))
 
-class Input(object):
-    def __init__(self):
-        super.__init__(self)
-        self._data = {}
+# class Input(object):
+#     def __init__(self, data):
+#         super().__init__()
+#         self._data = data
     
-    def to(self, device):
-        self._data = {k:v.to(device) for k, v in self.data}
+#     def to(self, device):
+#         self._data = {k:v.to(device) for k, v in self.data}
 
-    def __getitem__(self, key):
-        return self._data[key]
+#     def __getitem__(self, key):
+#         return self._data[key]
 
-    def __setitem__(self, key, value):
-        self._data[key] = value
+#     def __setitem__(self, key, value):
+#         self._data[key] = value

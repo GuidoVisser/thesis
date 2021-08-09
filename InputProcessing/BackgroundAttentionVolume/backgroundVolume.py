@@ -407,7 +407,7 @@ class BackgroundVolume(object):
 
         uv_map = cv2.warpPerspective(uv, transformation_matrix, self.frame_size)
 
-        return torch.from_numpy(uv_map).to(self.device).float()
+        return torch.from_numpy(uv_map).float()
 
 
     def draw_frame_border(self, image, Ht, homography):
