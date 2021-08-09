@@ -14,7 +14,7 @@ from utils.distributed_training import setup, cleanup, spawn_multiprocessor
 def distributed_training(rank, n_gpus, model):
     setup(rank, n_gpus)
 
-    model.net.to(rank)                
+    model.net = model.net.to(rank)                
     model.net = DistributedDataParallel(model.net, device_ids=[rank])
 
     model.train(rank)
@@ -41,11 +41,11 @@ def main(args):
     
     loss_module = DecompositeLoss()
 
-    network = DataParallel(LayerDecompositionUNet(
+    network = LayerDecompositionUNet(
         do_adjustment=args.do_adjustment, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
-    ))
+    )
 
     model = LayerDecompositer(
         data_loader, 
