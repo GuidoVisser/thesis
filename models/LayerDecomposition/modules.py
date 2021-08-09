@@ -124,11 +124,11 @@ class LayerDecompositionUNet(nn.Module):
         Apply forward pass of network
         """
 
-        input_tensor = input["input_tensor"]
-        background_flow = input["background_flow"]
+        input_tensor      = input["input_tensor"]
+        background_flow   = input["background_flow"]
         background_uv_map = input["background_uv_map"]
-        jitter_grid = input["jitter_grid"]
-        index = input["index"]
+        jitter_grid       = input["jitter_grid"]
+        index             = input["index"]
 
         batch_size, N_t, N_layers, channels, H, W = input_tensor.shape
 

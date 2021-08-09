@@ -34,8 +34,8 @@ class DecompositeLoss(nn.Module):
 
         # Ground truth values
         flow_gt = targets["flow"]                       # [B, 2, 2, H, W]
-        rgb_gt = targets["rgb"]                         # [B, 2, 3, H, W]
-        masks = targets["masks"]                        # [B, 2, 1, 1, H, W]
+        rgb_gt  = targets["rgb"]                        # [B, 2, 3, H, W]
+        masks   = targets["masks"]                      # [B, 2, 1, 1, H, W]
         flow_confidence = targets["flow_confidence"]    # [B, 2, 1, H, W]
 
         ### Main loss

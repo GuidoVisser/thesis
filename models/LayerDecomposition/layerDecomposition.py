@@ -1,3 +1,4 @@
+from typing import Union
 import cv2
 import torch.nn as nn
 import torch
@@ -16,36 +17,41 @@ class LayerDecompositer(nn.Module):
                  network: nn.Module,
                  learning_rate: float,
                  results_root: str,
-                 batch_size: int):
+                 batch_size: int,
+                 n_epochs: int,
+                 save_freq: int):
         super().__init__()
 
         self.dataloader = dataloader
         self.loss_module = loss_module
         self.net = network
-        self.optimizer = Adam(self.net.parameters(), learning_rate)
+        self.learning_rate = learning_rate
 
         self.save_dir = f"{results_root}/decomposition"
-        self.save_freq = 10
-        self.batch_size = batch_size
+        self.n_epochs = n_epochs
+        self.save_freq = save_freq
+        self.batch_size = batch_size        
 
-    def train(self, n_epochs):
-
-        for epoch in range(n_epochs):
+    def train(self, gpu: Union[None, str]):
+        
+        self.optimizer = Adam(self.net.parameters(), self.learning_rate)
+        
+        for epoch in range(self.n_epochs):
+            
             if epoch % self.save_freq == 0:
-                create_dirs(path.join(self.save_dir, f"{epoch:03}/background"), 
-                            path.join(self.save_dir, f"{epoch:03}/foreground"),
-                            path.join(self.save_dir, f"{epoch:03}/alpha"),
-                            path.join(self.save_dir, f"{epoch:03}/reconstruction"),
-                            path.join(self.save_dir, f"{epoch:03}/ground_truth"),
-                            path.join(self.save_dir, f"{epoch:03}/flow"))
-            print(f"Epoch: {epoch} / {n_epochs}")
+                self.create_save_dirs(epoch)
+            
+            print(f"Epoch: {epoch} / {self.n_epochs}")
 
             for i, (input, targets) in enumerate(self.dataloader):
 
+                if gpu is not None:
+                    input.to(gpu)
+                    targets.to(gpu)
+
+                self.optimizer.zero_grad()
                 output = self.net(input)
                 loss = self.loss_module(output, targets)
-                
-                self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
@@ -103,8 +109,10 @@ class LayerDecompositer(nn.Module):
                 cv2.imwrite(path.join(self.save_dir, f"{epoch:03}/foreground/{l:02}/{img_name}"), foreground_img)
                 cv2.imwrite(path.join(self.save_dir, f"{epoch:03}/alpha/{l:02}/{img_name}"), alpha_img)
 
-    
-    def get_rgba_layer_from_rgba(rgba):
-        """
-        Return an rgb image from a  
-        """
+    def create_save_dirs(self, epoch):
+        create_dirs(path.join(self.save_dir, f"{epoch:03}/background"), 
+                    path.join(self.save_dir, f"{epoch:03}/foreground"),
+                    path.join(self.save_dir, f"{epoch:03}/alpha"),
+                    path.join(self.save_dir, f"{epoch:03}/reconstruction"),
+                    path.join(self.save_dir, f"{epoch:03}/ground_truth"),
+                    path.join(self.save_dir, f"{epoch:03}/flow"))

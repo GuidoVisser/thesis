@@ -6,7 +6,6 @@ from PIL import Image
 from os import path, listdir
 from typing import Union
 import torch.nn.functional as F
-from skimage.measure import label
 
 from utils.utils import create_dir
 from utils.video_utils import save_frame

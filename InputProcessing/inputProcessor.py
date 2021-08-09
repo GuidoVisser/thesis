@@ -164,20 +164,20 @@ class InputProcessor(object):
             jitter_grid = self.initialize_jitter_grid()
 
 
-        targets = {
+        targets = Input({
             "rgb": rgb,
             "flow": flow,
             "masks": masks,
             "flow_confidence": flow_conf
-        }
+        })
 
-        model_input = {
+        model_input = Input({
             "input_tensor": input_tensor,
             "background_flow": background_flow,
             "background_uv_map": background_uv_map,
             "jitter_grid": jitter_grid,
             "index": torch.Tensor([idx, idx + 1]).long()
-        }
+        })
 
         return model_input, targets
 
@@ -319,3 +319,17 @@ class InputProcessor(object):
         if create_new:
             for _ in range(len(self) + 1):
                 self.composite_order.append(tuple([int(i+1) for i in range(self.mask_handler.N_objects)]))
+
+class Input(object):
+    def __init__(self):
+        super.__init__(self)
+        self._data = {}
+    
+    def to(self, device):
+        self._data = {k:v.to(device) for k, v in self.data}
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __setitem__(self, key, value):
+        self._data[key] = value

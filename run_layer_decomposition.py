@@ -1,13 +1,28 @@
 from argparse import ArgumentParser
 from datetime import datetime
+from typing import no_type_check_decorator
+from torch.serialization import save
 from torch.utils.data import DataLoader
-import torch.nn as nn
 import torch
+from torch.nn.parallel import DistributedDataParallel
 
 from InputProcessing.inputProcessor import InputProcessor
 from models.LayerDecomposition.layerDecomposition import LayerDecompositer
 from models.LayerDecomposition.loss_functions import DecompositeLoss
 from models.LayerDecomposition.modules import LayerDecompositionUNet
+
+from utils.distributed_training import setup, cleanup, spawn_multiprocessor
+
+def distributed_training(rank, n_gpus, model):
+    setup(rank, n_gpus)
+
+    model.net.to(rank)                
+    model.net = DistributedDataParallel(model.net, device_ids=[rank])
+
+    model.train(rank)
+
+    cleanup()
+
 
 def main(args):
 
@@ -28,11 +43,11 @@ def main(args):
     
     loss_module = DecompositeLoss()
 
-    network = nn.DataParallel(LayerDecompositionUNet(
+    network = LayerDecompositionUNet(
         do_adjustment=args.do_adjustment, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
-    ))
+    )
 
     model = LayerDecompositer(
         data_loader, 
@@ -40,12 +55,22 @@ def main(args):
         network, 
         args.learning_rate, 
         results_root=args.out_dir, 
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        n_epochs=args.n_epochs,
+        save_freq=args.save_freq
     )
 
-    model.to(args.device)
-
-    model.train(args.n_epochs)
+    assert args.device in ["cpu", "cuda"], f"{args.device} is an invalid specification for `device`. Please choose from 'cpu' or 'cuda'" 
+    if args.device == "cpu":
+        model.train()
+    elif args.n_gpus == 1:
+        model.to(args.device)
+        model.train(args.device)
+    else:
+        spawn_multiprocessor(
+            distributed_training, 
+            args.n_gpus,
+            model)
 
 if __name__ == "__main__":
     print("started")
@@ -68,6 +93,8 @@ if __name__ == "__main__":
     parser.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
     parser.add_argument("--device", type=str, default="cuda", help="CUDA device")
     parser.add_argument("--n_epochs", type=int, default=2000, help="Number of epochs used for training")
+    parser.add_argument("--save_freq", type=int, default=100, help="Frequency at which the intermediate results are saved")
+    parser.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
 
     parser.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
         help="path to the weights of the mask propagation model")
