@@ -14,12 +14,19 @@
 
 
 import torch
-from third_party.models.base_model import BaseModel
-from third_party.models.networks_lnr import MaskLoss, cal_alpha_reg
+try:
+    from ..third_party.models.base_model import BaseModel
+    from ..third_party.models.networks_lnr import MaskLoss, cal_alpha_reg
+except:
+    from third_party.models.base_model import BaseModel
+    from third_party.models.networks_lnr import MaskLoss, cal_alpha_reg
 from . import networks
 import numpy as np
 import torch.nn.functional as F
-import utils
+try:
+    from ..utils import tensor_flow_to_image
+except:
+    from utils import tensor_flow_to_image
 
 
 class OmnimatteModel(BaseModel):
@@ -65,21 +72,26 @@ class OmnimatteModel(BaseModel):
         """Setup the model for training mode."""
         print('setting up model')
         # specify the training losses you want to print out. The program will call base_model.get_current_losses to plot the losses to the console and save them to the disk.
-        self.loss_names = ['total', 'recon', 'alpha_reg', 'mask', 'recon_flow', 'recon_warp', 'alpha_warp', 'adj_reg']
+        self.loss_names   = ['total', 'recon', 'alpha_reg', 'mask', 'recon_flow', 'recon_warp', 'alpha_warp', 'adj_reg']
         self.visual_names = ['target_image', 'reconstruction', 'rgba_vis', 'alpha_vis', 'input_vis', 'flow_vis', 'mask_vis']
+        
         self.do_cam_adj = False
-        self.criterionLoss = torch.nn.L1Loss()
+        
+        self.criterionLoss     = torch.nn.L1Loss()
         self.criterionLossMask = MaskLoss().to(self.device)
-        self.lambda_mask = opt.lambda_mask
-        self.lambda_adj_reg = opt.lambda_adj_reg
+        
+        self.lambda_mask       = opt.lambda_mask
+        self.lambda_adj_reg    = opt.lambda_adj_reg
         self.lambda_recon_flow = opt.lambda_recon_flow
         self.lambda_recon_warp = opt.lambda_recon_warp
         self.lambda_alpha_warp = opt.lambda_alpha_warp
-        self.lambda_alpha_l0 = opt.lambda_alpha_l0
-        self.lambda_alpha_l1 = opt.lambda_alpha_l1
+        self.lambda_alpha_l0   = opt.lambda_alpha_l0
+        self.lambda_alpha_l1   = opt.lambda_alpha_l1
+        
         self.mask_loss_rolloff_epoch = opt.mask_loss_rolloff_epoch
         self.jitter_rgb = opt.jitter_rgb
-        self.optimizer = torch.optim.Adam(self.netOmnimatte.parameters(), lr=opt.lr)
+        
+        self.optimizer  = torch.optim.Adam(self.netOmnimatte.parameters(), lr=opt.lr)
         self.optimizers = [self.optimizer]
 
     def set_input(self, input):
@@ -93,15 +105,16 @@ class OmnimatteModel(BaseModel):
             # add brightness jitter to rgb
             self.target_image += self.jitter_rgb * torch.randn(self.target_image.shape[0], 1, 1, 1).to(self.device)
             self.target_image = torch.clamp(self.target_image, -1, 1)
-        self.input = input['input'].to(self.device)
-        self.input_bg_flow = input['bg_flow'].to(self.device)
-        self.input_bg_warp = input['bg_warp'].to(self.device)
-        self.mask = input['mask'].to(self.device)
-        self.flow_gt = input['flow'].to(self.device)
+
+        self.input           = input['input'].to(self.device)
+        self.input_bg_flow   = input['bg_flow'].to(self.device)
+        self.input_bg_warp   = input['bg_warp'].to(self.device)
+        self.mask            = input['mask'].to(self.device)
+        self.flow_gt         = input['flow'].to(self.device)
         self.flow_confidence = input['confidence'].to(self.device)
-        self.jitter_grid = input['jitter_grid'].to(self.device)
-        self.image_paths = input['image_path']
-        self.index = input['index']
+        self.jitter_grid     = input['jitter_grid'].to(self.device)
+        self.image_paths     = input['image_path']
+        self.index           = input['index']
 
     def gen_crop_params(self, orig_h, orig_w, crop_size=256):
         """Generate random square cropping parameters."""
@@ -114,51 +127,74 @@ class OmnimatteModel(BaseModel):
     def forward(self):
         """Run forward pass. This will be called by both functions <optimize_parameters> and <test>."""
         outputs = self.netOmnimatte(self.input, self.input_bg_flow, self.input_bg_warp, self.jitter_grid, self.index, self.do_cam_adj)
+        
         # rearrange t, t+1 to batch dimension
-        self.target_image = self.rearrange2batchdim(self.target_image)
-        self.mask = self.rearrange2batchdim(self.mask)
-        self.flow_confidence = self.rearrange2batchdim(self.flow_confidence)
-        self.flow_gt = self.rearrange2batchdim(self.flow_gt)
-        reconstruction_rgb = self.rearrange2batchdim(outputs['reconstruction_rgb'])
-        self.reconstruction = reconstruction_rgb[:, :3]
-        self.alpha_composite = reconstruction_rgb[:, 3:]
-        self.reconstruction_warped = outputs['reconstruction_warped']
-        self.alpha_warped = outputs['alpha_warped']
-        self.bg_offset = self.rearrange2batchdim(outputs['bg_offset'])
-        self.brightness_scale = self.rearrange2batchdim(outputs['brightness_scale'])
         self.reconstruction_flow = self.rearrange2batchdim(outputs['reconstruction_flow'])
-        self.output_flow = self.rearrange2batchdim(outputs['layers_flow'])
-        self.output_rgba = self.rearrange2batchdim(outputs['layers_rgba'])
-        n_layers = self.output_rgba.shape[2]
-        layers = self.output_rgba.clone()
+        self.output_flow         = self.rearrange2batchdim(outputs['layers_flow'])
+        self.output_rgba         = self.rearrange2batchdim(outputs['layers_rgba'])
+
+        reconstruction_rgb   = self.rearrange2batchdim(outputs['reconstruction_rgb'])
+        self.reconstruction  = reconstruction_rgb[:, :3]
+        self.alpha_composite = reconstruction_rgb[:, 3:]
+        
+        self.reconstruction_warped = outputs['reconstruction_warped']
+        self.alpha_warped          = outputs['alpha_warped']
+
+        self.bg_offset        = self.rearrange2batchdim(outputs['bg_offset'])
+        self.brightness_scale = self.rearrange2batchdim(outputs['brightness_scale'])
+        
+        self.target_image    = self.rearrange2batchdim(self.target_image)
+        self.mask            = self.rearrange2batchdim(self.mask)
+        self.flow_confidence = self.rearrange2batchdim(self.flow_confidence)
+        self.flow_gt         = self.rearrange2batchdim(self.flow_gt)
+        
+        n_layers         = self.output_rgba.shape[2]
+        layers           = self.output_rgba.clone()
         layers[:, -1, 0] = 1  # Background layer's alpha is always 1
-        layers = torch.cat([layers[:, :, l] for l in range(n_layers)], -2)
-        self.alpha_vis = layers[:, 3:]
-        self.rgba_vis = layers#[:, :4]
-        self.mask_vis = torch.cat([self.mask[:, l:l+1] for l in range(n_layers)], -2)
-        self.input_vis = torch.cat([self.input[:, l, 3:6] for l in range(n_layers)], -2)  # TODO: visualize input flow
+        layers           = torch.cat([layers[:, :, l] for l in range(n_layers)], -2)
+        
+        # Visuals
+        self.alpha_vis  = layers[:, 3:]
+        self.rgba_vis   = layers
+        self.mask_vis   = torch.cat([self.mask[:, l:l+1] for l in range(n_layers)], -2)
+        
+        self.input_vis  = torch.cat([self.input[:, l, 3:6] for l in range(n_layers)], -2)  # TODO: visualize input flow
         self.input_vis -= self.input_vis.min()
         self.input_vis /= self.input_vis.max()
-        self.flow_vis = torch.cat([self.output_flow[:, :, l] for l in range(n_layers)], -2)
-        self.flow_vis = utils.tensor_flow_to_image(self.flow_vis[0].detach()).unsqueeze(0)  # batchsize 1
+
+        self.flow_vis   = torch.cat([self.output_flow[:, :, l] for l in range(n_layers)], -2)
+        self.flow_vis   = tensor_flow_to_image(self.flow_vis[0].detach()).unsqueeze(0)  # batchsize 1
 
     def backward(self):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         self.loss_recon = self.criterionLoss(self.reconstruction[:, :3], self.target_image)
-        self.loss_total = self.loss_recon
+        
         self.loss_alpha_reg = cal_alpha_reg(self.alpha_composite * .5 + .5, self.lambda_alpha_l1, self.lambda_alpha_l0)
+        
         alpha_layers = self.output_rgba[:, 3]
+        
         self.loss_mask = self.lambda_mask * self.criterionLossMask(alpha_layers, self.mask)
         self.loss_recon_flow = self.lambda_recon_flow * self.criterionLoss(self.flow_confidence * self.reconstruction_flow, self.flow_confidence * self.flow_gt)
+        
         b_sz = self.target_image.shape[0]
         alpha_t = alpha_layers[:b_sz // 2]
+        
         self.loss_alpha_warp = self.lambda_alpha_warp * self.criterionLoss(self.alpha_warped[:, 0], alpha_t)
         rgb_t = self.target_image[:b_sz // 2]
+        
         self.loss_recon_warp = self.lambda_recon_warp * self.criterionLoss(self.reconstruction_warped, rgb_t)
+        
         brightness_reg = self.criterionLoss(self.brightness_scale, torch.ones_like(self.brightness_scale))
         offset_reg = self.bg_offset.abs().mean()
         self.loss_adj_reg = self.lambda_adj_reg * (brightness_reg + offset_reg)
-        self.loss_total += self.loss_alpha_reg + self.loss_mask + self.loss_recon_flow + self.loss_alpha_warp + self.loss_recon_warp + self.loss_adj_reg
+        
+        self.loss_total = self.loss_recon \
+                        + self.loss_alpha_reg \
+                        + self.loss_mask \
+                        + self.loss_recon_flow \
+                        + self.loss_alpha_warp \
+                        + self.loss_recon_warp \
+                        + self.loss_adj_reg
         self.loss_total.backward()
 
     def rearrange2batchdim(self, tensor):
@@ -213,9 +249,9 @@ class OmnimatteModel(BaseModel):
         results = {
             'reconstruction': self.reconstruction,
             'original': self.target_image,
-            'reconstruction_flow': utils.tensor_flow_to_image(self.reconstruction_flow[0]).unsqueeze(0),  # batchsize 1
-            'flow_gt': utils.tensor_flow_to_image(self.flow_gt[0]).unsqueeze(0),  # batchsize 1
-            'bg_offset': utils.tensor_flow_to_image(self.bg_offset[0]).unsqueeze(0),  # batchsize 1
+            'reconstruction_flow': tensor_flow_to_image(self.reconstruction_flow[0]).unsqueeze(0),  # batchsize 1
+            'flow_gt': tensor_flow_to_image(self.flow_gt[0]).unsqueeze(0),  # batchsize 1
+            'bg_offset': tensor_flow_to_image(self.bg_offset[0]).unsqueeze(0),  # batchsize 1
             'brightness_scale': self.brightness_scale - 1.
         }
         n_layers = self.rgba.shape[2]
@@ -225,5 +261,5 @@ class OmnimatteModel(BaseModel):
         for i in range(n_layers):
             results[f'mask_l{i}'] = self.mask[:, i:i+1]
             results[f'rgba_l{i}'] = self.rgba[:, :, i]
-            results[f'flow_l{i}'] = utils.tensor_flow_to_image(flow_layers[0, :, i]).unsqueeze(0)  # batchsize 1
+            results[f'flow_l{i}'] = tensor_flow_to_image(flow_layers[0, :, i]).unsqueeze(0)  # batchsize 1
         return results

@@ -16,7 +16,7 @@ class DecompositeLoss(nn.Module):
                  lambda_stabilization: float = 0.001) -> None:
         super().__init__()
 
-        self.criterion = L1Loss()
+        self.criterion = nn.L1Loss()
         self.mask_criterion = MaskLoss()
 
         self.lambda_alpha_l0       = lambda_alpha_l0
@@ -54,8 +54,13 @@ class DecompositeLoss(nn.Module):
         alpha_reg_loss           = cal_alpha_reg(alpha_composite * 0.5 + 0.5, self.lambda_alpha_l1, self.lambda_alpha_l0)
 
         # Turn off bootstrap loss when loss reaches threshold
-        if mask_bootstrap_loss < self.bootstrap_threshold:
-            self.lambda_mask_bootstrap = 0.
+        if self.lambda_mask_bootstrap > 0:
+            if mask_bootstrap_loss < self.bootstrap_threshold:
+                if self.lambda_mask_bootstrap > 0.5:
+                    self.lambda_mask_bootstrap *= 0.1
+                else:
+                    self.lambda_mask_bootstrap = 0
+                print(f"Setting alpha bootstrap lambda to {self.lambda_mask_bootstrap}")
 
         ### Temporal consistency loss
 
@@ -81,12 +86,12 @@ class DecompositeLoss(nn.Module):
 
         # Combine loss values
         loss = rgb_reconstruction_loss + \
-                alpha_reg_loss + \
-                self.lambda_recon_flow * flow_reconstruction_loss + \
-                self.lambda_mask_bootstrap * mask_bootstrap_loss + \
-                self.lambda_alpha_warp * alpha_warp_loss + \
-                self.lambda_recon_warp * rgb_reconstruction_warp_loss + \
-                self.lambda_stabilization * stabilization_loss
+               alpha_reg_loss + \
+               self.lambda_recon_flow     * flow_reconstruction_loss + \
+               self.lambda_mask_bootstrap * mask_bootstrap_loss + \
+               self.lambda_alpha_warp     * alpha_warp_loss + \
+               self.lambda_recon_warp     * rgb_reconstruction_warp_loss + \
+               self.lambda_stabilization  * stabilization_loss
 
         return loss
 
@@ -124,7 +129,7 @@ class MaskLoss(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.loss = L1Loss(reduction='none')
+        self.loss = nn.L1Loss(reduction='none')
 
     def __call__(self, prediction, target):
         """Calculate loss given predicted alpha matte and trimap.

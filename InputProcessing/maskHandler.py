@@ -41,8 +41,9 @@ class MaskHandler(object):
         # propagate each object mask through video
         for i in range(self.N_objects):
             save_dir = path.join(self.mask_dir, f"{i:02}")
-            create_dir(save_dir)
-            self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir)
+            if not path.exists(save_dir):
+                create_dir(save_dir)
+                self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir)
          
     @torch.no_grad()
     def propagate(self, initial_mask, top_k, mem_freq, model_device, memory_device, model_weights, save_dir):

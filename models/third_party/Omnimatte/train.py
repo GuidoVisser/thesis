@@ -20,6 +20,7 @@ from third_party.util.visualizer import Visualizer
 import torch
 import numpy as np
 
+import cv2
 
 def main():
     trainopt = TrainOptions()
@@ -32,7 +33,7 @@ def main():
     dataset_size = len(dataset)
     print('The number of training images = %d' % dataset_size)
 
-    opt.n_epochs = int(opt.n_steps / np.ceil(dataset_size / opt.batch_size))
+    opt.n_epochs       = int(opt.n_steps / np.ceil(dataset_size / opt.batch_size))
     opt.n_epochs_decay = int(opt.n_steps_decay / np.ceil(dataset_size / opt.batch_size))
 
     model = create_model(opt)
@@ -48,18 +49,22 @@ def train(model, dataset, visualizer, opt):
 
     for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):  # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
         epoch_start_time = time.time()  # timer for entire epoch
-        iter_data_time = time.time()    # timer for data loading per iteration
+        iter_data_time   = time.time()  # timer for data loading per iteration
+        
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
         model.update_lambdas(epoch)
         for i, data in enumerate(dataset):  # inner loop within one epoch
-            print("########################################################\n\n\n\n\n\n\n\n\n########################################")
-            print(i)
-            iter_start_time = time.time()  # timer for computation per iteration
+            
+            # if data["index"][0, 0] > 11:
+            #     continue
+
+            iter_start_time = time.time()   # timer for computation per iteration
+
             if i % opt.print_freq == 0:
                 t_data = iter_start_time - iter_data_time
 
             total_iters += opt.batch_size
-            epoch_iter += opt.batch_size
+            epoch_iter  += opt.batch_size
             model.set_input(data)
             model.optimize_parameters()
 

@@ -7,7 +7,7 @@
                  dataroot: models/third_party/Omnimatte/datasets/tennis
              dataset_mode: omnimatte                     
               display_env: main                          
-             display_freq: 20                            
+             display_freq: 10                            
                display_id: 1                             
             display_ncols: 0                             
              display_port: 8097                          
@@ -40,7 +40,7 @@
                      name: tennis                        
                   no_html: False                         
               num_filters: 64                            
-              num_threads: 4                             
+              num_threads: 1                             
                     phase: train                         
                print_freq: 10                            
             save_by_epoch: False                         
@@ -48,7 +48,7 @@
                      seed: 1                             
            serial_batches: False                         
                    suffix:                               
-         update_html_freq: 50                            
+         update_html_freq: 10                            
                   verbose: False                         
                     width: 448                           
 ----------------- End -------------------

@@ -1,9 +1,12 @@
+from models.third_party.Omnimatte.utils import flow_to_image
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import cv2
 
-from InputProcessing.FlowHandler.flowHandler import FlowHandler
+
+from InputProcessing.flowHandler import FlowHandler
 
 class ConvBlock(nn.Module):
     """Helper module consisting of a convolution, optional normalization and activation, with padding='same'.
@@ -119,7 +122,7 @@ class LayerDecompositionUNet(nn.Module):
         return rgba, flow
 
 
-    def forward(self, input):
+    def forward(self, input, disp=False):
         """
         Apply forward pass of network
         """
@@ -153,6 +156,39 @@ class LayerDecompositionUNet(nn.Module):
         background_offset = self.get_background_offset(jitter_grid, index)
         brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
 
+        # debug0 = torch.clone(input_t0).detach().cpu()
+        # debug1 = torch.clone(input_t1).detach().cpu()
+        # bg_uv = torch.clone(background_uv_map).detach().cpu()
+        # jit = torch.clone(jitter_grid).detach().cpu()
+        # bg_uv0 = bg_uv[0].numpy()
+        # bg_uv1 = bg_uv[1].numpy()
+        # jit0 = jit[0].permute(1, 2, 0).numpy()
+        # jit1 = jit[1].permute(1, 2, 0).numpy()
+        # b0 = debug0[0, 0].permute(1, 2, 0).numpy()
+        # b1 = debug1[0, 0].permute(1, 2, 0).numpy()
+        # l0 = debug0[0, 1].permute(1, 2, 0).numpy()
+        # l1 = debug1[0, 1].permute(1, 2, 0).numpy()
+
+        # print(index[0].item())
+        # cv2.imshow("bg pid 0", b0[:, :, 0])
+        # cv2.imshow("bg pid 1", b1[:, :, 0])
+        # cv2.imshow("l pid 0",  l0[:, :, 0])
+        # cv2.imshow("l pid 1",  l1[:, :, 0])
+        # cv2.imshow("bg flow 0", flow_to_image(b0[:, :, 1:3]))
+        # cv2.imshow("bg flow 1", flow_to_image(b1[:, :, 1:3]))
+        # cv2.imshow("l flow 0",  flow_to_image(l0[:, :, 1:3]))
+        # cv2.imshow("l flow 1",  flow_to_image(l1[:, :, 1:3]))
+        # cv2.imshow("bg uv 0", flow_to_image(bg_uv0))
+        # cv2.imshow("bg uv 1", flow_to_image(bg_uv1))
+        # cv2.imshow("jitter 0",  flow_to_image(jit0))
+        # cv2.imshow("jitter 1",  flow_to_image(jit1))
+        # cv2.imshow("bg noise 0", b0[:, :, 3:6] * 0.5 + 0.5)
+        # cv2.imshow("bg noise 1", b1[:, :, 3:6] * 0.5 + 0.5)
+        # cv2.imshow("l noise 0",  l0[:, :, 3:6] * 0.5 + 0.5)
+        # cv2.imshow("l noise 1",  l1[:, :, 3:6] * 0.5 + 0.5)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
@@ -169,17 +205,27 @@ class LayerDecompositionUNet(nn.Module):
                 flow = composite_flow
 
                 # Temporal consistency 
-                rgba_warped = rgba[:batch_size]
+                rgba_warped      = rgba[:batch_size]
                 composite_warped = rgba_warped[:, :3]
             # Object layers
             else:
+
+                if disp:
+                    composite_rgba_ = rgba * alpha + composite_rgba * (1. - alpha)
+                    cv2.imshow("rgba", torch.clone(rgba[0]).detach().permute(1, 2, 0).cpu().numpy() * 0.5 + 0.5)
+                    cv2.imshow("composite", torch.clone(composite_rgba[0]).detach().permute(1, 2, 0).cpu().numpy()* 0.5 + 0.5)
+                    cv2.imshow("alpha", torch.clone(alpha[0]).detach().permute(1, 2, 0).cpu().numpy()* 0.5 + 0.5)
+                    cv2.imshow("composite_", torch.clone(composite_rgba_[0]).detach().permute(1, 2, 0).cpu().numpy()* 0.5 + 0.5)
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
+
                 composite_rgba = rgba * alpha + composite_rgba * (1. - alpha)
                 composite_flow = flow * alpha + composite_flow * (1. - alpha)
 
                 # Temporal consistency
-                rgba_t1 = rgba[batch_size:]
-                rgba_warped = FlowHandler.apply_flow(rgba_t1, flow[:batch_size])
-                alpha_warped = self.get_alpha_from_rgba(rgba_warped)
+                rgba_t1          = rgba[batch_size:]
+                rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:batch_size])
+                alpha_warped     = self.get_alpha_from_rgba(rgba_warped)
                 composite_warped = rgba_warped[:, :3] * alpha_warped + composite_warped * (1.0 - alpha_warped)
 
             layers_rgba.append(rgba)
@@ -197,15 +243,15 @@ class LayerDecompositionUNet(nn.Module):
             composite_rgba = composite_rgba * 2 - 1
 
         # stack in time dimension
-        composite_rgba = torch.stack((composite_rgba[:batch_size], composite_rgba[batch_size:]), 1)
-        composite_flow = torch.stack((composite_flow[:batch_size], composite_flow[batch_size:]), 1)
-        layers_rgba = torch.stack(layers_rgba, 1)
-        layers_rgba = torch.stack((layers_rgba[:batch_size], layers_rgba[batch_size:]), 1)
-        layers_flow = torch.stack(layers_flow, 1)
-        layers_flow = torch.stack((layers_flow[:batch_size], layers_flow[batch_size:]), 1)
+        composite_rgba      = torch.stack((composite_rgba[:batch_size], composite_rgba[batch_size:]), 1)
+        composite_flow      = torch.stack((composite_flow[:batch_size], composite_flow[batch_size:]), 1)
+        layers_rgba         = torch.stack(layers_rgba, 1)
+        layers_rgba         = torch.stack((layers_rgba[:batch_size], layers_rgba[batch_size:]), 1)
+        layers_flow         = torch.stack(layers_flow, 1)
+        layers_flow         = torch.stack((layers_flow[:batch_size], layers_flow[batch_size:]), 1)
         layers_alpha_warped = torch.stack(layers_alpha_warped, 1)
-        brightness_scale = torch.stack((brightness_scale[:batch_size], brightness_scale[batch_size:]), 1)
-        background_offset = torch.stack((background_offset[:batch_size], background_offset[batch_size:]), 1)
+        brightness_scale    = torch.stack((brightness_scale[:batch_size], brightness_scale[batch_size:]), 1)
+        background_offset   = torch.stack((background_offset[:batch_size], background_offset[batch_size:]), 1)
 
 
         out = {

@@ -1,17 +1,18 @@
+from InputProcessing.utils.utils import get_translation_matrix
 from os import path
 import numpy as np
+from numpy.core.numeric import indices
 import torch
 import cv2
 
 from torch.nn.functional import grid_sample, l1_loss
 
 from utils.utils import create_dirs
-from InputProcessing.BackgroundAttentionVolume.align_frames import align_two_frames
-from InputProcessing.FlowHandler.utils import RaftNameSpace
 from InputProcessing.frameIterator import FrameIterator
-from InputProcessing.MaskPropagation import maskHandler
+from InputProcessing.maskHandler import MaskHandler
+from InputProcessing.homography import HomographyHandler
 
-from models.third_party.RAFT import RAFT, update
+from models.third_party.RAFT import RAFT
 from models.third_party.RAFT.utils.frame_utils import writeFlow, readFlow
 from models.third_party.RAFT.utils.flow_viz import flow_to_image
 from models.third_party.RAFT.utils.utils import InputPadder
@@ -19,11 +20,12 @@ from models.third_party.RAFT.utils.utils import InputPadder
 class FlowHandler(object):
     def __init__(self, 
                  frame_iterator: FrameIterator, 
-                 mask_iterator: maskHandler,
-                 homographies: list,
+                 mask_iterator: MaskHandler,
+                 homography_handler: HomographyHandler,
                  output_dir: str,
                  raft_weights: str,
                  iters: int = 12,
+                 aligned: bool = False,
                  forward_backward_threshold: float = 20.,
                  photometric_threshold: float = 20.,
                  device = "cuda") -> None:
@@ -34,6 +36,7 @@ class FlowHandler(object):
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
         self.raft = self.initialize_raft(raft_weights)
+        self.aligned = aligned
 
         self.output_dir= output_dir
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
@@ -42,12 +45,13 @@ class FlowHandler(object):
                     path.join(self.output_dir, "backward", "png"),
                     path.join(self.output_dir, "confidence"))
 
-        self.frame_iterator = frame_iterator
-        self.mask_iterator  = mask_iterator
-        self.homographies   = homographies
-        self.padder         = InputPadder(self.frame_iterator.frame_size)
+        self.frame_iterator     = frame_iterator
+        self.mask_iterator      = mask_iterator
+        self.homography_handler = homography_handler
+        self.padder             = InputPadder(self.frame_iterator.frame_size)
 
-        self.calculate_full_video_flow()
+        if not path.exists(path.join(self.output_dir, f"forward/flow/00000.flo")):
+            self.calculate_full_video_flow()
 
     @torch.no_grad()
     def __getitem__(self, frame_idx):
@@ -64,14 +68,14 @@ class FlowHandler(object):
 
         frame_path = path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo")
         flow = torch.from_numpy(readFlow(frame_path)).permute(2, 0, 1)
-        conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE))
+        conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
 
         conf = torch.stack([conf]*N_objects, dim=0) * object_masks
 
         # get flow of objects and background
-        object_flow, background_flow = self.get_object_and_background_flow(flow, object_masks)
+        object_flow = self.get_object_flow(flow, object_masks)
 
-        return flow, conf, object_flow, background_flow
+        return flow, conf, object_flow
         
     @torch.no_grad()
     def calculate_full_video_flow(self):
@@ -85,8 +89,9 @@ class FlowHandler(object):
 
             h, w, _ = image0.shape
 
-            # Align the frames using the pre-calculated homography
-            image1, image0, _, translation = align_two_frames(image0, image1, self.homographies[frame_idx])
+            if self.aligned:
+                # Align the frames using the pre-calculated homography
+                image1, image0 = self.homography_handler.align_frames([image0, image1], indices=[frame_idx, frame_idx + 1])
 
             # Prepare images for use with RAFT
             image0 = self.prepare_image_for_raft(image0)
@@ -111,8 +116,12 @@ class FlowHandler(object):
             forward_flow = padder.unpad(forward_flow)
             conf         = padder.unpad(conf)
 
-            forward_flow = forward_flow[:, translation[1]:h+translation[1], translation[0]:w+translation[0]]
-            conf         = conf[translation[1]:h+translation[1], translation[0]:w+translation[0]]
+            if self.aligned:
+                t = [-self.homography_handler.xmin, 
+                     -self.homography_handler.ymin]
+
+                forward_flow = forward_flow[:, t[1]:h+t[1], t[0]:w+t[0]]
+                conf         = conf[t[1]:h+t[1], t[0]:w+t[0]]
 
             forward_flow = forward_flow.permute(1, 2, 0).cpu().numpy()
             conf         = conf.cpu().numpy()
@@ -227,21 +236,16 @@ class FlowHandler(object):
 
         return conf
 
-    def get_object_and_background_flow(self, flow, masks):
+    def get_object_flow(self, flow, masks):
         """
         Return the object flow of all objects in the scene
         """
         N_objects, _, _ =  masks.shape
 
-        stacked_flow = torch.stack([flow]*N_objects)
-        object_flow  = stacked_flow * masks
+        object_flow = torch.stack([flow]*N_objects)
+        object_flow  = object_flow * masks
 
-        background_mask = 1. - torch.sum(masks, dim=0)
-        background_mask = torch.maximum(background_mask, torch.zeros_like(background_mask))
-        background_flow = flow * background_mask
-
-        return object_flow, background_flow
-
+        return object_flow
 
     @staticmethod
     def apply_flow(tensor: torch.Tensor, flow: torch.Tensor) -> torch.Tensor:
@@ -255,11 +259,11 @@ class FlowHandler(object):
         Returns:
             tensor (torch.Tensor): the warped input tensor
         """
-        _, _, h, w = tensor.size()
+        batch_size, _, h, w = tensor.size()
 
         # Calculate a base grid that functions as an identity sampler
-        horizontal = torch.linspace(-1.0, 1.0, flow.size(3)).view(1, 1, 1, flow.size(3)).expand(flow.size(0), 1, flow.size(2), flow.size(3))
-        vertical   = torch.linspace(-1.0, 1.0, flow.size(2)).view(1, 1, flow.size(2), 1).expand(flow.size(0), 1, flow.size(2), flow.size(3))
+        horizontal = torch.linspace(-1.0, 1.0, w).view(1, 1, 1, w).expand(batch_size, 1, h, w)
+        vertical   = torch.linspace(-1.0, 1.0, h).view(1, 1, h, 1).expand(batch_size, 1, h, w)
         base_grid  = torch.cat([horizontal, vertical], dim=1).to(tensor.device)
 
         # calculate a Delta grid based on the flow that offsets the base grid
@@ -343,3 +347,11 @@ class FlowHandler(object):
         model.eval()
 
         return model
+
+
+class RaftNameSpace(object):
+    def __init__(self, **kwargs) -> None:
+        self.__dict__.update(kwargs)
+
+    def _get_kwargs(self):
+        return self.__dict__.keys()

@@ -8,10 +8,11 @@ from typing import Union
 
 from utils.video_utils import opencv_folder_to_video
 from utils.utils import create_dirs
-from .BackgroundAttentionVolume.backgroundVolume import BackgroundVolume
-from .MaskPropagation.maskHandler import MaskHandler
-from .FlowHandler.flowHandler import FlowHandler
+from .backgroundVolume import BackgroundVolume
+from .maskHandler import MaskHandler
+from .flowHandler import FlowHandler
 from .frameIterator import FrameIterator
+from .homography import HomographyHandler
 
 class InputProcessor(object):
     def __init__(self,
@@ -24,55 +25,39 @@ class InputProcessor(object):
                  in_channels: int = 16,
                  device: str = "cuda",
                  frame_size: tuple=(448, 256),
-                 do_adjustment: bool = True,
+                 do_jitter: bool = True,
                  jitter_rate: float = 0.75
                 ) -> None:
         super().__init__()
 
-        self.device        = device
-        self.frame_size    = frame_size
-        self.in_channels   = in_channels
-        self.do_adjustment = do_adjustment
-        self.jitter_rate   = jitter_rate
+        self.device      = device
+        self.frame_size  = frame_size
+        self.in_channels = in_channels
+        self.do_jitter   = do_jitter
+        self.jitter_rate = jitter_rate
 
         if isinstance(initial_mask, str):
             self.N_objects = 1
         else:
             self.N_objects = len(initial_mask)
 
-        img_dir        = path.join(out_root, "images")
+        self.img_dir   = path.join(out_root, "images")
         mask_dir       = path.join(out_root, "masks")
         flow_dir       = path.join(out_root, "flow")
         background_dir = path.join(out_root, "background")
-        create_dirs(img_dir, mask_dir, flow_dir, background_dir)
+        create_dirs(self.img_dir, mask_dir, flow_dir, background_dir)
+        homography_path = path.join(out_root, "homographies.txt")
+        noise_path = "models/third_party/Omnimatte/datasets/tennis/zbar.pth"
 
-        self.prepare_image_dir(video, img_dir)
+        self.prepare_image_dir(video, self.img_dir)
 
-        self.frame_iterator    = FrameIterator(img_dir, frame_size, device=self.device)
-        self.mask_handler      = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
-        self.background_volume = BackgroundVolume(img_dir, mask_dir, background_dir, self.device, in_channels=in_channels, frame_size=self.frame_size)
-        self.flow_handler      = FlowHandler(self.frame_iterator, self.mask_handler, self.background_volume.homographies, flow_dir, raft_weights=flow_model, device=self.device)
+        self.frame_iterator     = FrameIterator(self.img_dir, frame_size, device=self.device)
+        self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
+        self.homography_handler = HomographyHandler(homography_path, self.img_dir, mask_dir, self.device, frame_size)
+        self.background_volume  = BackgroundVolume(background_dir, in_channels=in_channels, frame_size=frame_size, noise_fp=noise_path)       
+        self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, self.homography_handler, flow_dir, raft_weights=flow_model, device=self.device)
 
         self.load_composite_order(composite_order_fp)
-
-
-    def get_frame_input(self, frame_idx):
-        """
-        Return the input for a single frame
-        """
-        img = self.frame_iterator[frame_idx]
-        mask = self.mask_handler.get_binary_mask(frame_idx)
-
-        matte = self.get_rgba_matte(img, mask)
-
-        noise = self.background_volume.get_frame_noise(frame_idx).astype(np.uint8)
-
-        flow, conf = self.flow_handler.calculate_flow_between_stabilized_frames(frame_idx)
-        flow_img = self.flow_handler.convert_flow_to_image(flow, bgr=True)
-        flow_matte = self.get_flow_matte(flow, mask)
-        flow_matte_img = self.flow_handler.convert_flow_to_image(flow_matte, bgr=True)
-
-        return img, flow_img, mask, matte, flow_matte_img, conf, noise
         
     def __getitem__(self, idx):
         """
@@ -101,8 +86,11 @@ class InputProcessor(object):
         masks = torch.cat((torch.zeros_like(masks[:, 0:1]), masks), dim=1)
 
         # Get flow input and confidence
-        flow_t0, flow_conf_t0, object_flow_t0, background_flow_t0 = self.flow_handler[idx]
-        flow_t1, flow_conf_t1, object_flow_t1, background_flow_t1 = self.flow_handler[idx + 1]
+        flow_t0, flow_conf_t0, object_flow_t0 = self.flow_handler[idx]
+        flow_t1, flow_conf_t1, object_flow_t1 = self.flow_handler[idx + 1]
+
+        background_flow_t0 = self.homography_handler.frame_homography_to_flow(idx)
+        background_flow_t1 = self.homography_handler.frame_homography_to_flow(idx +1)
         
         flow            = torch.stack((flow_t0, flow_t1))                       # [T, C, H, W]      = [2, 2, H, W]
         flow_conf       = torch.stack((flow_conf_t0, flow_conf_t1))             # [T, L-1, H, W]    = [2, L-1, H, W]
@@ -110,16 +98,16 @@ class InputProcessor(object):
         background_flow = torch.stack((background_flow_t0, background_flow_t1)) # [T, C, H, W]      = [2, 2, H, W]
         
         # Get noise input
-        background_noise = torch.from_numpy(self.background_volume.spatial_noise_upsampled).float().permute(2, 0, 1)
+        background_noise = self.background_volume.spatial_noise_upsampled[0]
         background_noise = background_noise.unsqueeze(0).unsqueeze(0).repeat(2, 1, 1, 1, 1)
 
-        noise_t0 = torch.from_numpy(np.float32(self.background_volume.get_frame_noise(idx))).permute(2, 0, 1)       
-        noise_t1 = torch.from_numpy(np.float32(self.background_volume.get_frame_noise(idx + 1))).permute(2, 0, 1)
-        noise    = torch.stack((noise_t0, noise_t1)).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
-        
-        background_uv_map_t0 = self.background_volume.get_frame_uv(idx)
-        background_uv_map_t1 = self.background_volume.get_frame_uv(idx + 1)
+        background_uv_map_t0 = self.homography_handler.get_frame_uv(idx)
+        background_uv_map_t1 = self.homography_handler.get_frame_uv(idx + 1)
         background_uv_map    = torch.stack((background_uv_map_t0, background_uv_map_t1))
+
+        noise_t0 = F.grid_sample(self.background_volume.spatial_noise, background_uv_map_t0.unsqueeze(0))[0]   
+        noise_t1 = F.grid_sample(self.background_volume.spatial_noise, background_uv_map_t1.unsqueeze(0))[0]
+        noise    = torch.stack((noise_t0, noise_t1)).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
 
         # Get model input
         zeros = torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)
@@ -129,39 +117,36 @@ class InputProcessor(object):
         input_tensor = torch.cat((pids, object_flow, noise), dim=2)       # [T, L-1, C, H, W] = [2, L-1, 16, H, W]                             
         input_tensor = torch.cat((background_input, input_tensor), dim=1) # [T, L,   C, H, W] = [2, L,   16, H, W]
 
-        if self.do_adjustment:
-            # get parameters
-            params = self.get_camera_adjustment_parameters()
-            mode = "bilinear"
+        # get parameters for jitter
+        params = self.get_jitter_parameters()
+        mode = "bilinear"
             
-            # transform targets
-            rgb       = self.apply_jitter_transform(rgb,       params, mode)
-            flow      = self.apply_jitter_transform(flow,      params, mode)
-            masks     = self.apply_jitter_transform(masks,     params, mode)
-            flow_conf = self.apply_jitter_transform(flow_conf, params, mode)
+        # transform targets
+        rgb       = self.apply_jitter_transform(rgb,       params, mode)
+        flow      = self.apply_jitter_transform(flow,      params, mode)
+        masks     = self.apply_jitter_transform(masks,     params, mode)
+        flow_conf = self.apply_jitter_transform(flow_conf, params, mode)
 
-            # transform inputs
-            input_tensor      = self.apply_jitter_transform(input_tensor,      params, mode)
-            background_flow   = self.apply_jitter_transform(background_flow,   params, mode)
-            background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params, mode)
-            background_uv_map = background_uv_map.permute(0, 2, 3, 1)
+        # transform inputs
+        input_tensor      = self.apply_jitter_transform(input_tensor,      params, mode)
+        background_flow   = self.apply_jitter_transform(background_flow,   params, mode)
+        background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params, mode)
+        background_uv_map = background_uv_map.permute(0, 2, 3, 1)
 
-            # rescale flow values to conform to new image size
-            scale_w = params['jitter size'][1] / self.frame_size[0]
-            scale_h = params['jitter size'][0] / self.frame_size[1]
+        # rescale flow values to conform to new image size
+        scale_w = params['jitter size'][1] / self.frame_size[0]
+        scale_h = params['jitter size'][0] / self.frame_size[1]
 
-            flow[:, 0] *= scale_w
-            flow[:, 1] *= scale_h
-            background_flow[:, 0] *= scale_w
-            background_flow[:, 1] *= scale_h
-            input_tensor[:, :, 0] *= scale_w
-            input_tensor[:, :, 1] *= scale_h
+        flow[:, 0] *= scale_w
+        flow[:, 1] *= scale_h
+        background_flow[:, 0] *= scale_w
+        background_flow[:, 1] *= scale_h
+        input_tensor[:, :, 1] *= scale_w
+        input_tensor[:, :, 2] *= scale_h
 
-            # create jitter grid
-            jitter_grid = self.initialize_jitter_grid()
-            jitter_grid = self.apply_jitter_transform(jitter_grid, params, mode)
-        else:
-            jitter_grid = self.initialize_jitter_grid()
+        # create jitter grid
+        jitter_grid = self.initialize_jitter_grid()
+        jitter_grid = self.apply_jitter_transform(jitter_grid, params, mode)
 
 
         targets = {
@@ -179,29 +164,25 @@ class InputProcessor(object):
             "index": torch.Tensor([idx, idx + 1]).long()
         }
 
+        data = {
+            "image": torch.cat((rgb[0], rgb[1])),
+            "input": torch.cat((input_tensor[0], input_tensor[1]), dim=1),
+            "bg_flow": torch.cat((background_flow[0], background_flow[1])),
+            "bg_warp": torch.cat((background_uv_map[0], background_uv_map[1]), dim=2).permute(2, 0, 1),
+            "mask": torch.cat((masks[0], masks[1])).squeeze(1),
+            "flow": torch.cat((flow[0], flow[1])),
+            "confidence": flow_conf.squeeze(1),
+            "jitter_grid": torch.cat((jitter_grid[0], jitter_grid[1])),
+            "image_path": path.join(self.img_dir, f"{idx:05}.png"),
+            "index": torch.Tensor([idx, idx + 1]).long(),
+            "jitter_true": (params["jitter size"][0] != params["crop size"][0]) and (params["jitter size"][1] != params["crop size"][1])
+        }
+
+        # return data
         return model_input, targets
 
     def __len__(self):
         return len(self.frame_iterator) - 2
-
-    def input_demo(self, directory):
-        """
-        Generate a demo video of the generated input and ground truth values
-        """
-
-        for i in range(len(self.frame_iterator) - 1):
-            print(f"{i} / {len(self.frame_iterator) - 1}")
-            img, flow, mask, matte, flow_matte, noise = self.get_frame_input(i)
-
-            gt = np.concatenate((img, flow))
-            mid = np.concatenate((matte, flow_matte))
-            right = np.concatenate((np.stack([mask]*3, 2).astype(np.uint8)*255, noise))
-
-            full = np.concatenate((gt, mid, right), axis=1)
-
-            cv2.imwrite(path.join(directory, f"{i:05}.png"), full)
-        
-        opencv_folder_to_video(directory, path.join(directory, "demo.mp4"))
 
     def get_rgb_layers(self, rgb, masks):
         """
@@ -264,11 +245,11 @@ class InputProcessor(object):
         
         return data
 
-    def get_camera_adjustment_parameters(self):
+    def get_jitter_parameters(self):
 
         width, height = self.frame_size
 
-        if self.do_adjustment:
+        if self.do_jitter:
 
             # get scale
             if np.random.uniform() > self.jitter_rate:
@@ -299,9 +280,9 @@ class InputProcessor(object):
 
         frame_paths = [frame for frame in sorted(listdir(video_dir))]
         
-        for frame_path in frame_paths:
+        for i, frame_path in enumerate(frame_paths):
             img = cv2.resize(cv2.imread(path.join(video_dir, frame_path)), self.frame_size, interpolation=cv2.INTER_LINEAR)
-            cv2.imwrite(path.join(out_dir, frame_path), img)
+            cv2.imwrite(path.join(out_dir, f"{i:05}.jpg"), img)
 
     def load_composite_order(self, fp):
         self.composite_order = []
@@ -320,16 +301,43 @@ class InputProcessor(object):
             for _ in range(len(self) + 1):
                 self.composite_order.append(tuple([int(i+1) for i in range(self.mask_handler.N_objects)]))
 
-# class Input(object):
-#     def __init__(self, data):
-#         super().__init__()
-#         self._data = data
-    
-#     def to(self, device):
-#         self._data = {k:v.to(device) for k, v in self.data}
+    ########################
+    ###     Demo code    ###
+    ########################
 
-#     def __getitem__(self, key):
-#         return self._data[key]
+    def get_frame_input(self, frame_idx):
+        """
+        Return the input for a single frame
+        """
+        img = self.frame_iterator[frame_idx]
+        mask = self.mask_handler.get_binary_mask(frame_idx)
 
-#     def __setitem__(self, key, value):
-#         self._data[key] = value
+        matte = self.get_rgba_matte(img, mask)
+
+        noise = self.background_volume.get_frame_noise(frame_idx).astype(np.uint8)
+
+        flow, conf = self.flow_handler.calculate_flow_between_stabilized_frames(frame_idx)
+        flow_img = self.flow_handler.convert_flow_to_image(flow, bgr=True)
+        flow_matte = self.get_flow_matte(flow, mask)
+        flow_matte_img = self.flow_handler.convert_flow_to_image(flow_matte, bgr=True)
+
+        return img, flow_img, mask, matte, flow_matte_img, conf, noise
+
+    def input_demo(self, directory):
+        """
+        Generate a demo video of the generated input and ground truth values
+        """
+
+        for i in range(len(self.frame_iterator) - 1):
+            print(f"{i} / {len(self.frame_iterator) - 1}")
+            img, flow, mask, matte, flow_matte, noise = self.get_frame_input(i)
+
+            gt = np.concatenate((img, flow))
+            mid = np.concatenate((matte, flow_matte))
+            right = np.concatenate((np.stack([mask]*3, 2).astype(np.uint8)*255, noise))
+
+            full = np.concatenate((gt, mid, right), axis=1)
+
+            cv2.imwrite(path.join(directory, f"{i:05}.png"), full)
+        
+        opencv_folder_to_video(directory, path.join(directory, "demo.mp4"))

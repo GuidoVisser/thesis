@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 def get_translation_matrix(dx: float, dy: float) -> np.array:
     """
@@ -24,3 +25,10 @@ def get_scale_matrix(source_w, source_h, target_w, target_h):
     return np.array([[x_scale, 0, 0],
                      [0, y_scale, 0],
                      [0,    0,    1]])
+
+def homogeneous_2d_transform(x, y, m):
+    """Applies 2d homogeneous transformation."""
+    A = torch.matmul(m, torch.stack([x, y, torch.ones(len(x))]))
+    xt = A[0, :] / A[2, :]
+    yt = A[1, :] / A[2, :]
+    return xt, yt

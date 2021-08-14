@@ -16,10 +16,120 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from third_party.models.networks import init_net
-from third_party.models.networks_lnr import ConvBlock
+try:
+    from ..third_party.models.networks import init_net
+    from ..third_party.models.networks_lnr import ConvBlock
+except:
+    from third_party.models.networks import init_net
+    from third_party.models.networks_lnr import ConvBlock
 
+import cv2
+import numpy as np
 
+def make_colorwheel():
+    """
+    Generates a color wheel for optical flow visualization as presented in:
+        Baker et al. "A Database and Evaluation Methodology for Optical Flow" (ICCV, 2007)
+        URL: http://vision.middlebury.edu/flow/flowEval-iccv07.pdf
+    Code follows the original C++ source code of Daniel Scharstein.
+    Code follows the the Matlab source code of Deqing Sun.
+    Returns:
+        np.ndarray: Color wheel
+    """
+
+    RY = 15
+    YG = 6
+    GC = 4
+    CB = 11
+    BM = 13
+    MR = 6
+
+    ncols = RY + YG + GC + CB + BM + MR
+    colorwheel = np.zeros((ncols, 3))
+    col = 0
+
+    # RY
+    colorwheel[0:RY, 0] = 255
+    colorwheel[0:RY, 1] = np.floor(255*np.arange(0,RY)/RY)
+    col = col+RY
+    # YG
+    colorwheel[col:col+YG, 0] = 255 - np.floor(255*np.arange(0,YG)/YG)
+    colorwheel[col:col+YG, 1] = 255
+    col = col+YG
+    # GC
+    colorwheel[col:col+GC, 1] = 255
+    colorwheel[col:col+GC, 2] = np.floor(255*np.arange(0,GC)/GC)
+    col = col+GC
+    # CB
+    colorwheel[col:col+CB, 1] = 255 - np.floor(255*np.arange(CB)/CB)
+    colorwheel[col:col+CB, 2] = 255
+    col = col+CB
+    # BM
+    colorwheel[col:col+BM, 2] = 255
+    colorwheel[col:col+BM, 0] = np.floor(255*np.arange(0,BM)/BM)
+    col = col+BM
+    # MR
+    colorwheel[col:col+MR, 2] = 255 - np.floor(255*np.arange(MR)/MR)
+    colorwheel[col:col+MR, 0] = 255
+    return colorwheel
+
+def flow_uv_to_colors(u, v, convert_to_bgr=False):
+    """
+    Applies the flow color wheel to (possibly clipped) flow components u and v.
+    According to the C++ source code of Daniel Scharstein
+    According to the Matlab source code of Deqing Sun
+    Args:
+        u (np.ndarray): Input horizontal flow of shape [H,W]
+        v (np.ndarray): Input vertical flow of shape [H,W]
+        convert_to_bgr (bool, optional): Convert output image to BGR. Defaults to False.
+    Returns:
+        np.ndarray: Flow visualization image of shape [H,W,3]
+    """
+    flow_image = np.zeros((u.shape[0], u.shape[1], 3), np.uint8)
+    colorwheel = make_colorwheel()  # shape [55x3]
+    ncols = colorwheel.shape[0]
+    rad = np.sqrt(np.square(u) + np.square(v))
+    a = np.arctan2(-v, -u)/np.pi
+    fk = (a+1) / 2*(ncols-1)
+    k0 = np.floor(fk).astype(np.int32)
+    k1 = k0 + 1
+    k1[k1 == ncols] = 0
+    f = fk - k0
+    for i in range(colorwheel.shape[1]):
+        tmp = colorwheel[:,i]
+        col0 = tmp[k0] / 255.0
+        col1 = tmp[k1] / 255.0
+        col = (1-f)*col0 + f*col1
+        idx = (rad <= 1)
+        col[idx]  = 1 - rad[idx] * (1-col[idx])
+        col[~idx] = col[~idx] * 0.75   # out of range
+        # Note the 2-i => BGR instead of RGB
+        ch_idx = 2-i if convert_to_bgr else i
+        flow_image[:,:,ch_idx] = np.floor(255 * col)
+    return flow_image
+
+def flow_to_image(flow_uv, clip_flow=None, convert_to_bgr=False):
+    """
+    Expects a two dimensional flow image of shape.
+    Args:
+        flow_uv (np.ndarray): Flow UV image of shape [H,W,2]
+        clip_flow (float, optional): Clip maximum of flow values. Defaults to None.
+        convert_to_bgr (bool, optional): Convert output image to BGR. Defaults to False.
+    Returns:
+        np.ndarray: Flow visualization image of shape [H,W,3]
+    """
+    assert flow_uv.ndim == 3, 'input flow must have three dimensions'
+    assert flow_uv.shape[2] == 2, 'input flow must have shape [H,W,2]'
+    if clip_flow is not None:
+        flow_uv = np.clip(flow_uv, 0, clip_flow)
+    u = flow_uv[:,:,0]
+    v = flow_uv[:,:,1]
+    rad = np.sqrt(np.square(u) + np.square(v))
+    rad_max = np.max(rad)
+    epsilon = 1e-5
+    u = u / (rad_max + epsilon)
+    v = v / (rad_max + epsilon)
+    return flow_uv_to_colors(u, v, convert_to_bgr)
 ###############################################################################
 # Helper Functions
 ###############################################################################
@@ -128,6 +238,7 @@ class Omnimatte(nn.Module):
         layers_flow = []
         alphas_warped = []
         composite_warped = None
+        # print(index[0])
 
         # get camera adjustment params
         bg_offset = F.interpolate(self.bg_offset, (self.max_frames, 4, 7), mode='trilinear', align_corners=True)
@@ -136,6 +247,40 @@ class Omnimatte(nn.Module):
         br_scale = F.interpolate(self.brightness_scale, (self.max_frames, 4, 7), mode='trilinear', align_corners=True)
         br_scale = br_scale[0, 0, index].unsqueeze(1)
         br_scale = F.grid_sample(br_scale, jitter.permute(0, 2, 3, 1), align_corners=True)
+
+        # debug0 = torch.clone(input_t).detach().cpu()
+        # debug1 = torch.clone(input_t1).detach().cpu()
+        # bg_uv = torch.clone(bg_warp).detach().cpu()
+        # jit = torch.clone(jitter).detach().cpu()
+        # bg_uv0 = bg_uv[0].permute(1, 2, 0).numpy()
+        # bg_uv1 = bg_uv[1].permute(1, 2, 0).numpy()
+        # jit0 = jit[0].permute(1, 2, 0).numpy()
+        # jit1 = jit[1].permute(1, 2, 0).numpy()
+        # b0 = debug0[0, 0].permute(1, 2, 0).numpy()
+        # b1 = debug1[0, 0].permute(1, 2, 0).numpy()
+        # l0 = debug0[0, 1].permute(1, 2, 0).numpy()
+        # l1 = debug1[0, 1].permute(1, 2, 0).numpy()
+
+        # if index[0].item() != 6000:        
+        #     cv2.imshow("bg pid 0", b0[:, :, 0])
+        #     cv2.imshow("bg pid 1", b1[:, :, 0])
+        #     cv2.imshow("l pid 0",  l0[:, :, 0])
+        #     cv2.imshow("l pid 1",  l1[:, :, 0])
+        #     cv2.imshow("bg flow 0", flow_to_image(b0[:, :, 1:3]))
+        #     cv2.imshow("bg flow 1", flow_to_image(b1[:, :, 1:3]))
+        #     cv2.imshow("l flow 0",  flow_to_image(l0[:, :, 1:3]))
+        #     cv2.imshow("l flow 1",  flow_to_image(l1[:, :, 1:3]))
+        #     cv2.imshow("bg uv 0", flow_to_image(bg_uv0))
+        #     cv2.imshow("bg uv 1", flow_to_image(bg_uv1))
+        #     cv2.imshow("jitter 0",  flow_to_image(jit0))
+        #     cv2.imshow("jitter 1",  flow_to_image(jit1))
+        #     cv2.imshow("bg noise 0", b0[:, :, 3:6] * 0.5 + 0.5)
+        #     cv2.imshow("bg noise 1", b1[:, :, 3:6] * 0.5 + 0.5)
+        #     cv2.imshow("l noise 0",  l0[:, :, 3:6] * 0.5 + 0.5)
+        #     cv2.imshow("l noise 1",  l1[:, :, 3:6] * 0.5 + 0.5)
+        #     cv2.waitKey(0)
+        #     cv2.destroyAllWindows()
+
 
         for i in range(n_layers):
             # Get RGBA and flow for this layer.
@@ -175,14 +320,14 @@ class Omnimatte(nn.Module):
             composite_rgb = torch.clamp(composite_rgb, 0, 1)
             composite_rgb = composite_rgb * 2 - 1  # map back to [-1, 1] range
         # stack t, t+1 channelwise
-        composite_rgb = torch.cat((composite_rgb[:b_sz], composite_rgb[b_sz:]), 1)
+        composite_rgb  = torch.cat((composite_rgb[:b_sz], composite_rgb[b_sz:]), 1)
         composite_flow = torch.cat((composite_flow[:b_sz], composite_flow[b_sz:]), 1)
-        layers_rgba = torch.stack(layers_rgba, 2)
-        layers_rgba = torch.cat((layers_rgba[:b_sz], layers_rgba[b_sz:]), 1)
-        layers_flow = torch.stack(layers_flow, 2)
-        layers_flow = torch.cat((layers_flow[:b_sz], layers_flow[b_sz:]), 1)
-        br_scale = torch.cat((br_scale[:b_sz], br_scale[b_sz:]), 1)
-        bg_offset = torch.cat((bg_offset[:b_sz], bg_offset[b_sz:]), 1)
+        layers_rgba    = torch.stack(layers_rgba, 2)
+        layers_rgba    = torch.cat((layers_rgba[:b_sz], layers_rgba[b_sz:]), 1)
+        layers_flow    = torch.stack(layers_flow, 2)
+        layers_flow    = torch.cat((layers_flow[:b_sz], layers_flow[b_sz:]), 1)
+        br_scale       = torch.cat((br_scale[:b_sz], br_scale[b_sz:]), 1)
+        bg_offset      = torch.cat((bg_offset[:b_sz], bg_offset[b_sz:]), 1)
 
         outputs = {
             'reconstruction_rgb': composite_rgb,

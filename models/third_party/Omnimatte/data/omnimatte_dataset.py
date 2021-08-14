@@ -14,8 +14,12 @@
 
 
 import cv2
-from third_party.data.base_dataset import BaseDataset
-from third_party.data.image_folder import make_dataset
+try:
+    from ..third_party.data.base_dataset import BaseDataset
+    from ..third_party.data.image_folder import make_dataset
+except:
+    from third_party.data.base_dataset import BaseDataset
+    from third_party.data.image_folder import make_dataset
 from PIL import Image
 import torchvision.transforms as transforms
 import torch.nn.functional as F
@@ -24,7 +28,10 @@ import glob
 import torch
 import numpy as np
 import json
-import utils
+try:
+    from ..utils import readFlow, resize_flow
+except:
+    from utils import readFlow, resize_flow
 
 
 def load_and_process_image(im_path, mode='RGB', size=None):
@@ -38,8 +45,8 @@ def load_and_process_image(im_path, mode='RGB', size=None):
 
 
 def load_and_resize_flow(flow_path, width=None, height=None):
-    flow = torch.from_numpy(utils.readFlow(flow_path)).permute(2, 0, 1)
-    flow = utils.resize_flow(flow, width, height)
+    flow = torch.from_numpy(readFlow(flow_path)).permute(2, 0, 1)
+    flow = resize_flow(flow, width, height)
     return flow
 
 
@@ -161,7 +168,7 @@ class OmnimatteDataset(BaseDataset):
                         self.composite_order[index]]
         mask_h, mask_w = masks[0].shape[-2:]
         masks = torch.stack(masks)  # L-1, 1, H, W
-        binary_masks = (masks > 0).float()
+        binary_masks = (masks > 0.5).float()
 
         # Read flow
         if index >= len(self.flow_paths):

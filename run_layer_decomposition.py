@@ -1,7 +1,11 @@
 from argparse import ArgumentParser
 from datetime import datetime
+from numpy.random import shuffle
 from torch.utils.data import DataLoader
 import torch
+import numpy as np
+import cv2
+from os import path
 from torch.nn.parallel import DistributedDataParallel, DataParallel
 
 from InputProcessing.inputProcessor import InputProcessor
@@ -24,28 +28,32 @@ def distributed_training(rank, n_gpus, model):
 
 def main(args):
 
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
     input_processor = InputProcessor(
         args.img_dir, 
         args.out_dir, 
         args.initial_mask, 
         args.composite_order, 
-        do_adjustment=args.do_adjustment, 
-        propagation_model=args.propagation_model, 
-        flow_model=args.flow_model
+        do_jitter = False, 
+        propagation_model = args.propagation_model, 
+        flow_model = args.flow_model
     )
 
     data_loader = DataLoader(
         input_processor, 
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        shuffle=False
     )
-    
+
     loss_module = DecompositeLoss()
 
-    network = LayerDecompositionUNet(
-        do_adjustment=args.do_adjustment, 
+    network = DataParallel(LayerDecompositionUNet(
+        do_adjustment=True, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
-    )
+    )).to(args.device)
 
     model = LayerDecompositer(
         data_loader, 
@@ -58,20 +66,9 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    model.net = DataParallel(model.net.to(args.device))
-    model.train(args.device)
-
-    # assert args.device in ["cpu", "cuda"], f"{args.device} is an invalid specification for `device`. Please choose from 'cpu' or 'cuda'" 
-    # if args.device == "cpu":
-    #     model.train()
-    # elif args.n_gpus == 1:
-    #     model.to(args.device)
-    #     model.train(args.device)
-    # else:
-    #     spawn_multiprocessor(
-    #         distributed_training, 
-    #         args.n_gpus,
-    #         model)
+    network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
+    network.eval()
+    model.decomposite(args.device)
 
 if __name__ == "__main__":
     print("started")
@@ -79,23 +76,23 @@ if __name__ == "__main__":
     parser = ArgumentParser()
 
     video = "tennis"
-    parser.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/{datetime.now()}", 
+    parser.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/run_14_08", 
         help="path to directory where results are saved")
-    parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
+    parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/tennis/00000.png", 
         help="path to the initial mask")
-    parser.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/{video}", 
+    parser.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/tennis", 
         help="path to the directory in which the video frames are stored")
     parser.add_argument("--composite_order", type=str, 
         help="path to a text file containing the compositing order of the foreground objects")
 
-    parser.add_argument("--do_adjustment", type=bool, default=True, help="Specifies whether to use learnable camera adjustment")
-    parser.add_argument("--batch_size", type=int, default=2, help="Batch size")
+    parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate during training")
     parser.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
     parser.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    parser.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
-    parser.add_argument("--save_freq", type=int, default=100, help="Frequency at which the intermediate results are saved")
+    parser.add_argument("--n_epochs", type=int, default=176, help="Number of epochs used for training")
+    parser.add_argument("--save_freq", type=int, default=10, help="Frequency at which the intermediate results are saved")
     parser.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
+    parser.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
     parser.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
         help="path to the weights of the mask propagation model")
@@ -103,6 +100,5 @@ if __name__ == "__main__":
         help="path to the optical flow estimation model")
 
     args = parser.parse_args()
-
     main(args)
     print("done")
