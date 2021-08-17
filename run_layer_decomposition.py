@@ -14,6 +14,7 @@ from models.LayerDecomposition.loss_functions import DecompositeLoss
 from models.LayerDecomposition.modules import LayerDecompositionUNet
 
 from utils.distributed_training import setup, cleanup, spawn_multiprocessor
+from utils.demo import create_decomposite_demo
 
 def distributed_training(rank, n_gpus, model):
     setup(rank, n_gpus)
@@ -36,7 +37,7 @@ def main(args):
         args.out_dir, 
         args.initial_mask, 
         args.composite_order, 
-        do_jitter = False, 
+        do_jitter = True, 
         propagation_model = args.propagation_model, 
         flow_model = args.flow_model
     )
@@ -44,7 +45,7 @@ def main(args):
     data_loader = DataLoader(
         input_processor, 
         batch_size=args.batch_size,
-        shuffle=False
+        shuffle=True
     )
 
     loss_module = DecompositeLoss()
@@ -66,31 +67,39 @@ def main(args):
         save_freq=args.save_freq
     )
 
+    model.train(args.device)
+
+    # Set up for inference
+    input_processor.do_jitter = False
+    data_loader.shuffle = False
     network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
     network.eval()
+
     model.decomposite(args.device)
+
+    create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
 
 if __name__ == "__main__":
     print("started")
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
 
-    video = "tennis"
-    parser.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/run_14_08", 
+    video = "flamingo"
+    parser.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/{video}", 
         help="path to directory where results are saved")
-    parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/tennis/00000.png", 
+    parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
         help="path to the initial mask")
-    parser.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/tennis", 
+    parser.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
     parser.add_argument("--composite_order", type=str, 
         help="path to a text file containing the compositing order of the foreground objects")
 
-    parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
+    parser.add_argument("--batch_size", type=int, default=2, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate during training")
     parser.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
     parser.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    parser.add_argument("--n_epochs", type=int, default=176, help="Number of epochs used for training")
-    parser.add_argument("--save_freq", type=int, default=10, help="Frequency at which the intermediate results are saved")
+    parser.add_argument("--n_epochs", type=int, default=300, help="Number of epochs used for training")
+    parser.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
     parser.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
     parser.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
