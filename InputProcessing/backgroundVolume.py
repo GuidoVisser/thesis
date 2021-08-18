@@ -13,14 +13,11 @@ class BackgroundVolume(object):
     def __init__(self,
                  save_dir: str,
                  in_channels: int = 16,
-                 frame_size: list = [864, 480],
-                 noise_fp: Union[str, None] = None) -> None:
+                 frame_size: list = [864, 480]) -> None:
         super().__init__()
         self.save_dir  = save_dir
-        if noise_fp is not None:
-            self.spatial_noise = torch.load(noise_fp)
-        else:
-            self.spatial_noise = torch.randn(1, in_channels - 3, size=(frame_size[1] // 16, frame_size[0] // 16))
+
+        self.spatial_noise = torch.randn(1, in_channels - 3, size=(frame_size[1] // 16, frame_size[0] // 16))
         self.spatial_noise_upsampled = F.interpolate(self.spatial_noise, (frame_size[1], frame_size[0]), mode='bilinear')
 
         torch.save(self.spatial_noise, path.join(save_dir, "spatial_noise.pth"))
