@@ -4,7 +4,6 @@ from numpy.random import shuffle
 from torch.utils.data import DataLoader
 import torch
 import numpy as np
-import cv2
 from os import path
 from torch.nn.parallel import DistributedDataParallel, DataParallel
 
@@ -67,7 +66,7 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    model.train(args.device)
+    # model.train(args.device)
 
     # Set up for inference
     input_processor.do_jitter = False
@@ -94,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument("--composite_order", type=str, 
         help="path to a text file containing the compositing order of the foreground objects")
 
-    parser.add_argument("--batch_size", type=int, default=2, help="Batch size")
+    parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate during training")
     parser.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
     parser.add_argument("--device", type=str, default="cuda", help="CUDA device")

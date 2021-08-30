@@ -1,10 +1,8 @@
-from models.third_party.Omnimatte.utils import flow_to_image
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import cv2
-
 
 from InputProcessing.flowHandler import FlowHandler
 
@@ -155,39 +153,6 @@ class LayerDecompositionUNet(nn.Module):
         jitter_grid = torch.cat((jitter_grid[:, 0], jitter_grid[:, 1]))
         background_offset = self.get_background_offset(jitter_grid, index)
         brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
-
-        # debug0 = torch.clone(input_t0).detach().cpu()
-        # debug1 = torch.clone(input_t1).detach().cpu()
-        # bg_uv = torch.clone(background_uv_map).detach().cpu()
-        # jit = torch.clone(jitter_grid).detach().cpu()
-        # bg_uv0 = bg_uv[0].numpy()
-        # bg_uv1 = bg_uv[1].numpy()
-        # jit0 = jit[0].permute(1, 2, 0).numpy()
-        # jit1 = jit[1].permute(1, 2, 0).numpy()
-        # b0 = debug0[0, 0].permute(1, 2, 0).numpy()
-        # b1 = debug1[0, 0].permute(1, 2, 0).numpy()
-        # l0 = debug0[0, 1].permute(1, 2, 0).numpy()
-        # l1 = debug1[0, 1].permute(1, 2, 0).numpy()
-
-        # print(index[0].item())
-        # cv2.imshow("bg pid 0", b0[:, :, 0])
-        # cv2.imshow("bg pid 1", b1[:, :, 0])
-        # cv2.imshow("l pid 0",  l0[:, :, 0])
-        # cv2.imshow("l pid 1",  l1[:, :, 0])
-        # cv2.imshow("bg flow 0", flow_to_image(b0[:, :, 1:3]))
-        # cv2.imshow("bg flow 1", flow_to_image(b1[:, :, 1:3]))
-        # cv2.imshow("l flow 0",  flow_to_image(l0[:, :, 1:3]))
-        # cv2.imshow("l flow 1",  flow_to_image(l1[:, :, 1:3]))
-        # cv2.imshow("bg uv 0", flow_to_image(bg_uv0))
-        # cv2.imshow("bg uv 1", flow_to_image(bg_uv1))
-        # cv2.imshow("jitter 0",  flow_to_image(jit0))
-        # cv2.imshow("jitter 1",  flow_to_image(jit1))
-        # cv2.imshow("bg noise 0", b0[:, :, 3:6] * 0.5 + 0.5)
-        # cv2.imshow("bg noise 1", b1[:, :, 3:6] * 0.5 + 0.5)
-        # cv2.imshow("l noise 0",  l0[:, :, 3:6] * 0.5 + 0.5)
-        # cv2.imshow("l noise 1",  l1[:, :, 3:6] * 0.5 + 0.5)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
 
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.modules.loss import L1Loss
 
 
 class DecompositeLoss(nn.Module):
