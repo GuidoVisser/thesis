@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import cv2
 from os import path, listdir, remove
 from typing import Tuple, Union
+import imageio
 
 from models.third_party.SuperGlue.models.utils import process_resize, frame2tensor
 
@@ -32,13 +33,16 @@ class HomographyHandler(object):
 
         self.frame_size = frame_size
         self.interval = interval
-        
-        if path.exists(savepath):
-            self.load_homography(savepath)
+
+        homography_path = path.join(savepath, "homographies.txt")
+        if path.exists(homography_path):
+            self.load_homography(homography_path)
         else:
             self.homographies, self.origin_size = self.get_homographies()
             self.xmin, self.ymin, self.xmax, self.ymax = self.get_outer_borders()
-            self.save_homography(savepath)
+            self.save_homography(homography_path)
+
+        self.homography_demo(savepath)
 
     def load_homography(self, filepath):
         with open(filepath, "r") as f:
@@ -47,7 +51,7 @@ class HomographyHandler(object):
         self.origin_size = [int(item) 
                             for item 
                             in homography_data[0].rstrip().split(" ")]
-        self.xmin, self.xmax, self.ymin, self.ymax = [float(item)
+        self.xmin, self.xmax, self.ymin, self.ymax = [int(item)
                                                       for item 
                                                       in homography_data[1].rstrip().split(" ")]
         homographies = homography_data[2:]
@@ -119,9 +123,9 @@ class HomographyHandler(object):
 
         [xt, yt] = homogeneous_2d_transform(uv[0], uv[1], homography)
         xt -= self.xmin
-        xt /= (self.xmax - self.xmin)
+        xt /= float(self.xmax - self.xmin)
         yt -= self.ymin
-        yt /= (self.ymax - self.ymin)
+        yt /= float(self.ymax - self.ymin)
 
         uv = torch.stack([xt.reshape(h, w), yt.reshape(h, w)]).permute(1, 2, 0) * 2 - 1
 
@@ -240,7 +244,7 @@ class HomographyHandler(object):
         
         return flow
 
-    def align_frames(self, frames: list, indices: Union[list, None]) -> list:
+    def align_frames(self, frames: list, indices: Union[list, None] = None) -> list:
         """
         Expand, warp and align a set of frames such that they overlay each other correctly 
         using the respective homographies
@@ -266,7 +270,7 @@ class HomographyHandler(object):
 
         for i in frame_range:
             homography = self.calculate_homography_between_two_frames(initial_idx, i)
-            warped_frames.append(cv2.warpPerspective(frames[i], Ht @ homography, (self.xmax - self.xmin, self.ymax - self.ymin)))
+            warped_frames.append(cv2.warpPerspective(frames[i], Ht @ homography.numpy(), (self.xmax - self.xmin, self.ymax - self.ymin)))
 
         source_padded = np.zeros((self.ymax-self.ymin, self.xmax-self.xmin, 3), dtype=np.uint8)
         source_padded[-self.ymin:self.frame_size[1]-self.ymin, -self.xmin:self.frame_size[0]-self.xmin] = frames[0]
@@ -367,3 +371,14 @@ class HomographyHandler(object):
             masks (list[np.array]): list of np.arrays with all zero values
         """
         return [np.zeros(mask_shape) for _ in range(n_masks)]
+
+    def homography_demo(self, savepath):
+        """
+        Create a demo of the camera stabilization results
+        """
+        frames = [cv2.imread(frame_path) for frame_path in self.frame_sequence]
+        aligned_frames = self.align_frames(frames)
+        img_array = [cv2.cvtColor(img, cv2.COLOR_RGB2BGR) for img in aligned_frames]
+        img_array = np.stack(img_array)
+        video_path = path.join(savepath, "homography_demo.gif")
+        imageio.mimsave(video_path, img_array, format="GIF", fps=25)

@@ -1,6 +1,6 @@
 import torch
-from ..fbrs.controller import InteractiveController
-from ..fbrs.inference import utils
+from fbrs.controller import InteractiveController
+from fbrs.inference import utils
 
 
 class FBRSController:

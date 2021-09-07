@@ -29,19 +29,19 @@ from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QKeySequence, QImage, 
 from PyQt5.QtCore import Qt, QTimer 
 from PyQt5 import QtCore
 
-from .inference_core import InferenceCore
-from .interact.s2m_controller import S2MController
-from .interact.fbrs_controller import FBRSController
-from .model.propagation.prop_net import PropagationNetwork
-from .model.fusion_net import FusionNet
-from .model.s2m.s2m_network import deeplabv3plus_resnet50 as S2M
-from .model.aggregate import aggregate_sbg, aggregate_wbg
-from .util.tensor_util import pad_divide_by, unpad, unpad_3dim, compute_multi_class_iou_both_idx
-from .util.palette import pal_color_map
+from inference_core import InferenceCore
+from interact.s2m_controller import S2MController
+from interact.fbrs_controller import FBRSController
+from model.propagation.prop_net import PropagationNetwork
+from model.fusion_net import FusionNet
+from model.s2m.s2m_network import deeplabv3plus_resnet50 as S2M
+from model.aggregate import aggregate_sbg, aggregate_wbg
+from util.tensor_util import pad_divide_by, unpad, unpad_3dim, compute_multi_class_iou_both_idx
+from util.palette import pal_color_map
 
-from .interact.interactive_utils import *
-from .interact.interaction import *
-from .interact.timer import Timer
+from interact.interactive_utils import *
+from interact.interaction import *
+from interact.timer import Timer
 
 torch.set_grad_enabled(False)
 

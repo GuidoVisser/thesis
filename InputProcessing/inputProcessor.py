@@ -46,13 +46,12 @@ class InputProcessor(object):
         flow_dir       = path.join(out_root, "flow")
         background_dir = path.join(out_root, "background")
         create_dirs(self.img_dir, mask_dir, flow_dir, background_dir)
-        homography_path = path.join(out_root, "homographies.txt")
 
         self.prepare_image_dir(video, self.img_dir)
 
         self.frame_iterator     = FrameIterator(self.img_dir, frame_size, device=self.device)
         self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
-        self.homography_handler = HomographyHandler(homography_path, self.img_dir, mask_dir, self.device, frame_size)
+        self.homography_handler = HomographyHandler(out_root, self.img_dir, mask_dir, self.device, frame_size)
         self.background_volume  = BackgroundVolume(background_dir, in_channels=in_channels, frame_size=frame_size)       
         self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, self.homography_handler, flow_dir, raft_weights=flow_model, device=self.device)
 

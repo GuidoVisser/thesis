@@ -36,7 +36,7 @@ def main(args):
         args.out_dir, 
         args.initial_mask, 
         args.composite_order, 
-        do_jitter = True, 
+        do_jitter = False, 
         propagation_model = args.propagation_model, 
         flow_model = args.flow_model
     )
@@ -44,7 +44,7 @@ def main(args):
     data_loader = DataLoader(
         input_processor, 
         batch_size=args.batch_size,
-        shuffle=True
+        shuffle=False
     )
 
     loss_module = DecompositeLoss()
@@ -72,7 +72,6 @@ def main(args):
     input_processor.do_jitter = False
     data_loader.shuffle = False
     network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
-    network.eval()
 
     model.decomposite(args.device)
 
@@ -83,7 +82,7 @@ if __name__ == "__main__":
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
 
-    video = "surf"
+    video = "flamingo"
     parser.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/{video}", 
         help="path to directory where results are saved")
     parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
