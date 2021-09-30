@@ -5,6 +5,7 @@ import random
 
 from PIL import Image
 from os import path, listdir
+import torch.nn.functional as F
 
 from models.third_party.RAFT.utils.frame_utils import readFlow
 
@@ -161,21 +162,30 @@ class DAVISVideo(object):
 
 
 class Video(object):
-    def __init__(self, root, transforms) -> None:
+    def __init__(self, root, transforms, frame_size=None, forward=True) -> None:
         super().__init__()
 
         self.root       = root
         self.transforms = transforms
+        self.frame_size = frame_size
 
         self.frames = [path.join(root, frame) for frame in sorted(listdir(path.join(root)))]
+        
+        if not forward:
+            self.frames = list(reversed(self.frames))
 
     def __getitem__(self, idx):
         img = np.array(Image.open(self.frames[idx]).convert("RGB")) / 255.
 
         if self.transforms is not None:
             img = self.transforms([img])
+        
+        img = img[0].float()
+        
+        if self.frame_size is not None:
+            img = F.interpolate(img.unsqueeze(0), (self.frame_size[1], self.frame_size[0]), mode="bilinear")[0]
 
-        return img[0].float()
+        return img
 
     def __len__(self):
         return len(self.frames)

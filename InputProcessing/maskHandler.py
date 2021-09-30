@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import cv2
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from PIL import Image
 from os import path, listdir
 from typing import Union
@@ -44,14 +44,25 @@ class MaskHandler(object):
             if not path.exists(save_dir):
                 create_dir(save_dir)
                 self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir)
+                self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir, forward=False)
          
     @torch.no_grad()
-    def propagate(self, initial_mask, top_k, mem_freq, model_device, memory_device, model_weights, save_dir):
+    def propagate(self, initial_mask, top_k, mem_freq, model_device, memory_device, model_weights, save_dir, forward=True):
         """
         propagate the mask through the video
         """
+        dataset = Video(self.img_dir, get_transforms(), frame_size=self.frame_size, forward=forward)
+        length_video = len(dataset)
+        
+        initial_index = int((path.splitext(initial_mask)[0]).split("/")[-1])
+        
+        if forward:
+            dataset = Subset(dataset, range(initial_index, length_video))
+        else:
+            dataset = Subset(dataset, range(length_video - initial_index - 1, length_video))
+
         frame_iterator = DataLoader(
-            Video(self.img_dir, get_transforms()),
+            dataset,
             batch_size=1, 
             shuffle=False, 
             pin_memory=True
@@ -69,7 +80,7 @@ class MaskHandler(object):
         propagation_model.load_pretrained(model_weights)
         propagation_model.eval()
 
-        # get first frame in video
+        # get the frame in video for initial mask
         frame = next(iter(frame_iterator))
 
         # get mask of initial frame
@@ -77,14 +88,17 @@ class MaskHandler(object):
         mask = get_transforms()([mask])[0]
         mask = mask.unsqueeze(0)
         
-        propagation_model.add_to_memory(frame, mask, extend_memory=True)
         mask, _ = pad_divide_by(mask, 16)
         mask = F.interpolate(mask, (self.frame_size[1], self.frame_size[0]), mode="bilinear")
-        save_frame(mask, path.join(save_dir, f"00000.png"))
+        propagation_model.add_to_memory(frame, mask, extend_memory=True)
+        save_frame(mask, path.join(save_dir, f"{initial_index:05}.png"))
 
         # loop through video and propagate mask, skipping first frame
         for i, frame in enumerate(frame_iterator):
-            print(f"Propagating Mask: {i} / {len(frame_iterator)-1}")
+            if forward:
+                print(f"Propagating Mask: {i + initial_index} / {length_video - 1}")
+            else:
+                print(f"Propagating Mask: {initial_index - i} / {length_video - 1}")
 
             if i == 0:
                 continue
@@ -96,7 +110,10 @@ class MaskHandler(object):
             mask_pred = F.interpolate(mask_pred, (self.frame_size[1], self.frame_size[0]), mode="bilinear")
 
             # save mask as image
-            save_frame(mask_pred, path.join(save_dir, f"{i:05}.png"))
+            if forward:
+                save_frame(mask_pred, path.join(save_dir, f"{i + initial_index:05}.png"))
+            else:
+                save_frame(mask_pred, path.join(save_dir, f"{initial_index - i:05}.png"))
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         masks = []

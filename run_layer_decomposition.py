@@ -36,7 +36,7 @@ def main(args):
         args.out_dir, 
         args.initial_mask, 
         args.composite_order, 
-        do_jitter = False, 
+        do_jitter = True, 
         propagation_model = args.propagation_model, 
         flow_model = args.flow_model
     )
@@ -44,7 +44,7 @@ def main(args):
     data_loader = DataLoader(
         input_processor, 
         batch_size=args.batch_size,
-        shuffle=False
+        shuffle=True
     )
 
     loss_module = DecompositeLoss()
@@ -66,14 +66,14 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    # model.train(args.device)
+    model.train(args.device)
 
-    # Set up for inference
-    input_processor.do_jitter = False
-    data_loader.shuffle = False
-    network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
+    # # Set up for inference
+    # input_processor.do_jitter = False
+    # data_loader.shuffle = False
+    # network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
 
-    model.decomposite(args.device)
+    # model.decomposite(args.device)
 
     create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
 
@@ -82,12 +82,12 @@ if __name__ == "__main__":
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
 
-    video = "flamingo"
+    video = "LightSwitch"
     parser.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/{video}", 
         help="path to directory where results are saved")
-    parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
+    parser.add_argument("--initial_mask", type=str, default=f"datasets/wallflower/{video}/Annotations/00/00023.png", 
         help="path to the initial mask")
-    parser.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/{video}", 
+    parser.add_argument("--img_dir", type=str, default=f"datasets/wallflower/{video}/JPEGImages/", 
         help="path to the directory in which the video frames are stored")
     parser.add_argument("--composite_order", type=str, 
         help="path to a text file containing the compositing order of the foreground objects")
