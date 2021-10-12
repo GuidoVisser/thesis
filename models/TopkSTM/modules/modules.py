@@ -52,11 +52,11 @@ class MaskRGBEncoder(nn.Module):
 
         x = self.conv1(f)
         x = self.bn1(x)
-        x = self.relu(x)   # 1/2, 64
+        x = self.relu(x)     # 1/2, 64
         x = self.maxpool(x)  # 1/4, 64
         x = self.layer1(x)   # 1/4, 256
-        x = self.layer2(x) # 1/8, 512
-        x = self.layer3(x) # 1/16, 1024
+        x = self.layer2(x)   # 1/8, 512
+        x = self.layer3(x)   # 1/16, 1024
 
         return x
  

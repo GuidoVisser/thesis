@@ -11,13 +11,13 @@ from .modules import *
 
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, out_channels=1):
         super().__init__()
         self.compress = ResBlock(1024, 512)
         self.up_16_8  = UpsampleBlock(512, 512, 256) # 1/16 -> 1/8
         self.up_8_4   = UpsampleBlock(256, 256, 256) # 1/8 -> 1/4
 
-        self.pred = nn.Conv2d(256, 1, kernel_size=(3,3), padding=(1,1), stride=1)
+        self.pred = nn.Conv2d(256, out_channels, kernel_size=(3,3), padding=(1,1), stride=1)
 
     def forward(self, f16, f8, f4):
         x = self.compress(f16)
