@@ -15,6 +15,7 @@ class LayerDecompositer(nn.Module):
                  dataloader: DataLoader,
                  loss_module: nn.Module,
                  network: nn.Module,
+                 memory_net: nn.Module,
                  learning_rate: float,
                  results_root: str,
                  batch_size: int,
@@ -25,6 +26,7 @@ class LayerDecompositer(nn.Module):
         self.dataloader = dataloader
         self.loss_module = loss_module
         self.net = network
+        self.memory_net = memory_net
         self.learning_rate = learning_rate
 
         self.results_root = results_root
@@ -37,6 +39,7 @@ class LayerDecompositer(nn.Module):
     def train(self, gpu: Union[None, str]):
         
         self.optimizer = Adam(self.net.parameters(), self.learning_rate)
+        self.memory_optimizer = Adam(self.memory_net.parameters(), self.learning_rate)
         
         for epoch in range(self.n_epochs):
             
@@ -46,8 +49,12 @@ class LayerDecompositer(nn.Module):
             if epoch == self.mask_loss_l1_rolloff:
                 self.loss_module.lambda_alpha_l1 = 0.
 
-            print(f"Epoch: {epoch} / {self.n_epochs}")
+            self.memory_optimizer.zero_grad()
+            self.memory_net.set_global_contexts()
+            contexts = self.memory_net.global_contexts
 
+            print(f"Epoch: {epoch} / {self.n_epochs}")
+            
             for (input, targets) in self.dataloader:
 
                 if gpu is not None:
@@ -55,14 +62,16 @@ class LayerDecompositer(nn.Module):
                     targets = {k:v.to(gpu) for (k, v) in targets.items()}
 
                 self.optimizer.zero_grad()
-                output = self.net(input)
+                output = self.net(input, contexts)
                 loss = self.loss_module(output, targets)
-                loss.backward()
+                loss.backward(retain_graph=True)
                 self.optimizer.step()
 
                 if epoch % self.save_freq == 0:
                     frame_indices = input["index"][:, 0].tolist()
                     self.visualize_and_save_output(output, targets, frame_indices, epoch)
+
+            self.memory_optimizer.step()
 
         torch.save(self.net.state_dict(), path.join(self.results_root, "weights.pth"))
 

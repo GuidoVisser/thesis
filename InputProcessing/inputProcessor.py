@@ -159,24 +159,26 @@ class InputProcessor(object):
             "background_flow": background_flow,
             "background_uv_map": background_uv_map,
             "jitter_grid": jitter_grid,
-            "index": torch.Tensor([idx, idx + 1]).long()
-        }
-
-        data = {
-            "image": torch.cat((rgb[0], rgb[1])),
-            "input": torch.cat((input_tensor[0], input_tensor[1]), dim=1),
-            "bg_flow": torch.cat((background_flow[0], background_flow[1])),
-            "bg_warp": torch.cat((background_uv_map[0], background_uv_map[1]), dim=2).permute(2, 0, 1),
-            "mask": torch.cat((masks[0], masks[1])).squeeze(1),
-            "flow": torch.cat((flow[0], flow[1])),
-            "confidence": flow_conf.squeeze(1),
-            "jitter_grid": torch.cat((jitter_grid[0], jitter_grid[1])),
-            "image_path": path.join(self.img_dir, f"{idx:05}.png"),
             "index": torch.Tensor([idx, idx + 1]).long(),
-            "jitter_true": (params["jitter size"][0] != params["crop size"][0]) and (params["jitter size"][1] != params["crop size"][1])
+            "rgb": rgb
         }
 
+        # DEBUG
+        # data = {
+        #     "image": torch.cat((rgb[0], rgb[1])),
+        #     "input": torch.cat((input_tensor[0], input_tensor[1]), dim=1),
+        #     "bg_flow": torch.cat((background_flow[0], background_flow[1])),
+        #     "bg_warp": torch.cat((background_uv_map[0], background_uv_map[1]), dim=2).permute(2, 0, 1),
+        #     "mask": torch.cat((masks[0], masks[1])).squeeze(1),
+        #     "flow": torch.cat((flow[0], flow[1])),
+        #     "confidence": flow_conf.squeeze(1),
+        #     "jitter_grid": torch.cat((jitter_grid[0], jitter_grid[1])),
+        #     "image_path": path.join(self.img_dir, f"{idx:05}.png"),
+        #     "index": torch.Tensor([idx, idx + 1]).long(),
+        #     "jitter_true": (params["jitter size"][0] != params["crop size"][0]) and (params["jitter size"][1] != params["crop size"][1])
+        # }
         # return data
+
         return model_input, targets
 
     def __len__(self):
