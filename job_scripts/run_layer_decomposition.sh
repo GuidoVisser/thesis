@@ -31,7 +31,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --batch_size 5 \
-            --n_epochs 1 \
+            --n_epochs 510 \
             --n_gpus 1
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
