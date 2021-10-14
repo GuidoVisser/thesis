@@ -14,7 +14,7 @@ pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
 cp -RT $HOME/thesis/datasets/DAVIS_sample/JPEGImages/480p/tennis $TMPDIR/video
-cp -RT $HOME/thesis/datasets/DAVIS_sample/Annotations/480p/tennis/00000.png $TMPDIR/mask/00000.png
+cp -RT $HOME/thesis/datasets/DAVIS_sample/Annotations/480p/tennis/00000.png $TMPDIR/00000.png
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -26,7 +26,7 @@ mkdir $TMPDIR/output_dir
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
             --img_dir $TMPDIR/video \
-            --initial_mask $TMPDIR/mask/00000.png \
+            --initial_mask $TMPDIR/00000.png \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
