@@ -55,7 +55,7 @@ class LayerDecompositer(nn.Module):
 
             print(f"Epoch: {epoch} / {self.n_epochs}")
             
-            for (input, targets) in self.dataloader:
+            for iteration, (input, targets) in enumerate(self.dataloader):
 
                 if gpu is not None:
                     input = {k:v.to(gpu) for (k, v) in input.items()}
@@ -64,7 +64,7 @@ class LayerDecompositer(nn.Module):
                 self.optimizer.zero_grad()
                 output = self.net(input, contexts)
                 loss = self.loss_module(output, targets)
-                loss.backward(retain_graph=True)
+                loss.backward(retain_graph=(iteration < len(self.dataloader) - 1))
                 self.optimizer.step()
 
                 if epoch % self.save_freq == 0:
