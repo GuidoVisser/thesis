@@ -51,14 +51,14 @@ class LayerDecompositer(nn.Module):
 
             self.memory_optimizer.zero_grad()
             self.memory_net.module.set_global_contexts()
-            contexts = self.memory_net.module.global_contexts
+            self.net.module.contexts = self.memory_net.module.global_contexts
 
             print(f"Epoch: {epoch} / {self.n_epochs}")
             
             for iteration, (input, targets) in enumerate(self.dataloader):
 
                 self.optimizer.zero_grad()
-                output = self.net(input, contexts)
+                output = self.net(input)
 
                 # set targets to the same device as the input
                 device = next(iter(output.values())).get_device()

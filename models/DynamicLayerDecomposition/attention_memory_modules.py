@@ -62,7 +62,7 @@ class GlobalContextVolume(nn.Module):
     def __init__(self, keydim: int, valdim: int) -> None:
         super().__init__()
 
-        self.register_buffer("context_volume", torch.randn((valdim, keydim)))
+        self.register_buffer("context_volume", torch.zeros((valdim, keydim)))
 
     def forward(self, query: torch.Tensor) -> torch.Tensor:
         """

@@ -78,6 +78,8 @@ class LayerDecompositionUNet(nn.Module):
         self.memory_reader = memory_reader
         valdim = memory_reader.valdim
 
+        self.register_buffer("contexts", torch.zeros((memory_reader.valdim, memory_reader.keydim)))
+
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
             ConvBlock(nn.Conv2d, in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
@@ -134,7 +136,7 @@ class LayerDecompositionUNet(nn.Module):
         return rgba, flow
 
 
-    def forward(self, input, contexts, disp=False):
+    def forward(self, input, disp=False):
         """
         Apply forward pass of network
         """
@@ -174,7 +176,7 @@ class LayerDecompositionUNet(nn.Module):
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
-            context_volume = self.memory_reader(rgb, i, contexts[i])
+            context_volume = self.memory_reader(rgb, i, self.contexts[i])
             rgba, flow = self.render(layer_input, context_volume)
             alpha = self.get_alpha_from_rgba(rgba)
 
