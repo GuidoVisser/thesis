@@ -61,13 +61,13 @@ def main(args):
         num_objects,
         args.mem_freq,
         input_processor.frame_iterator,
-    )).to(args.mem_device)
+    )).to(args.device)
 
     memory_reader = DataParallel(MemoryReader(
         args.keydim,
         args.valdim,
         num_objects
-    ))
+    )).to(args.device)
 
     network = DataParallel(LayerDecompositionUNet(
         memory_reader,
