@@ -76,7 +76,7 @@ class LayerDecompositionUNet(nn.Module):
         super().__init__()
 
         self.memory_reader = memory_reader
-        valdim = memory_reader.module.valdim
+        valdim = memory_reader.valdim
 
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
