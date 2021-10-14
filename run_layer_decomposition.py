@@ -134,5 +134,7 @@ if __name__ == "__main__":
         help="path to the optical flow estimation model")
 
     args = parser.parse_args()
-    main(args)
+
+    print(vars(args))
+    # main(args)
     print("done")
