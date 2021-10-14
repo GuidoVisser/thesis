@@ -63,11 +63,11 @@ def main(args):
         input_processor.frame_iterator,
     )).to(args.device)
 
-    memory_reader = DataParallel(MemoryReader(
+    memory_reader = MemoryReader(
         args.keydim,
         args.valdim,
         num_objects
-    )).to(args.device)
+    )
 
     network = DataParallel(LayerDecompositionUNet(
         memory_reader,
@@ -76,7 +76,7 @@ def main(args):
         coarseness=args.coarseness
     )).to(args.device)
 
-    model = DataParallel(LayerDecompositer(
+    model = LayerDecompositer(
         data_loader, 
         loss_module, 
         network, 
@@ -86,7 +86,7 @@ def main(args):
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
         save_freq=args.save_freq
-    )).to(args.device)
+    )
 
     model.module.train()
 
