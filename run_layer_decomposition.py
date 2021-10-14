@@ -55,13 +55,13 @@ def main(args):
     else:
         raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
     
-    attention_memory = AttentionMemoryNetwork(
+    attention_memory = DataParallel(AttentionMemoryNetwork(
         args.keydim,
         args.valdim,
         num_objects,
         args.mem_freq,
         input_processor.frame_iterator,
-    ).to(args.mem_device)
+    )).to(args.mem_device)
 
     memory_reader = MemoryReader(
         args.keydim,
