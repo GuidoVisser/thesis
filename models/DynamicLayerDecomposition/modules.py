@@ -174,7 +174,7 @@ class LayerDecompositionUNet(nn.Module):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
             context_device = contexts[i].context_volume.get_device()
-            model_device = next(self.parameters()).get_device()
+            model_device = list(self.parameters())[0].get_device()
             contexts[i].to(model_device)
             context_volume = self.memory_reader(rgb, i, contexts[i])
             contexts[i].to(context_device)
