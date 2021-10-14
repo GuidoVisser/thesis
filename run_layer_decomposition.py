@@ -123,8 +123,8 @@ if __name__ == "__main__":
     parser.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
     parser.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
-    parser.add_argument("--keydim", type=int, default=8, help="number of key channels in the attention memory network")
-    parser.add_argument("--valdim", type=int, default=32, help="number of value channels in the attention memory network")
+    parser.add_argument("--keydim", type=int, default=128, help="number of key channels in the attention memory network")
+    parser.add_argument("--valdim", type=int, default=512, help="number of value channels in the attention memory network")
     parser.add_argument("--mem_freq", type=int, default=10, help="specifies the interval between the frames that are added to the memory network")
     parser.add_argument("--mem_device", type=str, default="cuda:0", help="specifies the device on which the memory network lives")
 
