@@ -117,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate during training")
     parser.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
-    parser.add_argument("--device", type=str, default="cuda", help="CUDA device")
+    parser.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
     parser.add_argument("--n_epochs", type=int, default=300, help="Number of epochs used for training")
     parser.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
     parser.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument("--keydim", type=int, default=128, help="number of key channels in the attention memory network")
     parser.add_argument("--valdim", type=int, default=512, help="number of value channels in the attention memory network")
     parser.add_argument("--mem_freq", type=int, default=30, help="specifies the interval between the frames that are added to the memory network")
-    parser.add_argument("--mem_device", type=str, default="cuda", help="specifies the device on which the memory network lives")
+    parser.add_argument("--mem_device", type=str, default="cuda:0", help="specifies the device on which the memory network lives")
 
     parser.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
         help="path to the weights of the mask propagation model")
