@@ -97,7 +97,7 @@ def main(args):
 
     # model.decomposite(args.device)
 
-    create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
+    # create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
 
 if __name__ == "__main__":
     print("started")
