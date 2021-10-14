@@ -50,19 +50,24 @@ class LayerDecompositer(nn.Module):
                 self.loss_module.lambda_alpha_l1 = 0.
 
             self.memory_optimizer.zero_grad()
-            self.memory_net.set_global_contexts()
-            contexts = self.memory_net.global_contexts
+            self.memory_net.module.set_global_contexts()
+            contexts = self.memory_net.module.global_contexts
 
             print(f"Epoch: {epoch} / {self.n_epochs}")
             
             for iteration, (input, targets) in enumerate(self.dataloader):
 
-                if gpu is not None:
-                    input = {k:v.to(gpu) for (k, v) in input.items()}
-                    targets = {k:v.to(gpu) for (k, v) in targets.items()}
+                # if gpu is not None:
+                #     input = {k:v.to(gpu) for (k, v) in input.items()}
+                #     targets = {k:v.to(gpu) for (k, v) in targets.items()}
 
                 self.optimizer.zero_grad()
                 output = self.net(input, contexts)
+
+                # set targets to the same device as the input
+                device = next(iter(output.values())).get_device()
+                targets = {k:v.to(device) for (k, v) in targets.items()}
+
                 loss = self.loss_module(output, targets)
                 loss.backward(retain_graph=(iteration < len(self.dataloader) - 1))
                 self.optimizer.step()

@@ -55,13 +55,13 @@ def main(args):
     else:
         raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
     
-    attention_memory = AttentionMemoryNetwork(
+    attention_memory = DataParallel(AttentionMemoryNetwork(
         args.keydim,
         args.valdim,
         num_objects,
         args.mem_freq,
         input_processor.frame_iterator,
-    )
+    )).to(args.mem_device)
 
     memory_reader = MemoryReader(
         args.keydim,
@@ -69,14 +69,14 @@ def main(args):
         num_objects
     )
 
-    network = LayerDecompositionUNet(
+    network = DataParallel(LayerDecompositionUNet(
         memory_reader,
         do_adjustment=True, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
-    )
+    )).to(args.device)
 
-    model = DataParallel(LayerDecompositer(
+    model = LayerDecompositer(
         data_loader, 
         loss_module, 
         network, 
@@ -86,7 +86,7 @@ def main(args):
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
         save_freq=args.save_freq
-    )).to(args.device)
+    )
 
     model.train(args.device)
 
