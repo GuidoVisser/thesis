@@ -55,13 +55,13 @@ def main(args):
     else:
         raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
     
-    attention_memory = DataParallel(AttentionMemoryNetwork(
+    attention_memory = AttentionMemoryNetwork(
         args.keydim,
         args.valdim,
         num_objects,
         args.mem_freq,
         input_processor.frame_iterator,
-    )).to(args.mem_device)
+    )
 
     memory_reader = MemoryReader(
         args.keydim,
@@ -69,14 +69,14 @@ def main(args):
         num_objects
     )
 
-    network = DataParallel(LayerDecompositionUNet(
+    network = LayerDecompositionUNet(
         memory_reader,
         do_adjustment=True, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
-    )).to(args.device)
+    )
 
-    model = LayerDecompositer(
+    model = DataParallel(LayerDecompositer(
         data_loader, 
         loss_module, 
         network, 
@@ -86,7 +86,7 @@ def main(args):
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
         save_freq=args.save_freq
-    )
+    )).to(args.device)
 
     model.train(args.device)
 
@@ -123,9 +123,9 @@ if __name__ == "__main__":
     parser.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
     parser.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
-    parser.add_argument("--keydim", type=int, default=32, help="number of key channels in the attention memory network")
-    parser.add_argument("--valdim", type=int, default=128, help="number of value channels in the attention memory network")
-    parser.add_argument("--mem_freq", type=int, default=10, help="specifies the interval between the frames that are added to the memory network")
+    parser.add_argument("--keydim", type=int, default=8, help="number of key channels in the attention memory network")
+    parser.add_argument("--valdim", type=int, default=32, help="number of value channels in the attention memory network")
+    parser.add_argument("--mem_freq", type=int, default=30, help="specifies the interval between the frames that are added to the memory network")
     parser.add_argument("--mem_device", type=str, default="cuda:0", help="specifies the device on which the memory network lives")
 
     parser.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 

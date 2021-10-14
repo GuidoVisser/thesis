@@ -50,8 +50,8 @@ class LayerDecompositer(nn.Module):
                 self.loss_module.lambda_alpha_l1 = 0.
 
             self.memory_optimizer.zero_grad()
-            self.memory_net.module.set_global_contexts()
-            contexts = self.memory_net.module.global_contexts
+            self.memory_net.set_global_contexts()
+            contexts = self.memory_net.global_contexts
 
             print(f"Epoch: {epoch} / {self.n_epochs}")
             
