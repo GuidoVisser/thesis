@@ -76,7 +76,7 @@ def main(args):
         coarseness=args.coarseness
     )).to(args.device)
 
-    model = LayerDecompositer(
+    model = DataParallel(LayerDecompositer(
         data_loader, 
         loss_module, 
         network, 
@@ -86,9 +86,9 @@ def main(args):
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
         save_freq=args.save_freq
-    )
+    )).to(args.device)
 
-    model.train()
+    model.module.train()
 
     # # Set up for inference
     # input_processor.do_jitter = False
