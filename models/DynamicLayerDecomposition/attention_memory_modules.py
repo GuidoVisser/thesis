@@ -64,7 +64,7 @@ class GlobalContextVolume(nn.Module):
 
         self.register_buffer("context_volume", torch.randn((valdim, keydim)))
 
-    def read(self, query: torch.Tensor) -> torch.Tensor:
+    def forward(self, query: torch.Tensor) -> torch.Tensor:
         """
         Returns a context distribution defined by the global context and the local query
 
@@ -195,7 +195,7 @@ class MemoryReader(nn.Module):
         """
         query, value = self.query_encoders[object_idx](query_imgs)
 
-        global_features = global_context.read(query)
+        global_features = global_context(query)
 
         feature_map = torch.cat((global_features, value), dim=1)
         return feature_map

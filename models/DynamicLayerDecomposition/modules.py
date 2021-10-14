@@ -76,6 +76,7 @@ class LayerDecompositionUNet(nn.Module):
         super().__init__()
 
         self.memory_reader = memory_reader
+        valdim = memory_reader.module.valdim
 
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
@@ -87,7 +88,7 @@ class LayerDecompositionUNet(nn.Module):
             ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
         
         self.decoder = nn.ModuleList([
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2 + 2 * self.memory_reader.valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d), # 1/8
+            ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2 + valdim * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d), # 1/8
             ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d),                                 # 1/4
             ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d),                                 # 1/2
             ConvBlock(nn.ConvTranspose2d, conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d)])                                # 1

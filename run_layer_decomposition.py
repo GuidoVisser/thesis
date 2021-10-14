@@ -63,11 +63,11 @@ def main(args):
         input_processor.frame_iterator,
     )).to(args.mem_device)
 
-    memory_reader = MemoryReader(
+    memory_reader = DataParallel(MemoryReader(
         args.keydim,
         args.valdim,
         num_objects
-    )
+    ))
 
     network = DataParallel(LayerDecompositionUNet(
         memory_reader,
@@ -88,7 +88,7 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    model.train(args.device)
+    model.train()
 
     # # Set up for inference
     # input_processor.do_jitter = False
