@@ -172,7 +172,12 @@ class LayerDecompositionUNet(nn.Module):
 
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
+
+            context_device = contexts[i].context_volume.get_device()
+            model_device = next(self.parameters()).get_device()
+            contexts[i].to(model_device)
             context_volume = self.memory_reader(rgb, i, contexts[i])
+            contexts[i].to(context_device)
 
             rgba, flow = self.render(layer_input, context_volume)
             alpha = self.get_alpha_from_rgba(rgba)
