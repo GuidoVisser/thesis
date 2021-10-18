@@ -14,12 +14,13 @@ config = {
         'composite_order': None 
     },
     "training_parameters": {
-        'batch_size':    1, 
-        'learning_rate': 0.001, 
-        'n_epochs':      300, 
-        'save_freq':     30, 
-        'n_gpus':        1, 
-        'seed':          1 
+        'batch_size':           1, 
+        'learning_rate':        0.001,
+        'memory_learning_rate': 0.001,
+        'n_epochs':             300, 
+        'save_freq':            30, 
+        'n_gpus':               1, 
+        'seed':                 1 
     },
     "memory_network" : {
         'keydim':     128, 

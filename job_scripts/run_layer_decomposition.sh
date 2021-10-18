@@ -39,5 +39,5 @@ python $HOME/thesis/run_layer_decomposition.py \
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO/$DT
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO/$DT
+mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO_$DT
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO_$DT
