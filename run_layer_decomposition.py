@@ -135,7 +135,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
     training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
-    training_param_args.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
+    training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
