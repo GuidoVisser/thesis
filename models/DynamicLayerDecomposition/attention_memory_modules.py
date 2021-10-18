@@ -79,8 +79,6 @@ class GlobalContextVolume(nn.Module):
         """
         B, _, H, W = query.shape
 
-        print(f"query: {query.get_device()} -- context_volume: {self.context_volume.get_device()}")
-
         query = query.view(B, -1, H*W)                          # -> [B x C_k x HW]
         context_dist = torch.matmul(self.context_volume, query) # -> [B x C_v x HW]
         context_dist = context_dist.view(B, -1, H, W)           # -> [B x C_v x H x W]

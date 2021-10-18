@@ -94,6 +94,7 @@ def main(args):
     # input_processor.do_jitter = False
     # data_loader.shuffle = False
     # network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
+    # attention_memory.load_state_dict(torch.load(path.join(args.out_dir, "memory_weights.pth")))
 
     # model.decomposite(args.device)
 

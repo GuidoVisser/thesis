@@ -13,8 +13,9 @@ module load Python
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-cp -RT $HOME/thesis/datasets/DAVIS_sample/JPEGImages/480p/tennis $TMPDIR/video
-cp -RT $HOME/thesis/datasets/DAVIS_sample/Annotations/480p/tennis/00000.png $TMPDIR/00000.png
+VIDEO="tennis"
+cp -RT $HOME/thesis/datasets/DAVIS_sample/JPEGImages/480p/$VIDEO $TMPDIR/video
+cp -RT $HOME/thesis/datasets/DAVIS_sample/Annotations/480p/$VIDEO/00000.png $TMPDIR/00000.png
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -35,4 +36,5 @@ python $HOME/thesis/run_layer_decomposition.py \
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition
+mkdir $HOME/thesis/results/layer_decomposition/$VIDEO
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO

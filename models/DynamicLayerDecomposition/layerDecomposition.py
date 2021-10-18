@@ -74,7 +74,8 @@ class LayerDecompositer(nn.Module):
 
             self.memory_optimizer.step()
 
-        torch.save(self.net.state_dict(), path.join(self.results_root, "weights.pth"))
+        torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
+        torch.save(self.memory_net.state_dict(), path.join(self.results_root, "memory_weights.pth"))
 
     @torch.no_grad()
     def decomposite(self, gpu: Union[str, None]):
