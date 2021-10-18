@@ -17,6 +17,7 @@ class LayerDecompositer(nn.Module):
                  network: nn.Module,
                  memory_net: nn.Module,
                  learning_rate: float,
+                 mem_learning_rate: float,
                  results_root: str,
                  batch_size: int,
                  n_epochs: int,
@@ -28,6 +29,7 @@ class LayerDecompositer(nn.Module):
         self.net = network
         self.memory_net = memory_net
         self.learning_rate = learning_rate
+        self.mem_learning_rate = mem_learning_rate
 
         self.results_root = results_root
         self.save_dir = f"{results_root}/decomposition"
@@ -39,7 +41,7 @@ class LayerDecompositer(nn.Module):
     def train(self):
         
         self.optimizer = Adam(self.net.parameters(), self.learning_rate)
-        self.memory_optimizer = Adam(self.memory_net.parameters(), self.learning_rate)
+        self.memory_optimizer = Adam(self.memory_net.parameters(), self.mem_learning_rate)
         
         for epoch in range(self.n_epochs):
             

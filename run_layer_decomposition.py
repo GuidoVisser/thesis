@@ -82,6 +82,7 @@ def main(args):
         network, 
         attention_memory,
         args.learning_rate, 
+        args.memory_learning_rate, 
         results_root=args.out_dir, 
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
@@ -117,6 +118,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate during training")
+    parser.add_argument("--memory_learning_rate", type=float, default=0.001, help="Learning rate for the memory encoder")
     parser.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
     parser.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
     parser.add_argument("--n_epochs", type=int, default=300, help="Number of epochs used for training")
