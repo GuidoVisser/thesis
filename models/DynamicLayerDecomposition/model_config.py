@@ -1,4 +1,4 @@
-
+import os
 
 config = {
     "directories": {
@@ -58,3 +58,5 @@ def save_config(filepath, config):
         recursive_write(config, txt_file, 0)
 
 
+if __name__ == "__main__":
+    save_config(os.getcwd(), config)

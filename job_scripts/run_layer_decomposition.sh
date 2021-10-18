@@ -6,7 +6,7 @@
 #SBATCH --gpus-per-node=gtx1080ti:4
 
 # get start time of script
-DT=`date +"%D_%T"`
+DT=`date +"%m_%d_%H_%M_%S"`
 
 # load modules
 module load 2020
