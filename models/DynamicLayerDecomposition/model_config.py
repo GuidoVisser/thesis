@@ -1,6 +1,6 @@
 import os
 
-config = {
+CONFIG = {
     "directories": {
         'out_dir':           'results/layer_decomposition_dynamic/tennis', 
         'initial_mask':      'datasets/DAVIS/Annotations/480p/tennis/00000.png', 
@@ -10,7 +10,6 @@ config = {
     },
     "reconstruction_model": {
         'coarseness':      10, 
-        'device':          'cuda:0', 
         'composite_order': None 
     },
     "training_parameters": {
@@ -20,25 +19,39 @@ config = {
         'n_epochs':             300, 
         'save_freq':            30, 
         'n_gpus':               1, 
-        'seed':                 1 
+        'seed':                 1, 
+        'device':               'cuda:0'
     },
     "memory_network" : {
         'keydim':     128, 
         'valdim':     512, 
         'mem_freq':   30, 
-        'mem_device': 'cuda:0'
+    },
+    "pretrained_models" : {
+        "propagation_model": "models/third_party/weights/propagation_model.pth",
+        "flow_model": "models/third_party/weights/raft-things.pth"
     }
 }
 
-def update_config(args):
+def update_config(args, config):
     """
     Update the config with the current settings
 
     Args:
         args (namespace): namespace containing settings of the model
     """
+    def recursive_update(arg_dict, dictionary):
+        for key, value in dictionary.items():
+            if isinstance(value, dict):
+                recursive_update(arg_dict, value)
+            elif key in arg_dict:
+                dictionary[key] = arg_dict[key]
+            else:
+                continue
 
-    config["x"] = 2
+    recursive_update(vars(args), config)
+
+    return config
 
 
 def save_config(filepath, config):
@@ -47,11 +60,13 @@ def save_config(filepath, config):
     """
     def recursive_write(input, io_stream, depth):
 
-        for item in input.items():
+        for (item, value) in input.items():
             if isinstance(input[item], dict):
+                io_stream.write(f"{''.join([' ']*4*depth)}{item}:\n")
                 recursive_write(input[item], io_stream, depth + 1)
             else:
-                io_stream.write(f"{'\t'*depth}{item} -- {input[item]}\n")
+                first_part = f"{''.join([' ']*4*(depth))}{item}".ljust(25)
+                io_stream.write(f"{first_part} -- {input[item]}\n")
 
 
     with open(filepath, "a") as txt_file:
@@ -59,4 +74,4 @@ def save_config(filepath, config):
 
 
 if __name__ == "__main__":
-    save_config(os.getcwd(), config)
+    save_config(os.getcwd() + "/test.txt", CONFIG)

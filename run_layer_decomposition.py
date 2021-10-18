@@ -15,6 +15,8 @@ from models.DynamicLayerDecomposition.modules import LayerDecompositionUNet
 
 from utils.distributed_training import setup, cleanup, spawn_multiprocessor
 from utils.demo import create_decomposite_demo
+from utils.utils import create_dir
+from models.DynamicLayerDecomposition.model_config import CONFIG, update_config, save_config 
 
 def distributed_training(rank, n_gpus, model):
     setup(rank, n_gpus)
@@ -106,37 +108,48 @@ if __name__ == "__main__":
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
 
-    video = "tennis"
-    parser.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
+    video = "dog-agility"
+    directory_args = parser.add_argument_group("directories")
+    directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    parser.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
+    directory_args.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
         help="path to the initial mask")
-    parser.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/{video}", 
+    directory_args.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
-    parser.add_argument("--composite_order", type=str, 
+    
+    reconstruction_model_args = parser.add_argument_group("reconstruction_model")
+    reconstruction_model_args.add_argument("--composite_order", type=str, 
         help="path to a text file containing the compositing order of the foreground objects")
+    reconstruction_model_args.add_argument("--coarseness", type=int, default=10, 
+        help="Temporal coarseness of camera adjustment parameters")
 
-    parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
-    parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate during training")
-    parser.add_argument("--memory_learning_rate", type=float, default=0.001, help="Learning rate for the memory encoder")
-    parser.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
-    parser.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
-    parser.add_argument("--n_epochs", type=int, default=300, help="Number of epochs used for training")
-    parser.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
-    parser.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
-    parser.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
+    memory_network_args = parser.add_argument_group("memory_network")
+    memory_network_args.add_argument("--keydim", type=int, default=128, help="number of key channels in the attention memory network")
+    memory_network_args.add_argument("--valdim", type=int, default=512, help="number of value channels in the attention memory network")
+    memory_network_args.add_argument("--mem_freq", type=int, default=10, help="specifies the interval between the frames that are added to the memory network")
 
-    parser.add_argument("--keydim", type=int, default=128, help="number of key channels in the attention memory network")
-    parser.add_argument("--valdim", type=int, default=512, help="number of value channels in the attention memory network")
-    parser.add_argument("--mem_freq", type=int, default=10, help="specifies the interval between the frames that are added to the memory network")
-    parser.add_argument("--mem_device", type=str, default="cuda:0", help="specifies the device on which the memory network lives")
+    training_param_args = parser.add_argument_group("training_parameters")
+    training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
+    training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
+    training_param_args.add_argument("--memory_learning_rate", type=float, default=0.001, help="Learning rate for the memory encoder")
+    training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
+    training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
+    training_param_args.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
+    training_param_args.add_argument("--n_gpus", type=int, default=1, help="Number of GPUs to use for training")
+    training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
-    parser.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
+    pretrained_model_args = parser.add_argument_group("pretrained_models")
+    pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
         help="path to the weights of the mask propagation model")
-    parser.add_argument("--flow_model", type=str, default="models/third_party/weights/raft-things.pth",
+    pretrained_model_args.add_argument("--flow_model", type=str, default="models/third_party/weights/raft-things.pth",
         help="path to the optical flow estimation model")
 
     args = parser.parse_args()
+
+    # update and save arguments
+    create_dir(args.out_dir)
+    CONFIG = update_config(args, CONFIG)
+    save_config(f"{args.out_dir}/config.txt", CONFIG)
 
     main(args)
     print("done")
