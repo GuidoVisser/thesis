@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 2:00:00
+#SBATCH -t 8:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -35,8 +35,8 @@ python $HOME/thesis/run_layer_decomposition_omni.py \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --batch_size 12 \
-            --n_epochs 511 \
-            --save_freq 30 \
+            --n_epochs 2001 \
+            --save_freq 100 \
             --description 'Static model with 511 epochs'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 

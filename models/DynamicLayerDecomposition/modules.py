@@ -95,6 +95,8 @@ class LayerDecompositionUNet(nn.Module):
             ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d),              # 1/2
             ConvBlock(nn.ConvTranspose2d, conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d)])             # 1
         
+        self.memory_select = nn.Linear(conv_channels * 4 + valdim * 2, conv_channels * 4)
+
         self.final_rgba = ConvBlock(nn.Conv2d, conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock(nn.Conv2d, conv_channels, 2, ksize=4, stride=1, activation='none')
 
@@ -104,7 +106,7 @@ class LayerDecompositionUNet(nn.Module):
         self.max_frames = max_frames
         self.do_adjustment = do_adjustment
         
-    def render(self, x, context):
+    def render(self, x, context, is_bg=False):
         """Pass inputs for a single layer through UNet.
 
         Parameters:
@@ -123,6 +125,7 @@ class LayerDecompositionUNet(nn.Module):
 
         # adding context
         x = torch.cat((x, context), 1)
+        # x = self.memory_select(x.flatten()).view(-1, )
 
         # decoding
         for layer in self.decoder:
@@ -177,7 +180,7 @@ class LayerDecompositionUNet(nn.Module):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
             context_volume = self.memory_reader(rgb, i, self.contexts[i])
-            rgba, flow = self.render(layer_input, context_volume)
+            rgba, flow = self.render(layer_input, context_volume, is_bg=(i==0))
             alpha = self.get_alpha_from_rgba(rgba)
 
             # Background layer
