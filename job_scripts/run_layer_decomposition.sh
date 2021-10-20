@@ -38,7 +38,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --n_epochs 511 \
             --save_freq 30 \
             --mem_freq 2 \
-            --description 'Dynamic model with 2000 epochs and a higher memory frequency'
+            --description 'Dynamic model with 511 epochs and a higher memory frequency'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
