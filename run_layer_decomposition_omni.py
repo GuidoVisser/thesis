@@ -8,10 +8,9 @@ from os import path
 from torch.nn.parallel import DistributedDataParallel, DataParallel
 
 from InputProcessing.inputProcessor import InputProcessor
-from models.DynamicLayerDecomposition.attention_memory_modules import AttentionMemoryNetwork, MemoryReader
-from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
-from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss
-from models.DynamicLayerDecomposition.modules import LayerDecompositionUNet
+from models.StaticLayerDecomposition.layerDecomposition import LayerDecompositer
+from models.StaticLayerDecomposition.loss_functions import DecompositeLoss
+from models.StaticLayerDecomposition.modules import LayerDecompositionUNet
 
 from utils.distributed_training import setup, cleanup, spawn_multiprocessor
 from utils.demo import create_decomposite_demo
@@ -57,22 +56,21 @@ def main(args):
     else:
         raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
     
-    attention_memory = DataParallel(AttentionMemoryNetwork(
-        args.keydim,
-        args.valdim,
-        num_objects,
-        args.mem_freq,
-        input_processor.frame_iterator,
-    )).to(args.device)
+    # attention_memory = DataParallel(AttentionMemoryNetwork(
+    #     args.keydim,
+    #     args.valdim,
+    #     num_objects,
+    #     args.mem_freq,
+    #     input_processor.frame_iterator,
+    # )).to(args.device)
 
-    memory_reader = MemoryReader(
-        args.keydim,
-        args.valdim,
-        num_objects
-    )
+    # memory_reader = MemoryReader(
+    #     args.keydim,
+    #     args.valdim,
+    #     num_objects
+    # )
 
     network = DataParallel(LayerDecompositionUNet(
-        memory_reader,
         do_adjustment=True, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
@@ -82,16 +80,14 @@ def main(args):
         data_loader, 
         loss_module, 
         network, 
-        attention_memory,
         args.learning_rate, 
-        args.memory_learning_rate, 
         results_root=args.out_dir, 
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
         save_freq=args.save_freq
     )
 
-    model.train()
+    model.train(args.device)
 
     # # Set up for inference
     # input_processor.do_jitter = False
@@ -110,7 +106,7 @@ if __name__ == "__main__":
 
     video = "dog-agility"
     directory_args = parser.add_argument_group("directories")
-    directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
+    directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/{video}", 
         help="path to directory where results are saved")
     directory_args.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
         help="path to the initial mask")
