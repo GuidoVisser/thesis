@@ -88,7 +88,7 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    # model.run_training()
+    model.run_training()
 
     # Set up for inference
     input_processor.do_jitter = False
