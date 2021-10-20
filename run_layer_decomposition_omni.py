@@ -75,7 +75,6 @@ def main(args):
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
     )).to(args.device)
-    network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
 
     model = LayerDecompositer(
         data_loader, 
@@ -88,10 +87,11 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    # model.run_training()
+    model.run_training()
 
     # Set up for inference
     input_processor.do_jitter = False
+    # network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
     model.eval()
 
     model.decomposite(args.device)
