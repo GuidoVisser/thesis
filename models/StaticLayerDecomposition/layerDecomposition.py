@@ -34,7 +34,7 @@ class LayerDecompositer(nn.Module):
         self.batch_size = batch_size
         self.mask_loss_l1_rolloff = 200        
 
-    def train(self, gpu: Union[None, str]):
+    def run_training(self):
         
         self.optimizer = Adam(self.net.parameters(), self.learning_rate)
         
@@ -50,9 +50,13 @@ class LayerDecompositer(nn.Module):
 
             for (input, targets) in self.dataloader:
 
-                if gpu is not None:
-                    input = {k:v.to(gpu) for (k, v) in input.items()}
-                    targets = {k:v.to(gpu) for (k, v) in targets.items()}
+                # if gpu is not None:
+                #     input = {k:v.to(gpu) for (k, v) in input.items()}
+                #     targets = {k:v.to(gpu) for (k, v) in targets.items()}
+                
+                # set targets to the same device as the input
+                device = next(iter(output.values())).get_device()
+                targets = {k:v.to(device) for (k, v) in targets.items()}
 
                 self.optimizer.zero_grad()
                 output = self.net(input)

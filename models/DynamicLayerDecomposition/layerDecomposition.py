@@ -38,7 +38,7 @@ class LayerDecompositer(nn.Module):
         self.batch_size = batch_size
         self.mask_loss_l1_rolloff = 200        
 
-    def train(self):
+    def run_training(self):
         
         self.optimizer = Adam(self.net.parameters(), self.learning_rate)
         self.memory_optimizer = Adam(self.memory_net.parameters(), self.mem_learning_rate)

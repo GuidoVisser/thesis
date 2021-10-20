@@ -91,17 +91,15 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    model.train()
+    model.run_training()
 
-    # # Set up for inference
-    # input_processor.do_jitter = False
-    # data_loader.shuffle = False
-    # network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
-    # attention_memory.load_state_dict(torch.load(path.join(args.out_dir, "memory_weights.pth")))
+    # Set up for inference
+    input_processor.do_jitter = False
+    model.eval()
 
-    # model.decomposite(args.device)
+    model.decomposite(args.device)
 
-    # create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
+    create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
 
 if __name__ == "__main__":
     print("started")

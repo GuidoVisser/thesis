@@ -75,6 +75,7 @@ def main(args):
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
         coarseness=args.coarseness
     )).to(args.device)
+    network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
 
     model = LayerDecompositer(
         data_loader, 
@@ -87,17 +88,15 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    model.train(args.device)
+    # model.run_training()
 
-    # # Set up for inference
-    # input_processor.do_jitter = False
-    # data_loader.shuffle = False
-    # network.load_state_dict(torch.load(path.join(args.out_dir, "weights.pth")))
-    # attention_memory.load_state_dict(torch.load(path.join(args.out_dir, "memory_weights.pth")))
+    # Set up for inference
+    input_processor.do_jitter = False
+    model.eval()
 
-    # model.decomposite(args.device)
+    model.decomposite(args.device)
 
-    # create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
+    create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
 
 if __name__ == "__main__":
     print("started")
@@ -130,7 +129,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--memory_learning_rate", type=float, default=0.001, help="Learning rate for the memory encoder")
     training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
     training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
-    training_param_args.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
+    training_param_args.add_argument("--save_freq", type=int, default=100, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
