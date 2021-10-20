@@ -1,6 +1,8 @@
 import os
+import re
 
 CONFIG = {
+    "description": "no description given",
     "directories": {
         'out_dir':           'results/layer_decomposition_dynamic/tennis', 
         'initial_mask':      'datasets/DAVIS/Annotations/480p/tennis/00000.png', 
@@ -61,12 +63,15 @@ def save_config(filepath, config):
     def recursive_write(input, io_stream, depth):
 
         for (item, value) in input.items():
-            if isinstance(input[item], dict):
+            if item == "description":
+                value = re.sub("(.{64})", "\\1\n\t", value, 0, re.DOTALL)
+                io_stream.write(f"{item} -- \n\t{value}\n")
+            elif isinstance(input[item], dict):
                 io_stream.write(f"{''.join([' ']*4*depth)}{item}:\n")
-                recursive_write(input[item], io_stream, depth + 1)
+                recursive_write(value, io_stream, depth + 1)
             else:
                 first_part = f"{''.join([' ']*4*(depth))}{item}".ljust(25)
-                io_stream.write(f"{first_part} -- {input[item]}\n")
+                io_stream.write(f"{first_part} -- {value}\n")
 
 
     with open(filepath, "a") as txt_file:

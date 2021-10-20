@@ -107,6 +107,7 @@ if __name__ == "__main__":
     print("started")
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
+    parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
     video = "dog-agility"
     directory_args = parser.add_argument_group("directories")
