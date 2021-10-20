@@ -51,10 +51,10 @@ def main(args):
 
     loss_module = DecompositeLoss()
 
-    if isinstance(args.initial_mask, str):
-        num_objects = 2
-    else:
-        raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
+    # if isinstance(args.initial_mask, str):
+    #     num_objects = 2
+    # else:
+    #     raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
     
     # attention_memory = DataParallel(AttentionMemoryNetwork(
     #     args.keydim,
@@ -88,7 +88,7 @@ def main(args):
         save_freq=args.save_freq
     )
 
-    model.run_training()
+    # model.run_training()
 
     # Set up for inference
     input_processor.do_jitter = False
@@ -102,14 +102,15 @@ if __name__ == "__main__":
     print("started")
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
+    parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
-    video = "dog-agility"
+    video = "scooter-black"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
+    directory_args.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS_minisample/Annotations/480p/{video}/00000.png", 
         help="path to the initial mask")
-    directory_args.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/{video}", 
+    directory_args.add_argument("--img_dir", type=str, default=f"datasets/DAVIS_minisample/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
     
     reconstruction_model_args = parser.add_argument_group("reconstruction_model")
@@ -119,9 +120,9 @@ if __name__ == "__main__":
         help="Temporal coarseness of camera adjustment parameters")
 
     memory_network_args = parser.add_argument_group("memory_network")
-    memory_network_args.add_argument("--keydim", type=int, default=128, help="number of key channels in the attention memory network")
-    memory_network_args.add_argument("--valdim", type=int, default=512, help="number of value channels in the attention memory network")
-    memory_network_args.add_argument("--mem_freq", type=int, default=10, help="specifies the interval between the frames that are added to the memory network")
+    memory_network_args.add_argument("--keydim", type=int, default=0, help="number of key channels in the attention memory network")
+    memory_network_args.add_argument("--valdim", type=int, default=0, help="number of value channels in the attention memory network")
+    memory_network_args.add_argument("--mem_freq", type=int, default=0, help="specifies the interval between the frames that are added to the memory network")
 
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")

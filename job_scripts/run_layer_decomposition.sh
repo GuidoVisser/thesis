@@ -28,7 +28,7 @@ mkdir $TMPDIR/output_dir
 
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
-python $HOME/thesis/run_layer_decomposition.py \
+python $HOME/thesis/run_layer_decomposition_omni.py \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/00000.png \
             --out_dir $TMPDIR/output_dir \
@@ -37,10 +37,9 @@ python $HOME/thesis/run_layer_decomposition.py \
             --batch_size 12 \
             --n_epochs 511 \
             --save_freq 30 \
-            --mem_freq 2 \
-            --description 'Dynamic model with 511 epochs and a higher memory frequency'
+            --description 'Static model with 511 epochs'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/${VIDEO}_${DT}
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/${VIDEO}_${DT}
+mkdir -p $HOME/thesis/results/layer_decomposition_omni/${VIDEO}_${DT}
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition_omni/${VIDEO}_${DT}
