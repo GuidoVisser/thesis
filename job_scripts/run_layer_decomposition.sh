@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 5:00:00
+#SBATCH -t 2:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -16,9 +16,9 @@ module load Python
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO="dog-agility"
-cp -RT $HOME/thesis/datasets/DAVIS/JPEGImages/480p/$VIDEO $TMPDIR/video
-cp -RT $HOME/thesis/datasets/DAVIS/Annotations/480p/$VIDEO/00000.png $TMPDIR/00000.png
+VIDEO="scooter-black"
+cp -RT $HOME/thesis/datasets/DAVIS_minisample/JPEGImages/480p/$VIDEO $TMPDIR/video
+cp -RT $HOME/thesis/datasets/DAVIS_minisample/Annotations/480p/$VIDEO/00000.png $TMPDIR/00000.png
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -35,9 +35,9 @@ python $HOME/thesis/run_layer_decomposition.py \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --batch_size 12 \
-            --n_epochs 2000 \
-            --save_freq 50 \
-            --mem_freq 3 \
+            --n_epochs 511 \
+            --save_freq 30 \
+            --mem_freq 2 \
             --description 'Dynamic model with 2000 epochs and a higher memory frequency'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
