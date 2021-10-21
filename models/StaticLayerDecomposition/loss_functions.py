@@ -92,7 +92,28 @@ class DecompositeLoss(nn.Module):
                self.lambda_recon_warp     * rgb_reconstruction_warp_loss + \
                self.lambda_stabilization  * stabilization_loss
 
-        return loss
+        # create dict of all separate losses for logging
+        loss_values = {
+            "total":                          loss.item(),
+            "rgb_reconstruction_loss":        rgb_reconstruction_loss.item(),
+            "alpha_regularization_loss":      alpha_reg_loss.item(),
+            "flow_reconstruction_loss":       flow_reconstruction_loss.item(),
+            "mask_bootstrap_loss":            mask_bootstrap_loss.item(),
+            "alpha_warp_loss":                alpha_warp_loss.item(),
+            "rgb_reconstruction_warp_loss":   rgb_reconstruction_warp_loss.item(),
+            "camera_stabilization_loss":      stabilization_loss.item(),
+            "brightness_regularization_loss": brightness_regularization_loss.item(),
+            "background_offset_loss":         background_offset_loss.item(),
+            "lambda_flow_reconstruction":     self.lambda_recon_flow,
+            "lambda_mask_bootstrap":          self.lambda_mask_bootstrap,
+            "lambda_alpha_warp":              self.lambda_alpha_warp,
+            "lambda_stabilization":           self.lambda_stabilization,
+            "lambda_warped_reconstruction":   self.lambda_recon_warp,
+            "lambda_alpha_l0":                self.lambda_alpha_l0,
+            "lambda_alpha_l1":                self.lambda_alpha_l1
+        }
+
+        return loss, loss_values
 
     def rearrange_t2b(self, tensor):
         """

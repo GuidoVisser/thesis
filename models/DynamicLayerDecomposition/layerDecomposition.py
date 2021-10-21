@@ -2,9 +2,11 @@ from typing import Union
 import cv2
 import torch.nn as nn
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, dataloader
 from torch.optim import Adam
 from os import path
+
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from utils.utils import create_dirs
 from models.third_party.RAFT.utils.flow_viz import flow_to_image
@@ -16,6 +18,7 @@ class LayerDecompositer(nn.Module):
                  loss_module: nn.Module,
                  network: nn.Module,
                  memory_net: nn.Module,
+                 summary_writer: SummaryWriter,
                  learning_rate: float,
                  mem_learning_rate: float,
                  results_root: str,
@@ -36,7 +39,8 @@ class LayerDecompositer(nn.Module):
         self.n_epochs = n_epochs
         self.save_freq = save_freq
         self.batch_size = batch_size
-        self.mask_loss_l1_rolloff = 200        
+        self.mask_loss_l1_rolloff = 200
+        self.writer = summary_writer
 
     def run_training(self):
         
@@ -66,7 +70,10 @@ class LayerDecompositer(nn.Module):
                 device = next(iter(output.values())).get_device()
                 targets = {k:v.to(device) for (k, v) in targets.items()}
 
-                loss = self.loss_module(output, targets)
+                loss, loss_values = self.loss_module(output, targets)
+                global_step = iteration + epoch*len(self.dataloader)
+                self.writer.add_scalars("losses", loss_values, global_step=global_step)
+
                 loss.backward(retain_graph=(iteration < len(self.dataloader) - 1))
                 self.optimizer.step()
 

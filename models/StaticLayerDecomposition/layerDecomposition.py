@@ -6,6 +6,8 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from os import path
 
+from torch.utils.tensorboard.writer import SummaryWriter
+
 from utils.utils import create_dirs
 from models.third_party.RAFT.utils.flow_viz import flow_to_image
 
@@ -15,6 +17,7 @@ class LayerDecompositer(nn.Module):
                  dataloader: DataLoader,
                  loss_module: nn.Module,
                  network: nn.Module,
+                 summary_writer: SummaryWriter,
                  learning_rate: float,
                  results_root: str,
                  batch_size: int,
@@ -32,7 +35,8 @@ class LayerDecompositer(nn.Module):
         self.n_epochs = n_epochs
         self.save_freq = save_freq
         self.batch_size = batch_size
-        self.mask_loss_l1_rolloff = 200        
+        self.mask_loss_l1_rolloff = 200
+        self.writer = summary_writer    
 
     def run_training(self):
         
@@ -57,7 +61,9 @@ class LayerDecompositer(nn.Module):
                 device = next(iter(output.values())).get_device()
                 targets = {k:v.to(device) for (k, v) in targets.items()}
                 
-                loss = self.loss_module(output, targets)
+                loss, loss_values = self.loss_module(output, targets)
+                self.writer.add_scalars("losses", loss_values)
+
                 loss.backward()
                 self.optimizer.step()
 

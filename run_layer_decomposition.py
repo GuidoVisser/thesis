@@ -6,6 +6,7 @@ import torch
 import numpy as np
 from os import path
 from torch.nn.parallel import DistributedDataParallel, DataParallel
+from torch.utils.tensorboard import SummaryWriter
 
 from InputProcessing.inputProcessor import InputProcessor
 from models.DynamicLayerDecomposition.attention_memory_modules import AttentionMemoryNetwork, MemoryReader
@@ -33,6 +34,8 @@ def main(args):
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+
+    writer = SummaryWriter(args.out_dir)
 
     input_processor = InputProcessor(
         args.img_dir, 
@@ -83,6 +86,7 @@ def main(args):
         loss_module, 
         network, 
         attention_memory,
+        writer,
         args.learning_rate, 
         args.memory_learning_rate, 
         results_root=args.out_dir, 
