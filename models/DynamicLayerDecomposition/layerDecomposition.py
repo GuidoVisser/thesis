@@ -62,7 +62,7 @@ class LayerDecompositer(nn.Module):
                 self.optimizer.zero_grad()
                 output = self.net(input)
 
-                # set targets to the same device as the input
+                # set targets to the same device as the output
                 device = next(iter(output.values())).get_device()
                 targets = {k:v.to(device) for (k, v) in targets.items()}
 
@@ -86,13 +86,12 @@ class LayerDecompositer(nn.Module):
 
         for (input, targets) in self.dataloader:
 
-            # put input and targets on correct device
-            if gpu is not None:
-                input = {k:v.to(gpu) for (k, v) in input.items()}
-                targets = {k:v.to(gpu) for (k, v) in targets.items()}
-
             # Forward pass through network
             output = self.net(input)
+
+            # set targets to the same device as the output
+            device = next(iter(output.values())).get_device()
+            targets = {k:v.to(device) for (k, v) in targets.items()}
 
             # Do detail transfer
             reconstruction = output["rgba_reconstruction"]
