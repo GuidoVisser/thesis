@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision.models import resnet50
+from models.TopkSTM.modules.modules import MaskRGBEncoder
 
 from InputProcessing.frameIterator import FrameIterator
 

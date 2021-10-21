@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import cv2
 
+from math import ceil
 from InputProcessing.flowHandler import FlowHandler
 
 class ConvBlock(nn.Module):
@@ -90,12 +91,12 @@ class LayerDecompositionUNet(nn.Module):
             ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
         
         self.decoder = nn.ModuleList([
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2 + valdim * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d), # 1/8
+            ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d), # 1/8
             ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d),              # 1/4
             ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d),              # 1/2
             ConvBlock(nn.ConvTranspose2d, conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d)])             # 1
         
-        self.memory_select = nn.Linear(conv_channels * 4 + valdim * 2, conv_channels * 4)
+        self.memory_select = nn.Conv2d(conv_channels * 4 + valdim * 2, conv_channels * 4, kernel_size=1)
 
         self.final_rgba = ConvBlock(nn.Conv2d, conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock(nn.Conv2d, conv_channels, 2, ksize=4, stride=1, activation='none')
@@ -123,9 +124,10 @@ class LayerDecompositionUNet(nn.Module):
             if i < 4:
                 skips.append(x)
 
-        # adding context
-        x = torch.cat((x, context), 1)
-        # x = self.memory_select(x.flatten()).view(-1, )
+        # adding context to background layer
+        if is_bg:
+            x = torch.cat((x, context), 1)
+            x = self.memory_select(x)
 
         # decoding
         for layer in self.decoder:
@@ -179,7 +181,7 @@ class LayerDecompositionUNet(nn.Module):
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
-            context_volume = self.memory_reader(rgb, i, self.contexts[i])
+            context_volume = self.memory_reader(rgb, 0, self.contexts[0]) # 0 in stead of i because we only use a memory network for the background layer
             rgba, flow = self.render(layer_input, context_volume, is_bg=(i==0))
             alpha = self.get_alpha_from_rgba(rgba)
 
