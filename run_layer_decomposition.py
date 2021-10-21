@@ -69,6 +69,7 @@ def main(args):
         num_mem_nets,
         args.mem_freq,
         input_processor.frame_iterator,
+        input_processor.mask_handler
     )).to(args.device)
 
     memory_reader = MemoryReader(

@@ -1,47 +1,70 @@
 import torch
 import torch.nn as nn
-from torchvision.models import resnet50
-from models.TopkSTM.modules.modules import MaskRGBEncoder
+from InputProcessing.maskHandler import MaskHandler
+# from torchvision.models import resnet50
+from models.TopkSTM.modules.modules import MaskRGBEncoder, RGBEncoder
 
 from InputProcessing.frameIterator import FrameIterator
 
-class ResNet50Backbone(nn.Module):
+def create_backbone(with_masks: bool):
 
-    def __init__(self):
-        super().__init__()
+    model_weights = torch.load("models/third_party/weights/propagation_model.pth")
+
+    if with_masks:
+        model = MaskRGBEncoder()
+        name = "mask_rgb_encoder"
+    else:
+        model = RGBEncoder()
+        name = "rgb_encoder"
+
+    new_dict = {}
+    for key, value in model_weights.items():
+        if name in key and not (("mask" in key) != ("mask" in name)):
+            new_key = ".".join(key.split(".")[1:])
+            new_dict[new_key] = value
+    model.load_state_dict(new_dict)
+    model.eval()
+
+    return model
+
+
+# class ResNet50Backbone(nn.Module):
+
+#     def __init__(self):
+#         super().__init__()
         
-        resnet = resnet50(pretrained=True)
-        self.conv1   = resnet.conv1
-        self.bn1     = resnet.bn1
-        self.relu    = resnet.relu  
-        self.maxpool = resnet.maxpool
+#         resnet = resnet50(pretrained=True)
+#         self.conv1   = resnet.conv1
+#         self.bn1     = resnet.bn1
+#         self.relu    = resnet.relu  
+#         self.maxpool = resnet.maxpool
 
-        self.res2   = resnet.layer1
-        self.layer2 = resnet.layer2
-        self.layer3 = resnet.layer3
+#         self.res2   = resnet.layer1
+#         self.layer2 = resnet.layer2
+#         self.layer3 = resnet.layer3
 
-        self.out_channels = 1024
+#         self.out_channels = 1024
 
-    def forward(self, f: torch.Tensor):
-        x   = self.conv1(f) 
-        x   = self.bn1(x)
-        x   = self.relu(x)     # 1/2, 64
-        x   = self.maxpool(x)  # 1/4, 64
-        f4  = self.res2(x)     # 1/4, 256
-        f8  = self.layer2(f4)  # 1/8, 512
-        f16 = self.layer3(f8)  # 1/16, 1024
+#     def forward(self, f: torch.Tensor):
+#         x   = self.conv1(f) 
+#         x   = self.bn1(x)
+#         x   = self.relu(x)     # 1/2, 64
+#         x   = self.maxpool(x)  # 1/4, 64
+#         f4  = self.res2(x)     # 1/4, 256
+#         f8  = self.layer2(f4)  # 1/8, 512
+#         f16 = self.layer3(f8)  # 1/16, 1024
 
-        return f16
+#         return f16
 
 
 class KeyValueEncoder(nn.Module):
 
-    def __init__(self, keydim: int, valdim: int) -> None:
+    def __init__(self, keydim: int, valdim: int, backbone) -> None:
         super().__init__()
 
-        self.backbone = ResNet50Backbone().eval()
+        self.backbone = backbone
 
-        indim = self.backbone.out_channels
+        indim = 1024 # defined by ResNet50
 
         self.key_layer = nn.Conv2d(indim, keydim, kernel_size=3, padding=1)
         self.val_layer = nn.Conv2d(indim, valdim, kernel_size=3, padding=1)
@@ -52,6 +75,9 @@ class KeyValueEncoder(nn.Module):
         # the backbone will not be trained
         with torch.no_grad():
             x = self.backbone(x)
+
+        if isinstance(x, tuple):
+            x = x[0]
 
         key = self.key_layer(x)
         val = self.val_layer(x)
@@ -100,18 +126,20 @@ class GlobalContextVolume(nn.Module):
 
 class AttentionMemoryNetwork(nn.Module):
 
-    def __init__(self, keydim: int, valdim: int, num_layers: int, mem_freq: int, frame_iterator: FrameIterator) -> None:
+    def __init__(self, keydim: int, valdim: int, num_layers: int, mem_freq: int, frame_iterator: FrameIterator, mask_iterator: MaskHandler) -> None:
         super().__init__()
 
         # Create a memory for every object layer plus one for the background layer
-        self.memory_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim)] * num_layers)
+        self.memory_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(with_masks=True))] * num_layers)
         self.global_contexts = nn.ModuleList([GlobalContextVolume(keydim, valdim)] * num_layers)
 
         self.frame_iterator = frame_iterator
+        self.mask_iterator  = mask_iterator
         self.num_layers     = num_layers
         self.mem_freq       = mem_freq
         self.valdim         = valdim
         self.keydim         = keydim
+        self.device         = self.frame_iterator.device
 
     def set_global_contexts(self) -> None:
         """
@@ -132,8 +160,24 @@ class AttentionMemoryNetwork(nn.Module):
             for frame_idx in iterator:
 
                 # get frame and add batch dimension
-                frame = self.frame_iterator[frame_idx].unsqueeze(0).to(self.frame_iterator.device)
+                frame = self.frame_iterator[frame_idx].unsqueeze(0).to(self.device)
                 
+                # get mask and add batch dimension
+                _, object_mask = self.mask_iterator[frame_idx]
+                object_mask = object_mask.to(self.device)
+
+                # create mask layer for other object layers
+                background_mask = torch.zeros_like(object_mask)
+
+                if l == 0:
+                    mask  = background_mask
+                    other = object_mask
+                else:
+                    mask  = object_mask
+                    other = background_mask
+
+                frame = torch.cat((frame, mask, other), dim=1)
+
                 # encode frame and get context matrix
                 encoded_frame = self.memory_encoders[l](frame)
                 context = self.get_context_from_key_value_pair(encoded_frame)
@@ -177,7 +221,7 @@ class MemoryReader(nn.Module):
     def __init__(self, keydim: int, valdim: int, num_layers: int) -> None:
         super().__init__()
 
-        self.query_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim)]*num_layers)
+        self.query_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(with_masks=False))]*num_layers)
 
         self.num_layers = num_layers
         self.keydim = keydim

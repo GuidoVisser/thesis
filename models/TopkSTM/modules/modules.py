@@ -46,11 +46,9 @@ class MaskRGBEncoder(nn.Module):
         self.layer2 = resnet.layer2 # 1/8, 512
         self.layer3 = resnet.layer3 # 1/16, 1024
 
-    def forward(self, f, m, o):
+    def forward(self, x):
 
-        f = torch.cat([f, m, o], 1)
-
-        x = self.conv1(f)
+        x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)     # 1/2, 64
         x = self.maxpool(x)  # 1/4, 64

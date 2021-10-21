@@ -154,7 +154,9 @@ class PropagationNetwork(nn.Module):
         else:
             others = torch.zeros_like(masks)
 
-        f16 = self.mask_rgb_encoder(frame, masks, others)
+        input = torch.cat((frame, masks, others), dim=1)
+
+        f16 = self.mask_rgb_encoder(input)
         k16, v16 = self.kv_m_f16(f16) # num_objects, 128 and 512, H/16, W/16
 
         return k16.unsqueeze(2), v16.unsqueeze(2)
