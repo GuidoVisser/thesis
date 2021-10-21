@@ -38,7 +38,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --n_epochs 2001 \
             --save_freq 100 \
             --mem_freq 2 \
-            --description 'Dynamic model with 2001 epochs and high memory frequency. Only the background layer uses attention memory'
+            --description 'Dynamic model with 2001 epochs and high memory frequency. Uses one memory network for all layers'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home

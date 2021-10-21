@@ -107,7 +107,7 @@ class LayerDecompositionUNet(nn.Module):
         self.max_frames = max_frames
         self.do_adjustment = do_adjustment
         
-    def render(self, x, context, is_bg=False):
+    def render(self, x, context, use_memory=False):
         """Pass inputs for a single layer through UNet.
 
         Parameters:
@@ -125,7 +125,7 @@ class LayerDecompositionUNet(nn.Module):
                 skips.append(x)
 
         # adding context to background layer
-        if is_bg:
+        if use_memory:
             x = torch.cat((x, context), 1)
             x = self.memory_select(x)
 
@@ -181,8 +181,8 @@ class LayerDecompositionUNet(nn.Module):
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
-            context_volume = self.memory_reader(rgb, 0, self.contexts[0]) # 0 in stead of i because we only use a memory network for the background layer
-            rgba, flow = self.render(layer_input, context_volume, is_bg=(i==0))
+            context_volume = self.memory_reader(rgb, 0, self.contexts[0]) # 0 in stead of i because we only use one memory network for all layers
+            rgba, flow = self.render(layer_input, context_volume, use_memory=True)
             alpha = self.get_alpha_from_rgba(rgba)
 
             # Background layer

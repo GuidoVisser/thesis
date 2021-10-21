@@ -56,14 +56,17 @@ def main(args):
     loss_module = DecompositeLoss()
 
     if isinstance(args.initial_mask, str):
-        num_objects = 2
+        num_mem_nets = 2
     else:
         raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
     
+    # use 1 memory network for all layers
+    num_mem_nets = 1
+
     attention_memory = DataParallel(AttentionMemoryNetwork(
         args.keydim,
         args.valdim,
-        num_objects,
+        num_mem_nets,
         args.mem_freq,
         input_processor.frame_iterator,
     )).to(args.device)
@@ -71,7 +74,7 @@ def main(args):
     memory_reader = MemoryReader(
         args.keydim,
         args.valdim,
-        num_objects
+        num_mem_nets
     )
 
     network = DataParallel(LayerDecompositionUNet(
