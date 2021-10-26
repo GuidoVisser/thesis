@@ -60,8 +60,8 @@ def main(args):
     else:
         raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
     
-    # use 1 memory network for all layers
-    num_mem_nets = 1
+    # # use 1 memory network for all layers
+    # num_mem_nets = 1
 
     attention_memory = DataParallel(AttentionMemoryNetwork(
         args.keydim,
