@@ -26,7 +26,7 @@ class DecompositeLoss(nn.Module):
         self.lambda_alpha_warp     = lambda_alpha_warp
         self.lambda_stabilization  = lambda_stabilization
 
-        self.bootstrap_threshold = 0.005
+        self.bootstrap_threshold = 0.00005
 
 
     def __call__(self, predictions: dict, targets: dict) -> torch.Tensor:
