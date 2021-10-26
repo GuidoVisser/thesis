@@ -91,10 +91,10 @@ class LayerDecompositionUNet(nn.Module):
             ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
         
         self.decoder = nn.ModuleList([
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d), # 1/8
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d),              # 1/4
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d),              # 1/2
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d)])             # 1
+            ConvBlock(nn.ConvTranspose2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/8
+            ConvBlock(nn.ConvTranspose2d, conv_channels * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/4
+            ConvBlock(nn.ConvTranspose2d, conv_channels * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/2
+            ConvBlock(nn.ConvTranspose2d, conv_channels,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d)]) # 1
         
         self.memory_select = nn.Conv2d(conv_channels * 4 + valdim * 2, conv_channels * 4, kernel_size=1)
 
@@ -131,7 +131,7 @@ class LayerDecompositionUNet(nn.Module):
 
         # decoding
         for layer in self.decoder:
-            x = torch.cat((x, skips.pop()), 1)
+            # x = torch.cat((x, skips.pop()), 1)
             x = layer(x)
 
         # finalizing render
