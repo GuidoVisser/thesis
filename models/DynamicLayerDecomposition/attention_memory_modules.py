@@ -6,9 +6,9 @@ from models.TopkSTM.modules.modules import MaskRGBEncoder, RGBEncoder
 
 from InputProcessing.frameIterator import FrameIterator
 
-def create_backbone(with_masks: bool):
+def create_backbone(weights_path: str, with_masks: bool):
 
-    model_weights = torch.load("models/third_party/weights/propagation_model.pth")
+    model_weights = torch.load(weights_path)
 
     if with_masks:
         model = MaskRGBEncoder()
@@ -126,11 +126,11 @@ class GlobalContextVolume(nn.Module):
 
 class AttentionMemoryNetwork(nn.Module):
 
-    def __init__(self, keydim: int, valdim: int, num_layers: int, mem_freq: int, frame_iterator: FrameIterator, mask_iterator: MaskHandler) -> None:
+    def __init__(self, keydim: int, valdim: int, num_layers: int, mem_freq: int, frame_iterator: FrameIterator, mask_iterator: MaskHandler, backbone_weights: str) -> None:
         super().__init__()
 
         # Create a memory for every object layer plus one for the background layer
-        self.memory_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(with_masks=True))] * num_layers)
+        self.memory_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(backbone_weights, with_masks=True))] * num_layers)
         self.global_contexts = nn.ModuleList([GlobalContextVolume(keydim, valdim)] * num_layers)
 
         self.frame_iterator = frame_iterator
@@ -218,10 +218,10 @@ class AttentionMemoryNetwork(nn.Module):
 
 
 class MemoryReader(nn.Module):
-    def __init__(self, keydim: int, valdim: int, num_layers: int) -> None:
+    def __init__(self, keydim: int, valdim: int, num_layers: int, backbone_weights: str) -> None:
         super().__init__()
 
-        self.query_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(with_masks=False))]*num_layers)
+        self.query_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(backbone_weights, with_masks=False))]*num_layers)
 
         self.num_layers = num_layers
         self.keydim = keydim

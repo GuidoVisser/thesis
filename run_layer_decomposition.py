@@ -69,13 +69,15 @@ def main(args):
         num_mem_nets,
         args.mem_freq,
         input_processor.frame_iterator,
-        input_processor.mask_handler
+        input_processor.mask_handler,
+        args.propagation_model
     )).to(args.device)
 
     memory_reader = MemoryReader(
         args.keydim,
         args.valdim,
-        num_mem_nets
+        num_mem_nets,
+        args.propagation_model
     )
 
     network = DataParallel(LayerDecompositionUNet(
