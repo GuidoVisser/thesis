@@ -56,7 +56,6 @@ class LayerDecompositer(nn.Module):
                 self.loss_module.lambda_alpha_l1 = 0.
 
             jitter_params = self.dataloader.dataset.prepare_jitter_parameters()
-            print(torch.cuda.current_device(), len(jitter_params))
 
             self.memory_optimizer.zero_grad()
             self.memory_net.module.set_global_contexts(jitter_params)

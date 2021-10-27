@@ -106,7 +106,7 @@ def main(args):
 
     # Set up for inference
     input_processor.do_jitter = False
-    model.eval()
+    # model.eval()
 
     model.decomposite()
 

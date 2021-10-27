@@ -39,8 +39,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --save_freq 100 \
             --mem_freq 2 \
             --alpha_bootstr_thresh 5e-5 \
-            --experiment_config 3 \
-            --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. alpha_bootstrap_threshold is set low. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension. \n    Experiment 3: Only the bg layer has a memory network. A 1x1 convolutional kernel is used to downsample the channels at the point where the context is added.'
+            --experiment_config 1 \
+            --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. alpha_bootstrap_threshold is set low. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension. \n    Experiment 1: All object layers have their own memory network. ADDITIONALLY: model is not set to eval mode before inference.'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
