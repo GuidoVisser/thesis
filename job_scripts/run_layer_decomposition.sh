@@ -38,6 +38,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --n_epochs 2001 \
             --save_freq 100 \
             --mem_freq 2 \
+            --alpha_bootstr_thresh 5e-5 \
             --description 'Dynamic model with 2001 epochs and high memory frequency. Includes object masks in the memorizing step, memory backbones have been changed to TopkSTM pretrained encoders. The mask bootstrap threshold has been set to 0.00005 from 0.005'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 

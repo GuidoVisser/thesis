@@ -22,7 +22,8 @@ CONFIG = {
         'save_freq':            30, 
         'n_gpus':               1, 
         'seed':                 1, 
-        'device':               'cuda:0'
+        'device':               'cuda:0',
+        'alpha_bootstr_thresh': 5e-3
     },
     "memory_network" : {
         'keydim':     128, 
