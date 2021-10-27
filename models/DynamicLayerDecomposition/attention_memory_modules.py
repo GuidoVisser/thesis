@@ -166,8 +166,8 @@ class AttentionMemoryNetwork(nn.Module):
                 object_mask = object_mask.to(self.device)
 
                 # apply jitter
-                frame       = self.input_processor.apply_jitter_transform(frame, jitter_params)
-                object_mask = self.input_processor.apply_jitter_transform(object_mask, jitter_params)
+                frame       = self.input_processor.apply_jitter_transform(frame, jitter_params[frame_idx])
+                object_mask = self.input_processor.apply_jitter_transform(object_mask, jitter_params[frame_idx])
 
                 # create mask layer for other object layers
                 background_mask = torch.zeros_like(object_mask)
