@@ -55,10 +55,10 @@ class LayerDecompositer(nn.Module):
             if epoch == self.mask_loss_l1_rolloff:
                 self.loss_module.lambda_alpha_l1 = 0.
 
-            self.dataloader.dataset.prepare_jitter_parameters()
+            jitter_params = self.dataloader.dataset.prepare_jitter_parameters()
 
             self.memory_optimizer.zero_grad()
-            self.memory_net.module.set_global_contexts()
+            self.memory_net.module.set_global_contexts(jitter_params)
             self.net.module.contexts = self.memory_net.module.global_contexts
 
             print(f"Epoch: {epoch} / {self.n_epochs}")

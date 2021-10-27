@@ -297,6 +297,7 @@ class InputProcessor(object):
                 "crop size": crop_size
             }
             self.jitter_parameters.append(params)
+        return self.jitter_parameters
 
     def prepare_image_dir(self, video_dir, out_dir):
 

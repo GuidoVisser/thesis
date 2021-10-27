@@ -1,11 +1,8 @@
 import torch
 import torch.nn as nn
 from InputProcessing.inputProcessor import InputProcessor
-from InputProcessing.maskHandler import MaskHandler
 # from torchvision.models import resnet50
 from models.TopkSTM.modules.modules import MaskRGBEncoder, RGBEncoder
-
-from InputProcessing.frameIterator import FrameIterator
 
 def create_backbone(weights_path: str, with_masks: bool):
 
@@ -134,7 +131,6 @@ class AttentionMemoryNetwork(nn.Module):
         self.memory_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(backbone_weights, with_masks=True))] * num_layers)
         self.global_contexts = nn.ModuleList([GlobalContextVolume(keydim, valdim)] * num_layers)
 
-        self.input_processor = input_processor
         self.frame_iterator  = input_processor.frame_iterator
         self.mask_iterator   = input_processor.mask_handler
         self.num_layers      = num_layers
@@ -143,7 +139,7 @@ class AttentionMemoryNetwork(nn.Module):
         self.keydim          = keydim
         self.device          = self.frame_iterator.device
 
-    def set_global_contexts(self) -> None:
+    def set_global_contexts(self, jitter_params) -> None:
         """
         Set the global context volumes from a set. This is equivalent to memorizing frames in a memory network
         but because we are overfitting on a single video we do this with a number of frames at the start of each epoch
@@ -169,8 +165,8 @@ class AttentionMemoryNetwork(nn.Module):
                 object_mask = object_mask.to(self.device)
 
                 # apply jitter
-                frame       = self.input_processor.apply_jitter_transform(frame, self.input_processor.jitter_parameters[frame_idx])
-                object_mask = self.input_processor.apply_jitter_transform(object_mask, self.input_processor.jitter_parameters[frame_idx])
+                frame       = self.input_processor.apply_jitter_transform(frame, jitter_params)
+                object_mask = self.input_processor.apply_jitter_transform(object_mask, jitter_params)
 
                 # create mask layer for other object layers
                 background_mask = torch.zeros_like(object_mask)

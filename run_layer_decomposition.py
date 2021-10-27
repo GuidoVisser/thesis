@@ -118,13 +118,13 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
-    video = "dog-agility"
+    video = "scooter-black"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
     directory_args.add_argument("--initial_mask", type=str, default=f"datasets/DAVIS/Annotations/480p/{video}/00000.png", 
         help="path to the initial mask")
-    directory_args.add_argument("--img_dir", type=str, default=f"datasets/DAVIS/JPEGImages/480p/{video}", 
+    directory_args.add_argument("--img_dir", type=str, default=f"datasets/DAVIS_minisample/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
     
     reconstruction_model_args = parser.add_argument_group("reconstruction_model")
