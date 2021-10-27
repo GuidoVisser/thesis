@@ -73,13 +73,22 @@ class ConvBlock(nn.Module):
         return x
 
 class LayerDecompositionUNet(nn.Module):
-    def __init__(self, memory_reader, conv_channels=64, in_channels=16, max_frames=200, coarseness=10, do_adjustment=True):
+    def __init__(self, memory_reader, conv_channels=64, in_channels=16, max_frames=200, coarseness=10, do_adjustment=True, experiment_config=1):
         super().__init__()
 
         self.memory_reader = memory_reader
         valdim = memory_reader.valdim
 
         self.register_buffer("contexts", torch.zeros((memory_reader.valdim, memory_reader.keydim)))
+
+        self.experiment_config = experiment_config
+        if experiment_config == 1:
+            decoder_in_channels = conv_channels * 4 * 2 + valdim * 2
+        elif experiment_config == 2:
+            decoder_in_channels = conv_channels * 4 * 2 + valdim * 2
+        elif experiment_config == 3:
+            decoder_in_channels = conv_channels * 4 * 2
+            self.memory_select = nn.Conv2d(conv_channels * 4 + valdim * 2, conv_channels * 4, kernel_size=1)
 
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
@@ -91,13 +100,11 @@ class LayerDecompositionUNet(nn.Module):
             ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
         
         self.decoder = nn.ModuleList([
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/8
+            ConvBlock(nn.ConvTranspose2d, decoder_in_channels,   conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/8
             ConvBlock(nn.ConvTranspose2d, conv_channels * 4 * 2, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/4
             ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/2
             ConvBlock(nn.ConvTranspose2d, conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d)]) # 1
         
-        self.memory_select = nn.Conv2d(conv_channels * 4 + valdim * 2, conv_channels * 4, kernel_size=1)
-
         self.final_rgba = ConvBlock(nn.Conv2d, conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock(nn.Conv2d, conv_channels, 2, ksize=4, stride=1, activation='none')
 
@@ -107,7 +114,7 @@ class LayerDecompositionUNet(nn.Module):
         self.max_frames = max_frames
         self.do_adjustment = do_adjustment
         
-    def render(self, x, context, use_memory=False):
+    def render(self, x, context, layer_idx):
         """Pass inputs for a single layer through UNet.
 
         Parameters:
@@ -125,9 +132,12 @@ class LayerDecompositionUNet(nn.Module):
                 skips.append(x)
 
         # adding context to background layer
-        if use_memory:
+        if self.experiment_config == 3:
+            if layer_idx == 0:
+                x = torch.cat((x, context), 1)
+                x = self.memory_select(x)
+        else:
             x = torch.cat((x, context), 1)
-            x = self.memory_select(x)
 
         # decoding
         for layer in self.decoder:
@@ -181,8 +191,13 @@ class LayerDecompositionUNet(nn.Module):
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
-            context_volume = self.memory_reader(rgb, i, self.contexts[i])
-            rgba, flow = self.render(layer_input, context_volume, use_memory=True)
+            if self.experiment_config == 1:
+                context_idx = i
+            else:
+                context_idx = 0
+            
+            context_volume = self.memory_reader(rgb, context_idx, self.contexts[context_idx])
+            rgba, flow = self.render(layer_input, context_volume, i)
             alpha = self.get_alpha_from_rgba(rgba)
 
             # Background layer

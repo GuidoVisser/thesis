@@ -89,7 +89,7 @@ class LayerDecompositer(nn.Module):
         torch.save(self.memory_net.state_dict(), path.join(self.results_root, "memory_weights.pth"))
 
     @torch.no_grad()
-    def decomposite(self, gpu: Union[str, None]):
+    def decomposite(self):
 
         self.create_save_dirs("inference")
 

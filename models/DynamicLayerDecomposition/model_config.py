@@ -23,7 +23,8 @@ CONFIG = {
         'n_gpus':               1, 
         'seed':                 1, 
         'device':               'cuda:0',
-        'alpha_bootstr_thresh': 5e-3
+        'alpha_bootstr_thresh': 5e-3,
+        'experiment_config':    1
     },
     "memory_network" : {
         'keydim':     128, 
