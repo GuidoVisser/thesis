@@ -93,6 +93,11 @@ class LayerDecompositer(nn.Module):
 
         self.create_save_dirs("inference")
 
+        # jitter_params = self.dataloader.dataset.prepare_jitter_parameters()
+
+        # self.memory_net.module.set_global_contexts(jitter_params)
+        # self.net.module.contexts = self.memory_net.module.global_contexts
+
         for (input, targets) in self.dataloader:
 
             # Forward pass through network
