@@ -6,6 +6,7 @@ import torch.nn.functional as F
 class DecompositeLoss(nn.Module):
 
     def __init__(self,
+                 bootstrap_threshold: float,
                  lambda_mask: float = 50.,
                  lambda_recon_flow: float = 1.,
                  lambda_recon_warp: float = 0.,
@@ -26,7 +27,7 @@ class DecompositeLoss(nn.Module):
         self.lambda_alpha_warp     = lambda_alpha_warp
         self.lambda_stabilization  = lambda_stabilization
 
-        self.bootstrap_threshold = 0.00005
+        self.bootstrap_threshold = bootstrap_threshold
 
 
     def __call__(self, predictions: dict, targets: dict) -> torch.Tensor:

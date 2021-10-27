@@ -53,7 +53,7 @@ def main(args):
         shuffle=True
     )
 
-    loss_module = DecompositeLoss()
+    loss_module = DecompositeLoss(args.alpha_bootstr_thresh)
 
     if isinstance(args.initial_mask, str):
         num_mem_nets = 2
@@ -68,8 +68,7 @@ def main(args):
         args.valdim,
         num_mem_nets,
         args.mem_freq,
-        input_processor.frame_iterator,
-        input_processor.mask_handler,
+        input_processor,
         args.propagation_model
     )).to(args.device)
 
@@ -146,6 +145,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
+    training_param_args.add_argument("--alpha_bootstr_thresh", type=float, default=5e-3, help="Threshold for the alpha bootstrap loss. If the loss comes under this the lambda is decreased")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 

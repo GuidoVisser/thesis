@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from InputProcessing.inputProcessor import InputProcessor
 from InputProcessing.maskHandler import MaskHandler
 # from torchvision.models import resnet50
 from models.TopkSTM.modules.modules import MaskRGBEncoder, RGBEncoder
@@ -126,20 +127,21 @@ class GlobalContextVolume(nn.Module):
 
 class AttentionMemoryNetwork(nn.Module):
 
-    def __init__(self, keydim: int, valdim: int, num_layers: int, mem_freq: int, frame_iterator: FrameIterator, mask_iterator: MaskHandler, backbone_weights: str) -> None:
+    def __init__(self, keydim: int, valdim: int, num_layers: int, mem_freq: int, input_processor: InputProcessor, backbone_weights: str) -> None:
         super().__init__()
 
         # Create a memory for every object layer plus one for the background layer
         self.memory_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(backbone_weights, with_masks=True))] * num_layers)
         self.global_contexts = nn.ModuleList([GlobalContextVolume(keydim, valdim)] * num_layers)
 
-        self.frame_iterator = frame_iterator
-        self.mask_iterator  = mask_iterator
-        self.num_layers     = num_layers
-        self.mem_freq       = mem_freq
-        self.valdim         = valdim
-        self.keydim         = keydim
-        self.device         = self.frame_iterator.device
+        self.input_processor = input_processor
+        self.frame_iterator  = input_processor.frame_iterator
+        self.mask_iterator   = input_processor.mask_handler
+        self.num_layers      = num_layers
+        self.mem_freq        = mem_freq
+        self.valdim          = valdim
+        self.keydim          = keydim
+        self.device          = self.frame_iterator.device
 
     def set_global_contexts(self) -> None:
         """
@@ -153,8 +155,8 @@ class AttentionMemoryNetwork(nn.Module):
 
             # create iterator for containing all frames that need to be considered
             iterator = list(range(0, len(self.frame_iterator), self.mem_freq))
-            if iterator[-1] < len(self.frame_iterator):
-                iterator.append(len(self.frame_iterator) - 1)
+            # if iterator[-1] < len(self.frame_iterator):
+            #     iterator.append(len(self.frame_iterator) - 1)
 
             # add frames to memory
             for frame_idx in iterator:
@@ -165,6 +167,10 @@ class AttentionMemoryNetwork(nn.Module):
                 # get mask and add batch dimension
                 _, object_mask = self.mask_iterator[frame_idx]
                 object_mask = object_mask.to(self.device)
+
+                # apply jitter
+                frame       = self.input_processor.apply_jitter_transform(frame, self.input_processor.jitter_parameters[frame_idx])
+                object_mask = self.input_processor.apply_jitter_transform(object_mask, self.input_processor.jitter_parameters[frame_idx])
 
                 # create mask layer for other object layers
                 background_mask = torch.zeros_like(object_mask)

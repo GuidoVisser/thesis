@@ -35,6 +35,7 @@ class InputProcessor(object):
         self.in_channels = in_channels
         self.do_jitter   = do_jitter
         self.jitter_rate = jitter_rate
+        self.jitter_mode = 'bilinear'
 
         if isinstance(initial_mask, str):
             self.N_objects = 1
@@ -116,19 +117,18 @@ class InputProcessor(object):
         input_tensor = torch.cat((background_input, input_tensor), dim=1) # [T, L,   C, H, W] = [2, L,   16, H, W]
 
         # get parameters for jitter
-        params = self.get_jitter_parameters()
-        mode = "bilinear"
+        params = self.jitter_parameters[idx]
             
         # transform targets
-        rgb       = self.apply_jitter_transform(rgb,       params, mode)
-        flow      = self.apply_jitter_transform(flow,      params, mode)
-        masks     = self.apply_jitter_transform(masks,     params, mode)
-        flow_conf = self.apply_jitter_transform(flow_conf, params, mode)
+        rgb       = self.apply_jitter_transform(rgb,       params)
+        flow      = self.apply_jitter_transform(flow,      params)
+        masks     = self.apply_jitter_transform(masks,     params)
+        flow_conf = self.apply_jitter_transform(flow_conf, params)
 
         # transform inputs
-        input_tensor      = self.apply_jitter_transform(input_tensor,      params, mode)
-        background_flow   = self.apply_jitter_transform(background_flow,   params, mode)
-        background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params, mode)
+        input_tensor      = self.apply_jitter_transform(input_tensor,      params)
+        background_flow   = self.apply_jitter_transform(background_flow,   params)
+        background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params)
         background_uv_map = background_uv_map.permute(0, 2, 3, 1)
 
         # rescale flow values to conform to new image size
@@ -144,7 +144,7 @@ class InputProcessor(object):
 
         # create jitter grid
         jitter_grid = self.initialize_jitter_grid()
-        jitter_grid = self.apply_jitter_transform(jitter_grid, params, mode)
+        jitter_grid = self.apply_jitter_transform(jitter_grid, params)
 
 
         targets = {
@@ -222,59 +222,81 @@ class InputProcessor(object):
         v = torch.linspace(-1, 1, steps=self.frame_size[1]).unsqueeze(-1).repeat(1, self.frame_size[0])
         return torch.stack([u, v], 0).unsqueeze(0).repeat(2, 1, 1, 1)
 
-    def apply_jitter_transform(self, input, params, interp_mode='bilinear'):
+    def apply_jitter_transform(self, input, params):
+        """
+        Apply jitter transform to the input.
+        Input can either be of the form [T, L, C, H, W] or [T, C, H, W]
+            if there is a L (layer) dimension T will always be 2
+
+        Interpolate will process input of the form
+            [T, C,   H, W]
+            [L, C*T, H, W]
+        """
+
+        # specify whether or not there is a time dimension that needs to be stacked in channel dimension        
+        rearrange_time_to_channel = len(input.shape) > 4
         
         tensor_size = params['jitter size'].tolist()
         crop_pos    = params['crop pos']
         crop_size   = params['crop size']
 
         # stack time dimension in channel dimension for `F.interpolate()`
-        input = torch.cat((input[0], input[1]), dim=-3)
+        if rearrange_time_to_channel:
+            input = torch.cat((input[0], input[1]), dim=-3)
 
-        if len(input.shape) < 4:
-            data = F.interpolate(input.unsqueeze(0), size=tensor_size, mode=interp_mode).squeeze(0)
-        else:
-            data = F.interpolate(input, size=tensor_size, mode=interp_mode)
+        # if len(input.shape) < 4:
+        #     data = F.interpolate(input.unsqueeze(0), size=tensor_size, mode=self.jitter_mode).squeeze(0)
+        # else:
+        data = F.interpolate(input, size=tensor_size, mode=self.jitter_mode)
         
         # separate time dimension
-        n_channel = input.size(-3)
-        data = torch.stack((data[..., :n_channel // 2, :, :], 
-                            data[..., n_channel // 2:, :, :]))
+        if rearrange_time_to_channel:
+            n_channel = input.size(-3)
+            data = torch.stack((data[..., :n_channel // 2, :, :], 
+                                data[..., n_channel // 2:, :, :]))
 
         data = data[..., crop_pos[0]:crop_pos[0] + crop_size[0], crop_pos[1]:crop_pos[1] + crop_size[1]]
         
         return data
 
-    def get_jitter_parameters(self):
+    def prepare_jitter_parameters(self):
+        """
+        prepare the jitter parameters for the entire epoch
+        NOTE This is done because the parameters are necessary in the context module as well as for the reconstruction model
+        """
 
-        width, height = self.frame_size
+        self.jitter_parameters = []
+        for _ in range(len(self)):
 
-        if self.do_jitter:
 
-            # get scale
-            if np.random.uniform() > self.jitter_rate:
-                scale = 1.
+            width, height = self.frame_size
+
+            if self.do_jitter:
+
+                # get scale
+                if np.random.uniform() > self.jitter_rate:
+                    scale = 1.
+                else:
+                    scale = np.random.uniform(1, 1.25)
+                
+                # construct jitter
+                jitter_size = (scale * np.array([height, width])).astype(np.int)
+                start_h = np.random.randint(jitter_size[0] - height + 1)
+                start_w = np.random.randint(jitter_size[1] - width  + 1)
             else:
-                scale = np.random.uniform(1, 1.25)
-            
-            # construct jitter
-            jitter_size = (scale * np.array([height, width])).astype(np.int)
-            start_h = np.random.randint(jitter_size[0] - height + 1)
-            start_w = np.random.randint(jitter_size[1] - width  + 1)
-        else:
-            jitter_size = np.array([height, width])
-            start_h = 0
-            start_w = 0
+                jitter_size = np.array([height, width])
+                start_h = 0
+                start_w = 0
 
-        crop_pos  = np.array([start_h, start_w])
-        crop_size = np.array([height,  width])
+            crop_pos  = np.array([start_h, start_w])
+            crop_size = np.array([height,  width])
 
-        params = {
-            "jitter size": jitter_size, 
-            "crop pos": crop_pos, 
-            "crop size": crop_size
-        }
-        return params
+            params = {
+                "jitter size": jitter_size, 
+                "crop pos": crop_pos, 
+                "crop size": crop_size
+            }
+            self.jitter_parameters.append(params)
 
     def prepare_image_dir(self, video_dir, out_dir):
 
