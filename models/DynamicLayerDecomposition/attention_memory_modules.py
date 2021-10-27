@@ -166,6 +166,7 @@ class AttentionMemoryNetwork(nn.Module):
                 object_mask = object_mask.to(self.device)
 
                 # apply jitter
+                print(f"{torch.cuda.current_device()} : {frame_idx} / {len(jitter_params)}")
                 frame       = self.input_processor.apply_jitter_transform(frame, jitter_params[frame_idx])
                 object_mask = self.input_processor.apply_jitter_transform(object_mask, jitter_params[frame_idx])
 
