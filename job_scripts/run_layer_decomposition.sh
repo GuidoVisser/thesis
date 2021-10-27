@@ -39,7 +39,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --save_freq 100 \
             --mem_freq 2 \
             --alpha_bootstr_thresh 5e-5 \
-            --description 'Dynamic model with 2001 epochs and high memory frequency. Includes object masks in the memorizing step, memory backbones have been changed to TopkSTM pretrained encoders. The mask bootstrap threshold has been set to 0.00005 from 0.005'
+            --experiment_config 1 \
+            --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. alpha_bootstrap_threshold is set low. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension. \n    Experiment 1: All object layers (incl. bg layer) have their own memory network.'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
