@@ -151,7 +151,7 @@ class AttentionMemoryNetwork(nn.Module):
             local_contexts = []
 
             # create iterator for containing all frames that need to be considered
-            iterator = list(range(0, len(self.frame_iterator), self.mem_freq))
+            iterator = list(range(0, len(self.input_processor), self.mem_freq))
             # if iterator[-1] < len(self.frame_iterator):
             #     iterator.append(len(self.frame_iterator) - 1)
 
