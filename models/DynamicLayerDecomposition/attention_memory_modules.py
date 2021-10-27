@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from InputProcessing.inputProcessor import InputProcessor
+from models.DynamicLayerDecomposition.modules import ConvBlock
 # from torchvision.models import resnet50
 from models.TopkSTM.modules.modules import MaskRGBEncoder, RGBEncoder
 
@@ -166,7 +167,6 @@ class AttentionMemoryNetwork(nn.Module):
                 object_mask = object_mask.to(self.device)
 
                 # apply jitter
-                print(f"{torch.cuda.current_device()} : {frame_idx} / {len(jitter_params)}")
                 frame       = self.input_processor.apply_jitter_transform(frame, jitter_params[frame_idx])
                 object_mask = self.input_processor.apply_jitter_transform(object_mask, jitter_params[frame_idx])
 
@@ -222,11 +222,14 @@ class AttentionMemoryNetwork(nn.Module):
 
 
 class MemoryReader(nn.Module):
-    def __init__(self, keydim: int, valdim: int, num_layers: int, backbone_weights: str) -> None:
+    def __init__(self, keydim: int, valdim: int, num_layers: int, backbone_weights: str, experiment_config: int = 1) -> None:
         super().__init__()
 
         self.query_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(backbone_weights, with_masks=False))]*num_layers)
+        if experiment_config in [4, 5, 6]:
+            self.decoders       = nn.ModuleList([ContextDecoder(valdim, out_channels=8)]*num_layers)
 
+        self.experiment_config = experiment_config
         self.num_layers = num_layers
         self.keydim = keydim
         self.valdim = valdim
@@ -248,4 +251,25 @@ class MemoryReader(nn.Module):
         global_features = global_context(query)
 
         feature_map = torch.cat((global_features, value), dim=1)
+
+        if self.experiment_config in [4, 5, 6]:
+            feature_map = self.decoders[object_idx](feature_map)
+
         return feature_map
+
+
+class ContextDecoder(nn.Module):
+    def __init__(self, valdim, out_channels):
+        super().__init__()
+
+        self.layers = nn.ModuleList([
+            ConvBlock(nn.ConvTranspose2d, valdim * 2,        out_channels * 64, ksize=4, stride=2),
+            ConvBlock(nn.ConvTranspose2d, out_channels * 64, out_channels * 16, ksize=4, stride=2),
+            ConvBlock(nn.ConvTranspose2d, out_channels * 16, out_channels * 4,  ksize=4, stride=2),
+            ConvBlock(nn.ConvTranspose2d, out_channels * 4,  out_channels,      ksize=4, stride=2)
+        ])
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        return x

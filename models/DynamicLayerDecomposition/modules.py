@@ -82,13 +82,13 @@ class LayerDecompositionUNet(nn.Module):
         self.register_buffer("contexts", torch.zeros((memory_reader.valdim, memory_reader.keydim)))
 
         self.experiment_config = experiment_config
-        if experiment_config == 1:
-            decoder_in_channels = conv_channels * 4 * 2 + valdim * 2
-        elif experiment_config == 2:
+        if experiment_config in [1, 2]:
             decoder_in_channels = conv_channels * 4 * 2 + valdim * 2
         elif experiment_config == 3:
             decoder_in_channels = conv_channels * 4 * 2
             self.memory_select = nn.Conv2d(conv_channels * 4 + valdim * 2, conv_channels * 4, kernel_size=1)
+        elif experiment_config in [4, 5, 6]:
+            decoder_in_channels = conv_channels * 4 * 2
 
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
@@ -136,7 +136,7 @@ class LayerDecompositionUNet(nn.Module):
             if layer_idx == 0:
                 x = torch.cat((x, context), 1)
                 x = self.memory_select(x)
-        else:
+        elif self.experiment_config in [1, 2]:
             x = torch.cat((x, context), 1)
 
         # decoding
@@ -191,12 +191,18 @@ class LayerDecompositionUNet(nn.Module):
         for i in range(N_layers):
             layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
 
-            if self.experiment_config == 1:
+            if self.experiment_config in [1, 4]:
                 context_idx = i
             else:
                 context_idx = 0
             
             context_volume = self.memory_reader(rgb, context_idx, self.contexts[context_idx])
+
+            if self.experiment_config in [4, 5]:
+                layer_input[:, -8:] = context_volume
+            elif self.experiment_config == 6:
+                if i == 0:
+                    layer_input[:, -8:] = context_volume
             rgba, flow = self.render(layer_input, context_volume, i)
             alpha = self.get_alpha_from_rgba(rgba)
 
