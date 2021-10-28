@@ -107,10 +107,8 @@ def main(args):
 
     # Set up for inference
     input_processor.do_jitter = False
-    model.eval()
-
+    
     model.decomposite()
-
     create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
 
 if __name__ == "__main__":
