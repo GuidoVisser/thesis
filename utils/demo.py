@@ -56,7 +56,15 @@ def create_decomposite_demo(roots: Union[str, list], fps=10):
 if __name__ == "__main__":
     fps = 5
 
-    file_paths = ["results/layer_decomposition_dynamic/scooter-black_10_20_20_00_41/decomposition/inference",
-                  "results/layer_decomposition/scooter-black_10_20_18_24_28/decomposition/inference"]    
+    file_paths = [
+        "results/layer_decomposition/scooter-black_10_20_18_24_28/decomposition/inference",
+        "results/layer_decomposition_dynamic/scooter-black_10_28_00_02_20/decomposition/inference",
+        "results/layer_decomposition_dynamic/scooter-black_10_28_00_02_54/decomposition/inference",
+        "results/layer_decomposition_dynamic/scooter-black_10_28_00_06_50/decomposition/inference",
+        "results/layer_decomposition_dynamic/scooter-black_10_28_01_56_16/decomposition/inference",
+        "results/layer_decomposition_dynamic/scooter-black_10_28_02_01_09/decomposition/inference",
+        "results/layer_decomposition_dynamic/scooter-black_10_28_03_43_34/decomposition/inference",
+        "results/layer_decomposition_dynamic/scooter-black_10_28_04_03_45/decomposition/inference",
+    ]    
 
     create_decomposite_demo(file_paths, fps)
