@@ -66,40 +66,45 @@ def visualize_attention_map(root: str, channels: Union[list, None] = None, batch
 
         assert num_channels > 0, "No valid input found"
 
+        num_layers = attention_volume.shape[0]
+
         num_batches = ceil(num_channels / (batch_width*batch_height))
         batch_iterator = range(num_batches) if channels == None else channels
 
-        create_dirs(*[path.join(root, f"context_volumes/visualization/{batch:02}") for batch in range(num_batches)])
+        for layer in range(num_layers):
+            create_dirs(path.join(root, f"context_volumes/visualization/layer_{layer:02}"))
+            create_dirs(*[path.join(root, f"context_volumes/visualization/layer_{layer:02}/{batch:02}") for batch in range(num_batches)])
 
         img = cv2.resize(img, (w, h))
 
         attention_volume = (attention_volume - torch.min(attention_volume)) / (torch.max(attention_volume) - torch.min(attention_volume)) * 255
 
-        channel_count = 0
-        for batch in batch_iterator:
+        for layer in range(num_layers):
+            channel_count = 0
+            for batch in batch_iterator:
 
-            imgs = []
-            for i in range(batch_width):
-                img_row = []
-                for j in range(batch_height):
+                imgs = []
+                for i in range(batch_width):
+                    img_row = []
+                    for j in range(batch_height):
 
-                    if channel_count < num_channels:
-                        attn_map_idx = num_batches * batch + i * batch_width + j
+                        if channel_count < num_channels:
+                            attn_map_idx = num_batches * batch + i * batch_width + j
 
-                        attention_map = attention_volume[1:2, attn_map_idx:attn_map_idx+1]
-                        attention_map = F.interpolate(attention_map, size=(h, w), mode='bilinear', align_corners=True)[0].permute(1, 2, 0).byte().numpy()
-                        attention_map = cv2.applyColorMap(attention_map, cv2.COLORMAP_JET)
-                    else:
-                        attention_map = np.zeros_like(attention_map)
-                        img = np.zeros_like(img)
+                            attention_map = attention_volume[layer:layer+1, attn_map_idx:attn_map_idx+1]
+                            attention_map = F.interpolate(attention_map, size=(h, w), mode='bilinear', align_corners=True)[0].permute(1, 2, 0).byte().numpy()
+                            attention_map = cv2.applyColorMap(attention_map, cv2.COLORMAP_JET)
+                        else:
+                            attention_map = np.zeros_like(attention_map)
+                            img = np.zeros_like(img)
 
-                    channel_count += 1
+                        channel_count += 1
 
-                    img_row.append(cv2.addWeighted(img, 0.7, attention_map, 0.3, 0))
-                imgs.append(np.concatenate(img_row, 1))
-            imgs = np.concatenate(imgs, 0)
+                        img_row.append(cv2.addWeighted(img, 0.7, attention_map, 0.3, 0))
+                    imgs.append(np.concatenate(img_row, 1))
+                imgs = np.concatenate(imgs, 0)
 
-            cv2.imwrite(path.join(root, f"context_volumes/visualization/{batch:02}/{frame_idx:05}.png"), imgs)
+                cv2.imwrite(path.join(root, f"context_volumes/visualization/layer_{layer:02}/{batch:02}/{frame_idx:05}.png"), imgs)
 
 
 
