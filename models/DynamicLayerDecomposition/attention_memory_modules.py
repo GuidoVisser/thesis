@@ -227,7 +227,7 @@ class MemoryReader(nn.Module):
 
         self.query_encoders = nn.ModuleList([KeyValueEncoder(keydim, valdim, create_backbone(backbone_weights, with_masks=False))]*num_layers)
         if experiment_config in [4, 5, 6]:
-            self.decoders       = nn.ModuleList([ContextDecoder(valdim, out_channels=8)]*num_layers)
+            self.decoders = nn.ModuleList([ContextDecoder(valdim, out_channels=8)]*num_layers)
 
         self.experiment_config = experiment_config
         self.num_layers = num_layers

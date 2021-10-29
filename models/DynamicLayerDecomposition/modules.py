@@ -178,6 +178,8 @@ class LayerDecompositionUNet(nn.Module):
         layers_rgba = []
         layers_flow = []
 
+        context_volumes = []
+
         # For temporal consistency
         layers_alpha_warped = []
         composite_warped = None
@@ -197,6 +199,7 @@ class LayerDecompositionUNet(nn.Module):
                 context_idx = 0
             
             context_volume = self.memory_reader(rgb, context_idx, self.contexts[context_idx])
+            context_volumes.append(context_volume)
 
             if self.experiment_config in [4, 5]:
                 layer_input[:, -8:] = context_volume
@@ -253,6 +256,9 @@ class LayerDecompositionUNet(nn.Module):
             # map back to [-1, 1]
             composite_rgba = composite_rgba * 2 - 1
 
+        # stack contexts in layer dimension
+        context_volumes = torch.stack(context_volumes, 1)
+
         # stack in time dimension
         composite_rgba      = torch.stack((composite_rgba[:batch_size], composite_rgba[batch_size:]), 1)
         composite_flow      = torch.stack((composite_flow[:batch_size], composite_flow[batch_size:]), 1)
@@ -263,7 +269,7 @@ class LayerDecompositionUNet(nn.Module):
         layers_alpha_warped = torch.stack(layers_alpha_warped, 1)
         brightness_scale    = torch.stack((brightness_scale[:batch_size], brightness_scale[batch_size:]), 1)
         background_offset   = torch.stack((background_offset[:batch_size], background_offset[batch_size:]), 1)
-
+        context_volumes     = torch.stack((context_volumes[:batch_size], context_volumes[batch_size:]), 1)
 
         out = {
             "rgba_reconstruction": composite_rgba,          # [B, 2, 4, H, W]
@@ -273,7 +279,8 @@ class LayerDecompositionUNet(nn.Module):
             "layers_flow": layers_flow,                     # [B, 2, L, 2, H, W]
             "layers_alpha_warped": layers_alpha_warped,     # [B, L, 1, H, W]
             "brightness_scale": brightness_scale,           # [B, 2, 1, H, W]
-            "background_offset": background_offset          # [B, 2, 2, H, W]
+            "background_offset": background_offset,         # [B, 2, 2, H, W]
+            "context_volumes": context_volumes              # [B, 2, L, Cv, H//16, W//16]
         }
         return out
 

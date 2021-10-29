@@ -131,6 +131,8 @@ class LayerDecompositer(nn.Module):
 
         gt_rgb = targets["rgb"]
 
+        context_volumes = model_output["context_volumes"]
+
         # NOTE: current_batch_size is not necessarily the same as self.batch_size at the end of an epoch
         current_batch_size, _, n_layers, _, _, _ = rgba_layers.shape 
 
@@ -163,9 +165,9 @@ class LayerDecompositer(nn.Module):
 
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_offset/{img_name}"), flow_to_image(background_offset_img, convert_to_bgr=True))
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/brightness_scale/{img_name}"), brightness_scale_img)
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
 
+                # save context volumes
+                torch.save(context_volumes[b, t].detach().cpu(), path.join(self.save_dir, f"{epoch_name}/context_volumes/{path.splitext(img_name)[0]}.pth"))
 
                 for l in range(1, n_layers):
                     create_dirs(path.join(self.save_dir, f"{epoch_name}/foreground/{l:02}"),
@@ -193,7 +195,8 @@ class LayerDecompositer(nn.Module):
                     path.join(self.save_dir, f"{epoch_name}/ground_truth"),
                     path.join(self.save_dir, f"{epoch_name}/flow"),
                     path.join(self.save_dir, f"{epoch_name}/background_offset"),
-                    path.join(self.save_dir, f"{epoch_name}/brightness_scale"))
+                    path.join(self.save_dir, f"{epoch_name}/brightness_scale"),
+                    path.join(self.save_dir, f"{epoch_name}/context_volumes"))
 
     def transfer_detail(self, reconstruction, rgba_layers, gt_image):
         residual = gt_image - reconstruction
