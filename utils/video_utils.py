@@ -80,7 +80,7 @@ def video_to_folder(video, dir_path, image_ext=".png"):
     save_path = os.path.join(dir_path, video)
     save_path = save_path.replace(" ", "_")
     if save_path[-4:] == ".mp4":
-        save_path = save_path[:-4] + "_720p"
+        save_path = save_path[:-4] + "_480p"
 
     if not os.path.exists(save_path):
         os.mkdir(save_path)
@@ -95,10 +95,9 @@ def video_to_folder(video, dir_path, image_ext=".png"):
     count = 0
     assert success, f"Could not read first frame of {video}"
     while success:
-        frame = cv2.resize(frame, (1280, 720), fx=0, fy=0, interpolation=cv2.INTER_CUBIC)
+        frame = cv2.resize(frame, (720, 480), fx=0, fy=0, interpolation=cv2.INTER_CUBIC)
         cv2.imwrite(os.path.join(save_path, f"{count:05d}{image_ext}"), frame)
         success, frame = vidcap.read()
-        print(f"read new frame : {success}")
         count += 1
     
     return

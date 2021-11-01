@@ -106,6 +106,7 @@ def main(args):
     model.run_training()
 
     # Set up for inference
+    print("Epoch: inference")
     input_processor.do_jitter = False
     
     model.decomposite()
