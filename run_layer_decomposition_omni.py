@@ -134,9 +134,11 @@ if __name__ == "__main__":
     training_param_args.add_argument("--memory_learning_rate", type=float, default=0.001, help="Learning rate for the memory encoder")
     training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
     training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
-    training_param_args.add_argument("--save_freq", type=int, default=100, help="Frequency at which the intermediate results are saved")
+    training_param_args.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
+    training_param_args.add_argument("--alpha_bootstr_thresh", type=float, default=5e-3, help="Threshold for the alpha bootstrap loss. If the loss comes under this the lambda is decreased")
+    training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
