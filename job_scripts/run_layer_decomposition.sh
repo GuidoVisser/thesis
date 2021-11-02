@@ -20,7 +20,7 @@ VIDEO="kruispunt_rijks"
 DATASET="Jaap_Jelle"
 MASK_PATH="00006.png"
 cp -RT $HOME/thesis/datasets/$DATASET/JPEGImages/480p/$VIDEO $TMPDIR/video
-cp -RT $HOME/thesis/datasets/$DATASET/Annotations/$VIDEO/combined/$MASK_PATH.png $TMPDIR/$MASK_PATH.png
+cp -RT $HOME/thesis/datasets/$DATASET/Annotations/$VIDEO/combined/$MASK_PATH $TMPDIR/$MASK_PATH
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
