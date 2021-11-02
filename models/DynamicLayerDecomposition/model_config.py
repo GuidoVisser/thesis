@@ -31,6 +31,15 @@ CONFIG = {
         'valdim':     512, 
         'mem_freq':   30, 
     },
+    "lambdas": {
+        "lambda_mask":          50.,
+        "lambda_recon_flow":    1.,
+        "lambda_recon_warp":    0.,
+        "lambda_alpha_warp":    0.005,
+        "lambda_alpha_l0":      0.005,
+        "lambda_alpha_l1":      0.01,
+        "lambda_stabilization": 0.001
+    },
     "pretrained_models" : {
         "propagation_model": "models/third_party/weights/propagation_model.pth",
         "flow_model": "models/third_party/weights/raft-things.pth"

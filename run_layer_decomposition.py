@@ -53,7 +53,16 @@ def main(args):
         shuffle=True
     )
 
-    loss_module = DecompositeLoss(args.alpha_bootstr_thresh)
+    loss_module = DecompositeLoss(
+        args.alpha_bootstr_thresh,
+        args.lambda_mask,
+        args.lambda_recon_flow,
+        args.lambda_recon_warp,
+        args.lambda_alpha_warp,
+        args.lambda_alpha_l0,
+        args.lambda_alpha_l1,
+        args.lambda_stabilization
+    )
 
     if isinstance(args.initial_mask, str):
         num_mem_nets = 2
@@ -118,7 +127,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
-    video = "scooter-black"
+    dataset = "Jaap_Jelle"
+    video = "kruispunt_rijks"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
@@ -149,6 +159,15 @@ if __name__ == "__main__":
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
     training_param_args.add_argument("--alpha_bootstr_thresh", type=float, default=5e-3, help="Threshold for the alpha bootstrap loss. If the loss comes under this the lambda is decreased")
     training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
+
+    lambdas = parser.add_argument_group("lambdas")
+    lambdas.add_argument("--lambda_mask", type=float, default=50., help="starting value for the lambda of the alpha_mask_bootstrap loss")
+    lambdas.add_argument("--lambda_recon_flow", type=float, default=1., help="lambda of the flow reconstruction loss")
+    lambdas.add_argument("--lambda_recon_warp", type=float, default=0., help="lambda of the warped rgb reconstruction loss")
+    lambdas.add_argument("--lambda_alpha_warp", type=float, default=0.005, help="lambda of the warped alpha estimation loss")
+    lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.005, help="lambda of the l0 part of the alpha regularization loss")
+    lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.01, help="lambda of the l1 part of the alpha regularization loss")
+    lambdas.add_argument("--lambda_stabilization", type=float, default=0.001, help="lambda of the camera stabilization loss")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
