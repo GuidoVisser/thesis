@@ -52,9 +52,9 @@ class InputProcessor(object):
 
         self.frame_iterator     = FrameIterator(self.img_dir, frame_size, device=self.device)
         self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
-        self.homography_handler = HomographyHandler(out_root, self.img_dir, mask_dir, self.device, frame_size)
+        self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device)
+        self.homography_handler = HomographyHandler(out_root, self.img_dir, path.join(flow_dir, "dynamics_mask"), self.device, frame_size)
         self.background_volume  = BackgroundVolume(background_dir, in_channels=in_channels, frame_size=frame_size)       
-        self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, self.homography_handler, flow_dir, raft_weights=flow_model, device=self.device)
 
         self.load_composite_order(composite_order_fp)
         
@@ -85,8 +85,8 @@ class InputProcessor(object):
         masks = torch.cat((torch.zeros_like(masks[:, 0:1]), masks), dim=1)
 
         # Get flow input and confidence
-        flow_t0, flow_conf_t0, object_flow_t0 = self.flow_handler[idx]
-        flow_t1, flow_conf_t1, object_flow_t1 = self.flow_handler[idx + 1]
+        flow_t0, flow_conf_t0, object_flow_t0, dynamics_t0 = self.flow_handler[idx]
+        flow_t1, flow_conf_t1, object_flow_t1, dynamics_t1 = self.flow_handler[idx + 1]
 
         background_flow_t0 = self.homography_handler.frame_homography_to_flow(idx)
         background_flow_t1 = self.homography_handler.frame_homography_to_flow(idx +1)

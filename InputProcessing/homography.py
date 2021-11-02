@@ -26,6 +26,7 @@ class HomographyHandler(object):
         self.mask_dirs = [path.join(mask_dir, dir) 
                                for dir 
                                in sorted(listdir(mask_dir))]
+        self.mask_dir = mask_dir
 
         self.frame_sequence = [path.join(image_dir, frame) 
                                for frame 
@@ -328,31 +329,39 @@ class HomographyHandler(object):
             masks (list): list of combined masks
         """
 
-        n_masks = len(listdir(self.mask_dirs[0]))//self.interval
-        masks   = self._initialize_masks(n_masks, (self.frame_size[1], self.frame_size[0]))
-        for dir in self.mask_dirs:
 
-            mask_paths = [path.join(dir, mask) for mask in sorted(listdir(dir))]
-            for i, mask_path in enumerate(mask_paths):
+        masks = []
+        for idx, mask_path in enumerate(sorted(listdir(self.mask_dir))):
+            if idx % self.interval == 0:
+                masks.append(cv2.imread(path.join(self.mask_dir, mask_path), cv2.IMREAD_GRAYSCALE) / 255.)
 
-                # skip iteration if it is not a valid iteration according to the interval
-                if i % self.interval != 0:
-                    continue
 
-                mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
-                # resize mask
-                # w, h         = mask.shape[1], mask.shape[0]
-                # w_new, h_new = process_resize(w, h, self.frame_size)
-                # mask         = cv2.resize(mask, (w_new, h_new))
+
+        # masks   = self._initialize_masks(n_masks, (self.frame_size[1], self.frame_size[0]))
+        # for dir in self.mask_dirs:
+
+        #     mask_paths = [path.join(dir, mask) for mask in sorted(listdir(dir))]
+        #     for i, mask_path in enumerate(mask_paths):
+
+        #         # skip iteration if it is not a valid iteration according to the interval
+        #         if i % self.interval != 0:
+        #             continue
+
+        #         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+
+        #         # resize mask
+        #         # w, h         = mask.shape[1], mask.shape[0]
+        #         # w_new, h_new = process_resize(w, h, self.frame_size)
+        #         # mask         = cv2.resize(mask, (w_new, h_new))
                 
-                # ensure that mask is binary
-                _, mask = cv2.threshold(mask, binary_threshold, 1, cv2.THRESH_BINARY)
+        #         # ensure that mask is binary
+        #         _, mask = cv2.threshold(mask, binary_threshold, 1, cv2.THRESH_BINARY)
 
-                masks[i//self.interval] = np.add(masks[i//self.interval], mask)
+        #         masks[i//self.interval] = np.add(masks[i//self.interval], mask)
 
-        for mask in masks:
-            np.minimum(mask, np.ones(mask.shape), mask)
+        # for mask in masks:
+        #     np.minimum(mask, np.ones(mask.shape), mask)
 
         return masks
 

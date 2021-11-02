@@ -12,12 +12,15 @@ def remove_foreground_features(coords: list, masks: list) -> list:
         adjusted_coords (list): the same list of coordinate pairs as the input, with the foreground features removed
     """
 
-    assert len(coords) == len(masks) - 1, f"Should get N-1 coords for N masks. Got {len(coords)} coords and {len(masks)} masks"
+    assert len(coords) == len(masks), f"Should get N-1 coords for N masks. Got {len(coords)} coords and {len(masks)} masks"
 
     adjusted_coords = []
     for i in range(len(coords)):
         coords0, coords1 = coords[i]
-        mask0, mask1     = masks[i], masks[i+1]
+        if i != len(coords)-1:
+            mask0, mask1 = masks[i], masks[i+1]
+        else:
+            mask0, mask1 = masks[i], masks[i]
 
         adjusted_coords0, adjusted_coords1 = [], []
         for j in range(len(coords0)):

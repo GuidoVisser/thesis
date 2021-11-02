@@ -21,7 +21,6 @@ class FlowHandler(object):
     def __init__(self, 
                  frame_iterator: FrameIterator, 
                  mask_iterator: MaskHandler,
-                 homography_handler: HomographyHandler,
                  output_dir: str,
                  raft_weights: str,
                  iters: int = 12,
@@ -36,18 +35,18 @@ class FlowHandler(object):
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
         self.raft = self.initialize_raft(raft_weights)
-        self.aligned = aligned
+        # self.aligned = aligned
 
         self.output_dir= output_dir
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
                     path.join(self.output_dir, "forward", "png"),
                     path.join(self.output_dir, "backward", "flow"),
                     path.join(self.output_dir, "backward", "png"),
-                    path.join(self.output_dir, "confidence"))
+                    path.join(self.output_dir, "confidence"),
+                    path.join(self.output_dir, "dynamics_mask"))
 
         self.frame_iterator     = frame_iterator
         self.mask_iterator      = mask_iterator
-        self.homography_handler = homography_handler
         self.padder             = InputPadder(self.frame_iterator.frame_size)
 
         if not path.exists(path.join(self.output_dir, f"forward/flow/00000.flo")):
@@ -69,13 +68,17 @@ class FlowHandler(object):
         frame_path = path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo")
         flow = torch.from_numpy(readFlow(frame_path)).permute(2, 0, 1)
         conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
+        dynamics_mask = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"dynamics_mask/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
+
+        background_mask = 1 - torch.minimum(torch.sum(object_masks, dim=0), torch.ones(object_masks.shape[1:]))
+        dynamics_mask = background_mask * dynamics_mask
 
         conf = torch.stack([conf]*N_objects, dim=0) * object_masks
 
         # get flow of objects and background
         object_flow = self.get_object_flow(flow, object_masks)
 
-        return flow, conf, object_flow
+        return flow, conf, object_flow, dynamics_mask
         
     @torch.no_grad()
     def calculate_full_video_flow(self):
@@ -89,9 +92,9 @@ class FlowHandler(object):
 
             h, w, _ = image0.shape
 
-            if self.aligned:
-                # Align the frames using the pre-calculated homography
-                image1, image0 = self.homography_handler.align_frames([image0, image1], indices=[frame_idx, frame_idx + 1])
+            # if self.aligned:
+            #     # Align the frames using the pre-calculated homography
+            #     image1, image0 = self.homography_handler.align_frames([image0, image1], indices=[frame_idx, frame_idx + 1])
 
             # Prepare images for use with RAFT
             image0 = self.prepare_image_for_raft(image0)
@@ -116,18 +119,26 @@ class FlowHandler(object):
             forward_flow = padder.unpad(forward_flow)
             conf         = padder.unpad(conf)
 
-            if self.aligned:
-                t = [-self.homography_handler.xmin, 
-                     -self.homography_handler.ymin]
+            # Construct dynamics mask for the scene
+            flow_magnitude = torch.sqrt(torch.square(forward_flow[0]) + torch.square(forward_flow[1]))
+            flow_magnitude = flow_magnitude / torch.max(flow_magnitude)
 
-                forward_flow = forward_flow[:, t[1]:h+t[1], t[0]:w+t[0]]
-                conf         = conf[t[1]:h+t[1], t[0]:w+t[0]]
+            dynamics_mask = torch.where(flow_magnitude > torch.mean(flow_magnitude), torch.ones_like(flow_magnitude), torch.zeros_like(flow_magnitude))
+
+            # if self.aligned:
+            #     t = [-self.homography_handler.xmin, 
+            #          -self.homography_handler.ymin]
+
+            #     forward_flow = forward_flow[:, t[1]:h+t[1], t[0]:w+t[0]]
+            #     conf         = conf[t[1]:h+t[1], t[0]:w+t[0]]
 
             forward_flow = forward_flow.permute(1, 2, 0).cpu().numpy()
             conf         = conf.cpu().numpy()
+            dynamics_mask = torch.stack([dynamics_mask * 255]*3, dim=2).byte().cpu().numpy()
             writeFlow(path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo"), forward_flow)
             cv2.imwrite(path.join(self.output_dir, f"forward/png/{frame_idx:05}.png"), flow_to_image(forward_flow))
             cv2.imwrite(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), np.expand_dims(conf, 2) * 255)
+            cv2.imwrite(path.join(self.output_dir, f"dynamics_mask/{frame_idx:05}.png"), dynamics_mask)
             
     def get_confidence(self, image0, image1, forward, backward):
         """
