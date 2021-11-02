@@ -40,7 +40,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --n_epochs 2001 \
             --save_freq 500 \
             --mem_freq 2 \
-            --alpha_bootstr_thresh 5e-5 \
+            --alpha_bootstr_thresh 5e-4 \
             --experiment_config 2 \
             --lambda_alpha_l0 0.05 \
             --lambda_alpha_l1 0.1 \
