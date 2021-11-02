@@ -16,9 +16,11 @@ module load Python
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO="scooter-black"
-cp -RT $HOME/thesis/datasets/DAVIS_minisample/JPEGImages/480p/$VIDEO $TMPDIR/video
-cp -RT $HOME/thesis/datasets/DAVIS_minisample/Annotations/480p/$VIDEO/00000.png $TMPDIR/00000.png
+VIDEO="kruispunt_rijks"
+DATASET="Jaap_Jelle"
+MASK_PATH="00006.png"
+cp -RT $HOME/thesis/datasets/$DATASET/JPEGImages/480p/$VIDEO $TMPDIR/video
+cp -RT $HOME/thesis/datasets/$DATASET/Annotations/$VIDEO/combined/$MASK_PATH.png $TMPDIR/$MASK_PATH.png
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -30,7 +32,7 @@ mkdir $TMPDIR/output_dir
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
             --img_dir $TMPDIR/video \
-            --initial_mask $TMPDIR/00000.png \
+            --initial_mask $TMPDIR/$MASK_PATH \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
@@ -39,8 +41,10 @@ python $HOME/thesis/run_layer_decomposition.py \
             --save_freq 500 \
             --mem_freq 2 \
             --alpha_bootstr_thresh 5e-5 \
-            --experiment_config 3 \
-            --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. alpha_bootstrap_threshold is set low. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension. \n    Experiment 2: Only the background layer has a context module. A 1x1 convolutional kernel is used to downsample the number of channels before the decoder.'
+            --experiment_config 2 \
+            --lambda_alpha_l0 0.05 \
+            --lambda_alpha_l1 0.1 \
+            --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension.'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
