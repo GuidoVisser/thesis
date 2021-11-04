@@ -54,7 +54,7 @@ class LayerDecompositer(nn.Module):
             if epoch == self.mask_bootstrap_rolloff:
                 self.loss_module.lambda_mask_bootstrap = 0
 
-            if torch.cuda.device_count() <= 1:
+            if torch.cuda.device_count() <= 10:
                 print(f"Epoch: {epoch} / {self.n_epochs - 1}")
             
             for iteration, (input, targets) in enumerate(self.dataloader):
