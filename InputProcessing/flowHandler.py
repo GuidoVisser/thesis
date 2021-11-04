@@ -70,8 +70,8 @@ class FlowHandler(object):
         conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
         dynamics_mask = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"dynamics_mask/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
 
-        background_mask = 1 - torch.minimum(torch.sum(object_masks, dim=0), torch.ones(object_masks.shape[1:]))
-        dynamics_mask = background_mask * dynamics_mask
+        # background_mask = 1 - torch.minimum(torch.sum(object_masks, dim=0), torch.ones(object_masks.shape[1:]))
+        # dynamics_mask = background_mask * dynamics_mask
 
         conf = torch.stack([conf]*N_objects, dim=0) * object_masks
 

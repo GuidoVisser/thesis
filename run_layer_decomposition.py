@@ -1,33 +1,19 @@
 from argparse import ArgumentParser
-from datetime import datetime
-from numpy.random import shuffle
 from torch.utils.data import DataLoader
 import torch
 import numpy as np
 from os import path
-from torch.nn.parallel import DistributedDataParallel, DataParallel
+from torch.nn.parallel import DataParallel
 from torch.utils.tensorboard import SummaryWriter
 
 from InputProcessing.inputProcessor import InputProcessor
-from models.DynamicLayerDecomposition.attention_memory_modules import AttentionMemoryNetwork, MemoryReader
 from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
 from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss
-from models.DynamicLayerDecomposition.modules import LayerDecompositionUNet
+from models.DynamicLayerDecomposition.modules import LayerDecompositionAttentionMemoryNet
 
-from utils.distributed_training import setup, cleanup, spawn_multiprocessor
 from utils.demo import create_decomposite_demo
 from utils.utils import create_dir
 from models.DynamicLayerDecomposition.model_config import CONFIG, update_config, save_config 
-
-def distributed_training(rank, n_gpus, model):
-    setup(rank, n_gpus)
-
-    model.net = model.net.to(rank)                
-    model.net = DistributedDataParallel(model.net, device_ids=[rank])
-
-    model.train(rank)
-
-    cleanup()
 
 
 def main(args):
@@ -65,24 +51,7 @@ def main(args):
         args.lambda_stabilization
     )
 
-    attention_memory = DataParallel(AttentionMemoryNetwork(
-        args.in_channels,
-        args.conv_channels,
-        args.keydim,
-        args.valdim,
-        input_processor,
-    )).to(args.device)
-
-
-    memory_reader = MemoryReader(
-        args.in_channels,
-        args.conv_channels,
-        args.keydim,
-        args.valdim
-    )
-
-    network = DataParallel(LayerDecompositionUNet(
-        memory_reader,
+    network = DataParallel(LayerDecompositionAttentionMemoryNet(
         in_channels=args.in_channels,
         conv_channels=args.conv_channels,
         do_adjustment=True, 
@@ -94,10 +63,8 @@ def main(args):
         data_loader, 
         loss_module, 
         network, 
-        attention_memory,
         writer,
         args.learning_rate, 
-        args.memory_learning_rate, 
         args.alpha_bootstr_rolloff,
         args.alpha_loss_l1_rolloff,
         results_root=args.out_dir, 
@@ -145,7 +112,6 @@ if __name__ == "__main__":
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
-    training_param_args.add_argument("--memory_learning_rate", type=float, default=0.001, help="Learning rate for the memory encoder")
     training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
     training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=20, help="Frequency at which the intermediate results are saved")

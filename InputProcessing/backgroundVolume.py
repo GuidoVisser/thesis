@@ -26,9 +26,9 @@ class BackgroundVolume(object):
         self.spatial_noise = torch.randn(in_channels - 3, frame_size[1] // 16, frame_size[0] // 16)
         self.spatial_noise_upsampled = F.interpolate(self.spatial_noise.unsqueeze(0), (frame_size[1], frame_size[0]), mode='bilinear')[0]
 
-        spatiotemporal_noise = torch.randn(in_channels - 1, ceil(num_frames/temporal_coarseness), frame_size[1] // 16, frame_size[0] // 16)
-        spatiotemporal_noise = F.interpolate(spatiotemporal_noise.unsqueeze(0), (num_frames, frame_size[1], frame_size[0]), mode='trilinear')[0]
-        self.spatiotemporal_noise = torch.cat((self.spatial_noise_upsampled[0:1].repeat(1, num_frames, 1, 1), spatiotemporal_noise))
+        spatiotemporal_noise = torch.randn(in_channels // 2, ceil(num_frames/temporal_coarseness), frame_size[1] // 16, frame_size[0] // 16)
+        spatiotemporal_noise = F.interpolate(spatiotemporal_noise.unsqueeze(0), (num_frames, frame_size[1], frame_size[0]), mode='trilinear')[0].permute(1, 0, 2, 3)
+        self.spatiotemporal_noise = torch.cat((self.spatial_noise_upsampled[:ceil(in_channels/2)-3].unsqueeze(0).repeat(num_frames, 1, 1, 1), spatiotemporal_noise), dim=1)
 
         torch.save(self.spatial_noise, path.join(save_dir, "spatial_noise.pth"))
         torch.save(self.spatial_noise_upsampled, path.join(save_dir, "spatial_noise_upsampled.pth"))

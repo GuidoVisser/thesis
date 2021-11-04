@@ -17,10 +17,8 @@ class LayerDecompositer(nn.Module):
                  dataloader: DataLoader,
                  loss_module: nn.Module,
                  network: nn.Module,
-                 memory_net: nn.Module,
                  summary_writer: SummaryWriter,
                  learning_rate: float,
-                 mem_learning_rate: float,
                  mask_bootstrap_rolloff: int,
                  mask_loss_l1_rolloff: int,
                  results_root: str,
@@ -32,9 +30,8 @@ class LayerDecompositer(nn.Module):
         self.dataloader = dataloader
         self.loss_module = loss_module
         self.net = network
-        self.memory_net = memory_net
         self.learning_rate = learning_rate
-        self.mem_learning_rate = mem_learning_rate
+        self.optimizer = Adam(self.net.parameters(), self.learning_rate)
 
         self.results_root = results_root
         self.save_dir = f"{results_root}/decomposition"
@@ -47,9 +44,6 @@ class LayerDecompositer(nn.Module):
 
     def run_training(self):
         
-        self.optimizer = Adam(self.net.parameters(), self.learning_rate)
-        self.memory_optimizer = Adam(self.memory_net.parameters(), self.mem_learning_rate)
-
         for epoch in range(self.n_epochs):
             
             if epoch % self.save_freq == 0:
@@ -60,14 +54,6 @@ class LayerDecompositer(nn.Module):
 
             if epoch == self.mask_bootstrap_rolloff:
                 self.loss_module.lambda_mask_bootstrap = 0
-                self.net.module.use_context = True
-
-            jitter_params = self.dataloader.dataset.prepare_jitter_parameters()
-
-            if self.net.module.use_context:
-                self.memory_optimizer.zero_grad()
-                self.memory_net.module.set_global_contexts(jitter_params)
-                self.net.module.contexts = self.memory_net.module.global_context
 
             if torch.cuda.device_count() <= 1:
                 print(f"Epoch: {epoch} / {self.n_epochs - 1}")
@@ -85,27 +71,19 @@ class LayerDecompositer(nn.Module):
                 global_step = iteration + epoch*len(self.dataloader)
                 self.writer.add_scalars("losses", loss_values, global_step=global_step)
 
-                loss.backward(retain_graph=(iteration < len(self.dataloader) - 1))
+                loss.backward()
                 self.optimizer.step()
 
                 if epoch % self.save_freq == 0:
                     frame_indices = input["index"][:, 0].tolist()
                     self.visualize_and_save_output(output, targets, frame_indices, epoch)
 
-            self.memory_optimizer.step()
-
         torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
-        torch.save(self.memory_net.state_dict(), path.join(self.results_root, "memory_weights.pth"))
 
     @torch.no_grad()
     def decomposite(self):
 
         self.create_save_dirs("inference")
-
-        jitter_params = self.dataloader.dataset.prepare_jitter_parameters()
-
-        self.memory_net.module.set_global_contexts(jitter_params)
-        self.net.module.contexts = self.memory_net.module.global_context
 
         for (input, targets) in self.dataloader:
 
@@ -140,8 +118,6 @@ class LayerDecompositer(nn.Module):
 
         gt_rgb = targets["rgb"]
 
-        context_volumes = model_output["context_volumes"]
-
         # NOTE: current_batch_size is not necessarily the same as self.batch_size at the end of an epoch
         current_batch_size, _, n_layers, _, _, _ = rgba_layers.shape 
 
@@ -155,13 +131,19 @@ class LayerDecompositer(nn.Module):
             for t in timesteps:
 
                 # background
-                background_rgb     = torch.clone(rgba_layers[b, t, 0, :3]).detach()
+                background_rgb_static    = torch.clone(rgba_layers[b, t, 0, :3]).detach()
+                background_rgb_dynamic   = torch.clone(rgba_layers[b, t, 1, :3]).detach()
+                background_alpha_dynamic = torch.clone(rgba_layers[b, t, 1, 3:]).detach()
+
+                background_rgb = (1 - background_alpha_dynamic) * background_rgb_static + background_alpha_dynamic * background_rgb_dynamic
+
                 reconstruction_rgb = torch.clone(reconstruction[b, t, :3]).detach()
                 gt_rgb_batch       = gt_rgb[b, t]
 
-                background_img     = cv2.cvtColor((background_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
-                reconstruction_img = cv2.cvtColor((reconstruction_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
-                gt_rgb_img         = cv2.cvtColor((gt_rgb_batch.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
+                background_img        = cv2.cvtColor((background_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
+                background_img_static = cv2.cvtColor((background_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
+                reconstruction_img    = cv2.cvtColor((reconstruction_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
+                gt_rgb_img            = cv2.cvtColor((gt_rgb_batch.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
 
                 background_offset_img = torch.clone(background_offset[b, t]).detach().cpu().permute(1, 2, 0).numpy()
                 brightness_scale_img  = (torch.clone(brightness_scale[b, t]).detach().permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255
@@ -169,15 +151,12 @@ class LayerDecompositer(nn.Module):
                 img_name = f"{(frame_indices[b] + t):05}.png"
                 epoch_name = f"{epoch:03}" if isinstance(epoch, int) else epoch
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background/{img_name}"), background_img)
+                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_static/{img_name}"), background_img_static)
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/reconstruction/{img_name}"), reconstruction_img)
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/ground_truth/{img_name}"), gt_rgb_img)
 
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_offset/{img_name}"), flow_to_image(background_offset_img, convert_to_bgr=True))
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/brightness_scale/{img_name}"), brightness_scale_img)
-
-                # save context volumes
-                if isinstance(context_volumes, torch.Tensor):
-                    torch.save(context_volumes[b, t].detach().cpu(), path.join(self.save_dir, f"{epoch_name}/context_volumes/raw/{path.splitext(img_name)[0]}.pth"))
 
                 for l in range(1, n_layers):
                     create_dirs(path.join(self.save_dir, f"{epoch_name}/foreground/{l:02}"),
@@ -198,15 +177,15 @@ class LayerDecompositer(nn.Module):
     def create_save_dirs(self, epoch):
 
         epoch_name = f"{epoch:03}" if isinstance(epoch, int) else epoch
-        create_dirs(path.join(self.save_dir, f"{epoch_name}/background"), 
+        create_dirs(path.join(self.save_dir, f"{epoch_name}/background"),
+                    path.join(self.save_dir, f"{epoch_name}/background_static"), 
                     path.join(self.save_dir, f"{epoch_name}/foreground"),
                     path.join(self.save_dir, f"{epoch_name}/alpha"),
                     path.join(self.save_dir, f"{epoch_name}/reconstruction"),
                     path.join(self.save_dir, f"{epoch_name}/ground_truth"),
                     path.join(self.save_dir, f"{epoch_name}/flow"),
                     path.join(self.save_dir, f"{epoch_name}/background_offset"),
-                    path.join(self.save_dir, f"{epoch_name}/brightness_scale"),
-                    path.join(self.save_dir, f"{epoch_name}/context_volumes/raw"))
+                    path.join(self.save_dir, f"{epoch_name}/brightness_scale"))
 
     def transfer_detail(self, reconstruction, rgba_layers, gt_image):
         residual = gt_image - reconstruction

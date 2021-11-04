@@ -43,6 +43,8 @@ class InputProcessor(object):
         else:
             self.N_objects = len(initial_mask)
 
+        self.N_layers = self.N_objects + 2
+
         self.img_dir   = path.join(out_root, "images")
         mask_dir       = path.join(out_root, "masks")
         flow_dir       = path.join(out_root, "flow")
@@ -79,11 +81,8 @@ class InputProcessor(object):
         # Get mask input
         masks_t0, binary_masks_t0 = self.mask_handler[idx]
         masks_t1, binary_masks_t1 = self.mask_handler[idx + 1]
-        masks                     = torch.stack((masks_t0, masks_t1))               # [T, L-1, C, H, W] = [2, L-1, 1, H, W]
-        binary_masks              = torch.stack((binary_masks_t0, binary_masks_t1)) # [T, L-1, C, H, W] = [2, L-1, 1, H, W]
-
-        # add background layer in masks
-        masks = torch.cat((torch.zeros_like(masks[:, 0:1]), masks), dim=1)
+        masks                     = torch.stack((masks_t0, masks_t1))               # [T, L-2, C, H, W] = [2, L-2, 1, H, W]
+        binary_masks              = torch.stack((binary_masks_t0, binary_masks_t1)) # [T, L-2, C, H, W] = [2, L-2, 1, H, W]
 
         # Get flow input and confidence
         flow_t0, flow_conf_t0, object_flow_t0, dynamics_t0 = self.flow_handler[idx]
@@ -92,38 +91,46 @@ class InputProcessor(object):
         background_flow_t0 = self.homography_handler.frame_homography_to_flow(idx)
         background_flow_t1 = self.homography_handler.frame_homography_to_flow(idx +1)
         
-        flow            = torch.stack((flow_t0, flow_t1))                       # [T, C, H, W]      = [2, 2, H, W]
-        flow_conf       = torch.stack((flow_conf_t0, flow_conf_t1))             # [T, L-1, H, W]    = [2, L-1, H, W]
-        object_flow     = torch.stack((object_flow_t0, object_flow_t1))         # [T, L-1, C, H, W] = [2, L-1, 2, H, W]
-        background_flow = torch.stack((background_flow_t0, background_flow_t1)) # [T, C, H, W]      = [2, 2, H, W]
+        flow            = torch.stack((flow_t0, flow_t1))                       # [T,      C, H, W] 
+        flow_conf       = torch.stack((flow_conf_t0, flow_conf_t1))             # [T, L-2,    H, W] 
+        object_flow     = torch.stack((object_flow_t0, object_flow_t1))         # [T, L-2, C, H, W] 
+        background_flow = torch.stack((background_flow_t0, background_flow_t1)) # [T,      C, H, W] 
+        dynamics_mask   = torch.stack((dynamics_t0, dynamics_t1))               # [T,         H, W]    
         
+        # convert dynamics mask to trimap
+        dynamics_mask = dynamics_mask * 2 - 1
+
+        # Add background layers to masks
+        masks = torch.cat((torch.zeros_like(masks[:, 0:1]), dynamics_mask.unsqueeze(1).unsqueeze(1), masks), dim=1)
+
         # Get spatial noise input
-        background_noise = self.background_volume.spatial_noise_upsampled
-        background_noise = background_noise.unsqueeze(0).unsqueeze(0).repeat(2, 1, 1, 1, 1)
+        background_noise = self.background_volume.spatial_noise_upsampled                   #       [C-3, H, W]
+        background_noise = background_noise.unsqueeze(0).unsqueeze(0).repeat(2, 1, 1, 1, 1) # [T, 1, C-3, H, W]
 
         background_uv_map_t0 = self.homography_handler.get_frame_uv(idx)
         background_uv_map_t1 = self.homography_handler.get_frame_uv(idx + 1)
         background_uv_map    = torch.stack((background_uv_map_t0, background_uv_map_t1))
 
-        noise_t0 = F.grid_sample(self.background_volume.spatial_noise.unsqueeze(0), background_uv_map_t0.unsqueeze(0))[0]   
-        noise_t1 = F.grid_sample(self.background_volume.spatial_noise.unsqueeze(0), background_uv_map_t1.unsqueeze(0))[0]
-        noise    = torch.stack((noise_t0, noise_t1)).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
-
         # Get spatiotemporal noise input
-        attention_query_t0 = torch.cat((dynamics_t0.unsqueeze(0), self.background_volume.spatiotemporal_noise[1:, idx]))
-        attention_query_t1 = torch.cat((dynamics_t1.unsqueeze(0), self.background_volume.spatiotemporal_noise[1:, idx + 1]))
-        attention_query    = torch.stack((attention_query_t0, attention_query_t1))
+        spatiotemporal_noise    = self.background_volume.spatiotemporal_noise #    [Nf, C-3, H, W]
+        spatiotemporal_noise_t0 = F.grid_sample(spatiotemporal_noise[idx:idx+1],   background_uv_map_t0.unsqueeze(0)) #    [1, C-3, H, w]
+        spatiotemporal_noise_t1 = F.grid_sample(spatiotemporal_noise[idx+1:idx+2], background_uv_map_t0.unsqueeze(0)) #    [1, C-3, H, w]
+        spatiotemporal_noise_t  = torch.stack((spatiotemporal_noise_t0, spatiotemporal_noise_t1))                     # [T, 1, C-3, H, W]
 
         # Get model input
-        zeros = torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)
-        background_input = torch.cat((zeros, background_noise), dim=2)#.repeat(1, 2, 1, 1, 1)
-        pids = binary_masks * torch.Tensor(self.composite_order[idx]).view(1, -1, 1, 1, 1) # [T, L-2, 1, H, W] = [2, L-2, 1, H, W]
+        zeros = torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [T, 1, 3, H, W]
+        static_background_input  = torch.cat((zeros, background_noise), dim=2)                       # [T, 1, C, H, W]
+        dynamic_background_input = torch.cat((zeros, spatiotemporal_noise_t), dim=2)                 # [T, 1, C, H, W]
         
-        input_tensor = torch.cat((pids, object_flow, noise), dim=2)       # [T, L-2, C, H, W] = [2, L-1, 16, H, W]                             
-        input_tensor = torch.cat((background_input, input_tensor), dim=1) # [T, L,   C, H, W] = [2, L,   16, H, W]
+        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(1, self.N_layers - 2, 1, 1, 1)             # [T, L-2, 1, H, W] 
+        input_tensor = torch.cat((pids, object_flow, spatiotemporal_noise_t.repeat(1, self.N_layers - 2, 1, 1, 1)), dim=2)  # [T, L-2, C, H, W]
+        
+        input_tensor = torch.cat((static_background_input, dynamic_background_input, input_tensor), dim=1)                  # [T, L, C, H, W]
+
+        spatiotemporal_noise = torch.cat((torch.zeros_like(spatiotemporal_noise[:, :3]), spatiotemporal_noise), dim=1) # [Nf, C, H, W]
 
         # get parameters for jitter
-        params = self.jitter_parameters[idx]
+        params = self.get_jitter_parameters()
             
         # transform targets
         rgb       = self.apply_jitter_transform(rgb,       params)
@@ -134,7 +141,6 @@ class InputProcessor(object):
         # transform inputs
         input_tensor      = self.apply_jitter_transform(input_tensor,    params)
         background_flow   = self.apply_jitter_transform(background_flow, params)
-        attention_query   = self.apply_jitter_transform(attention_query, params)
         background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params)
         background_uv_map = background_uv_map.permute(0, 2, 3, 1)
 
@@ -162,28 +168,12 @@ class InputProcessor(object):
 
         model_input = {
             "input_tensor": input_tensor,
+            "spatiotemporal_noise": spatiotemporal_noise,
             "background_flow": background_flow,
             "background_uv_map": background_uv_map,
             "jitter_grid": jitter_grid,
             "index": torch.Tensor([idx, idx + 1]).long(),
-            "attention_query": attention_query
         }
-
-        # DEBUG
-        # data = {
-        #     "image": torch.cat((rgb[0], rgb[1])),
-        #     "input": torch.cat((input_tensor[0], input_tensor[1]), dim=1),
-        #     "bg_flow": torch.cat((background_flow[0], background_flow[1])),
-        #     "bg_warp": torch.cat((background_uv_map[0], background_uv_map[1]), dim=2).permute(2, 0, 1),
-        #     "mask": torch.cat((masks[0], masks[1])).squeeze(1),
-        #     "flow": torch.cat((flow[0], flow[1])),
-        #     "confidence": flow_conf.squeeze(1),
-        #     "jitter_grid": torch.cat((jitter_grid[0], jitter_grid[1])),
-        #     "image_path": path.join(self.img_dir, f"{idx:05}.png"),
-        #     "index": torch.Tensor([idx, idx + 1]).long(),
-        #     "jitter_true": (params["jitter size"][0] != params["crop size"][0]) and (params["jitter size"][1] != params["crop size"][1])
-        # }
-        # return data
 
         return model_input, targets
 
@@ -265,45 +255,48 @@ class InputProcessor(object):
         
         return data
 
-    def prepare_jitter_parameters(self):
+    def get_jitter_parameters(self):
         """
-        prepare the jitter parameters for the entire epoch
-        NOTE This is done because the parameters are necessary in the context module as well as for the reconstruction model
+        get random jitter parameters for the input.
         """
 
-        self.jitter_parameters = []
-        for _ in range(len(self) + 2):
+        width, height = self.frame_size
 
-            width, height = self.frame_size
+        if self.do_jitter:
 
-            if self.do_jitter:
-
-                # get scale
-                if np.random.uniform() > self.jitter_rate:
-                    scale = 1.
-                else:
-                    scale = np.random.uniform(1, 1.25)
-                
-                # construct jitter
-                jitter_size = (scale * np.array([height, width])).astype(np.int)
-                start_h = np.random.randint(jitter_size[0] - height + 1)
-                start_w = np.random.randint(jitter_size[1] - width  + 1)
+            # get scale
+            if np.random.uniform() > self.jitter_rate:
+                scale = 1.
             else:
-                jitter_size = np.array([height, width])
-                start_h = 0
-                start_w = 0
+                scale = np.random.uniform(1, 1.25)
+            
+            # construct jitter
+            jitter_size = (scale * np.array([height, width])).astype(np.int)
+            start_h = np.random.randint(jitter_size[0] - height + 1)
+            start_w = np.random.randint(jitter_size[1] - width  + 1)
+        else:
+            jitter_size = np.array([height, width])
+            start_h = 0
+            start_w = 0
 
-            crop_pos  = np.array([start_h, start_w])
-            crop_size = np.array([height,  width])
+        crop_pos  = np.array([start_h, start_w])
+        crop_size = np.array([height,  width])
 
-            params = {
+        params = {
+            "jitter size": jitter_size, 
                 "jitter size": jitter_size, 
+            "jitter size": jitter_size, 
+                "jitter size": jitter_size, 
+            "jitter size": jitter_size, 
+            "crop pos": crop_pos, 
                 "crop pos": crop_pos, 
-                "crop size": crop_size
-            }
-            self.jitter_parameters.append(params)
+            "crop pos": crop_pos, 
+                "crop pos": crop_pos, 
+            "crop pos": crop_pos, 
+            "crop size": crop_size
+        }
 
-        return self.jitter_parameters
+        return params
 
     def prepare_image_dir(self, video_dir, out_dir):
 
