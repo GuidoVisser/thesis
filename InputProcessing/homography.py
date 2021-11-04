@@ -1,14 +1,13 @@
 import torch
 import numpy as np
-import torch.nn.functional as F
 import cv2
 from os import path, listdir, remove
 from typing import Tuple, Union
 import imageio
 
-from models.third_party.SuperGlue.models.utils import process_resize, frame2tensor
+from models.third_party.SuperGlue.models.utils import frame2tensor
 
-from .utils.utils import get_translation_matrix, get_scale_matrix, homogeneous_2d_transform
+from .utils.utils import get_translation_matrix, homogeneous_2d_transform
 from .utils.feature_matching import extract_and_match_features, get_matching_coordinates, get_model_config
 from .utils.remove_foreground import remove_foreground_features
 
@@ -303,11 +302,6 @@ class HomographyHandler(object):
             # load frameremove_foreground_features
             frame = cv2.imread(frame_path)
 
-            # resize image
-            # w, h         = frame.shape[1], frame.shape[0]
-            # w_new, h_new = process_resize(w, h, self.frame_size)
-            # frame        = cv2.resize(frame, (w_new, h_new))
-            
             # convert to grayscale for SuperGlue
             frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype('float32')
 
@@ -334,34 +328,6 @@ class HomographyHandler(object):
         for idx, mask_path in enumerate(sorted(listdir(self.mask_dir))):
             if idx % self.interval == 0:
                 masks.append(cv2.imread(path.join(self.mask_dir, mask_path), cv2.IMREAD_GRAYSCALE) / 255.)
-
-
-
-
-        # masks   = self._initialize_masks(n_masks, (self.frame_size[1], self.frame_size[0]))
-        # for dir in self.mask_dirs:
-
-        #     mask_paths = [path.join(dir, mask) for mask in sorted(listdir(dir))]
-        #     for i, mask_path in enumerate(mask_paths):
-
-        #         # skip iteration if it is not a valid iteration according to the interval
-        #         if i % self.interval != 0:
-        #             continue
-
-        #         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-
-        #         # resize mask
-        #         # w, h         = mask.shape[1], mask.shape[0]
-        #         # w_new, h_new = process_resize(w, h, self.frame_size)
-        #         # mask         = cv2.resize(mask, (w_new, h_new))
-                
-        #         # ensure that mask is binary
-        #         _, mask = cv2.threshold(mask, binary_threshold, 1, cv2.THRESH_BINARY)
-
-        #         masks[i//self.interval] = np.add(masks[i//self.interval], mask)
-
-        # for mask in masks:
-        #     np.minimum(mask, np.ones(mask.shape), mask)
 
         return masks
 

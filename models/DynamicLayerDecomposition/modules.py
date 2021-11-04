@@ -1,13 +1,9 @@
-from typing import Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import cv2
 
-from math import ceil
 from InputProcessing.flowHandler import FlowHandler
-from InputProcessing.inputProcessor import InputProcessor
 
 class ConvBlock(nn.Module):
     """Helper module consisting of a convolution, optional normalization and activation, with padding='same'.

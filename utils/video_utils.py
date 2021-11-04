@@ -1,10 +1,9 @@
 import os
 import numpy as np
-import torch
 import cv2
 import json
 from PIL import Image
-from moviepy.editor import ImageSequenceClip, CompositeVideoClip, concatenate_videoclips, VideoFileClip
+from moviepy.editor import ImageSequenceClip, CompositeVideoClip, concatenate_videoclips
 
 from torchvision.transforms.functional import to_tensor
 from torchvision.utils import save_image

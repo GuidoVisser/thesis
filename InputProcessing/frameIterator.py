@@ -2,7 +2,6 @@ from os import path, listdir
 import cv2
 import torch
 import numpy as np
-from torchvision.transforms import functional as F
 
 class FrameIterator(object):
 

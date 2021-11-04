@@ -1,8 +1,7 @@
-from typing import Union
 import cv2
 import torch.nn as nn
 import torch
-from torch.utils.data import DataLoader, dataloader
+from torch.utils.data import DataLoader
 from torch.optim import Adam
 from os import path
 
