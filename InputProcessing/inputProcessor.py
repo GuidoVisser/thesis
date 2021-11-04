@@ -85,8 +85,8 @@ class InputProcessor(object):
         binary_masks              = torch.stack((binary_masks_t0, binary_masks_t1)) # [T, L-2, C, H, W] = [2, L-2, 1, H, W]
 
         # Get flow input and confidence
-        flow_t0, flow_conf_t0, object_flow_t0, dynamics_t0 = self.flow_handler[idx]
-        flow_t1, flow_conf_t1, object_flow_t1, dynamics_t1 = self.flow_handler[idx + 1]
+        flow_t0, flow_conf_t0, object_flow_t0, _ = self.flow_handler[idx]
+        flow_t1, flow_conf_t1, object_flow_t1, _ = self.flow_handler[idx + 1]
 
         background_flow_t0 = self.homography_handler.frame_homography_to_flow(idx)
         background_flow_t1 = self.homography_handler.frame_homography_to_flow(idx +1)
@@ -95,13 +95,10 @@ class InputProcessor(object):
         flow_conf       = torch.stack((flow_conf_t0, flow_conf_t1))             # [T, L-2,    H, W] 
         object_flow     = torch.stack((object_flow_t0, object_flow_t1))         # [T, L-2, C, H, W] 
         background_flow = torch.stack((background_flow_t0, background_flow_t1)) # [T,      C, H, W] 
-        dynamics_mask   = torch.stack((dynamics_t0, dynamics_t1))               # [T,         H, W]    
-        
-        # convert dynamics mask to trimap
-        dynamics_mask = dynamics_mask * 2 - 1
+        # dynamics_mask   = torch.stack((dynamics_t0, dynamics_t1))               # [T,         H, W]    
 
         # Add background layers to masks
-        masks = torch.cat((torch.zeros_like(masks[:, 0:1]), dynamics_mask.unsqueeze(1).unsqueeze(1), masks), dim=1)
+        masks = torch.cat((torch.zeros_like(masks[:, 0:2]), masks), dim=1)
 
         # Get spatial noise input
         background_noise = self.background_volume.spatial_noise_upsampled                   #       [C-3, H, W]

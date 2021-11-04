@@ -10,7 +10,6 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from utils.utils import create_dirs
 from models.third_party.RAFT.utils.flow_viz import flow_to_image
 
-
 class LayerDecompositer(nn.Module):
     def __init__(self,
                  dataloader: DataLoader,
@@ -134,6 +133,10 @@ class LayerDecompositer(nn.Module):
                 background_rgb_dynamic   = torch.clone(rgba_layers[b, t, 1, :3]).detach()
                 background_alpha_dynamic = torch.clone(rgba_layers[b, t, 1, 3:]).detach()
 
+                # Go from tripmap to binary mask
+                background_alpha_dynamic = background_alpha_dynamic + 1 / 2
+
+                # Get the full background
                 background_rgb = (1 - background_alpha_dynamic) * background_rgb_static + background_alpha_dynamic * background_rgb_dynamic
 
                 reconstruction_rgb = torch.clone(reconstruction[b, t, :3]).detach()

@@ -131,8 +131,8 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_recon_flow", type=float, default=1., help="lambda of the flow reconstruction loss")
     lambdas.add_argument("--lambda_recon_warp", type=float, default=0., help="lambda of the warped rgb reconstruction loss")
     lambdas.add_argument("--lambda_alpha_warp", type=float, default=0.005, help="lambda of the warped alpha estimation loss")
-    lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.005, help="lambda of the l0 part of the alpha regularization loss")
-    lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.01, help="lambda of the l1 part of the alpha regularization loss")
+    lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.015, help="lambda of the l0 part of the alpha regularization loss")
+    lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.03, help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization", type=float, default=0.001, help="lambda of the camera stabilization loss")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
