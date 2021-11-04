@@ -9,11 +9,12 @@
 DT=`date +"%m_%d_%H_%M_%S"`
 
 # load modules
-module load 2020
-module load Python
+module load 2021
+module load Python/3.9.5-GCCcore-10.3.0
 
 # instasll dependencies
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
+pip install tensorboard
 
 #Copy input file to scratch
 VIDEO="kruispunt_rijks"
