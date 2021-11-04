@@ -106,8 +106,8 @@ if __name__ == "__main__":
         help="Temporal coarseness of camera adjustment parameters")
 
     memory_network_args = parser.add_argument_group("memory_network")
-    memory_network_args.add_argument("--keydim", type=int, default=16, help="number of key channels in the attention memory network")
-    memory_network_args.add_argument("--valdim", type=int, default=32, help="number of value channels in the attention memory network")
+    memory_network_args.add_argument("--keydim", type=int, default=64, help="number of key channels in the attention memory network")
+    memory_network_args.add_argument("--valdim", type=int, default=128, help="number of value channels in the attention memory network")
     memory_network_args.add_argument("--mem_freq", type=int, default=9, help="specifies the interval between the frames that are added to the memory network")
 
     training_param_args = parser.add_argument_group("training_parameters")
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--alpha_loss_l1_rolloff", type=int, default=100, help="Number of epochs to use mask l1 regularization loss")
     training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
     training_param_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
-    training_param_args.add_argument("--conv_channels", type=int, default=32, help="base number of convolution channels in the convolutional neural networks")
+    training_param_args.add_argument("--conv_channels", type=int, default=64, help="base number of convolution channels in the convolutional neural networks")
     training_param_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
     training_param_args.add_argument("--shared_encoder", type=int, default=1, help="Specifies whether to use a shared memory/query encoder in the network")
 
