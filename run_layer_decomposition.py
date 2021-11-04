@@ -54,7 +54,6 @@ def main(args):
     )
 
     loss_module = DecompositeLoss(
-        args.alpha_bootstr_thresh,
         args.lambda_mask,
         args.lambda_recon_flow,
         args.lambda_recon_warp,
@@ -97,6 +96,8 @@ def main(args):
         writer,
         args.learning_rate, 
         args.memory_learning_rate, 
+        args.alpha_bootstr_rolloff,
+        args.alpha_loss_l1_rolloff,
         results_root=args.out_dir, 
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
@@ -148,7 +149,8 @@ if __name__ == "__main__":
     training_param_args.add_argument("--save_freq", type=int, default=20, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
-    training_param_args.add_argument("--alpha_bootstr_thresh", type=float, default=5e-4, help="Threshold for the alpha bootstrap loss. If the loss comes under this the lambda is decreased")
+    training_param_args.add_argument("--alpha_bootstr_rolloff", type=int, default=50, help="Number of epochs to use mask bootstrap loss")
+    training_param_args.add_argument("--alpha_loss_l1_rolloff", type=int, default=100, help="Number of epochs to use mask l1 regularization loss")
     training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
     training_param_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
     training_param_args.add_argument("--conv_channels", type=int, default=32, help="base number of convolution channels in the convolutional neural networks")

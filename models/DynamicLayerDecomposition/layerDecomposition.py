@@ -21,6 +21,8 @@ class LayerDecompositer(nn.Module):
                  summary_writer: SummaryWriter,
                  learning_rate: float,
                  mem_learning_rate: float,
+                 mask_bootstrap_rolloff: int,
+                 mask_loss_l1_rolloff: int,
                  results_root: str,
                  batch_size: int,
                  n_epochs: int,
@@ -39,7 +41,8 @@ class LayerDecompositer(nn.Module):
         self.n_epochs = n_epochs
         self.save_freq = save_freq
         self.batch_size = batch_size
-        self.mask_loss_l1_rolloff = 200
+        self.mask_bootstrap_rolloff = mask_bootstrap_rolloff
+        self.mask_loss_l1_rolloff = mask_loss_l1_rolloff
         self.writer = summary_writer
 
     def run_training(self):
@@ -55,7 +58,8 @@ class LayerDecompositer(nn.Module):
             if epoch == self.mask_loss_l1_rolloff:
                 self.loss_module.lambda_alpha_l1 = 0.
 
-            if self.loss_module.lambda_mask_bootstrap == 0:
+            if epoch == self.mask_bootstrap_rolloff:
+                self.loss_module.lambda_mask_bootstrap = 0
                 self.net.module.use_context = True
 
             jitter_params = self.dataloader.dataset.prepare_jitter_parameters()
@@ -88,6 +92,8 @@ class LayerDecompositer(nn.Module):
                     self.visualize_and_save_output(output, targets, frame_indices, epoch)
 
             self.memory_optimizer.step()
+            print(self.loss_module.lambda_mask_bootstrap)
+            print(self.loss_module.lambda_alpha_l1)
 
         torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
         torch.save(self.memory_net.state_dict(), path.join(self.results_root, "memory_weights.pth"))

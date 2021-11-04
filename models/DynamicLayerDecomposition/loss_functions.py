@@ -6,7 +6,6 @@ import torch.nn.functional as F
 class DecompositeLoss(nn.Module):
 
     def __init__(self,
-                 bootstrap_threshold: float,
                  lambda_mask: float = 50.,
                  lambda_recon_flow: float = 1.,
                  lambda_recon_warp: float = 0.,
@@ -26,8 +25,6 @@ class DecompositeLoss(nn.Module):
         self.lambda_recon_warp     = lambda_recon_warp
         self.lambda_alpha_warp     = lambda_alpha_warp
         self.lambda_stabilization  = lambda_stabilization
-
-        self.bootstrap_threshold = bootstrap_threshold
 
 
     def __call__(self, predictions: dict, targets: dict) -> torch.Tensor:
@@ -52,15 +49,6 @@ class DecompositeLoss(nn.Module):
         flow_reconstruction_loss = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
         mask_bootstrap_loss      = self.calculate_loss(alpha_layers, masks, mask_loss=True)
         alpha_reg_loss           = cal_alpha_reg(alpha_composite * 0.5 + 0.5, self.lambda_alpha_l1, self.lambda_alpha_l0)
-
-        # Turn off bootstrap loss when loss reaches threshold
-        if self.lambda_mask_bootstrap > 0:
-            if mask_bootstrap_loss < self.bootstrap_threshold:
-                if self.lambda_mask_bootstrap > 0.5:
-                    self.lambda_mask_bootstrap *= 0.1
-                else:
-                    self.lambda_mask_bootstrap = 0
-                print(f"Setting alpha bootstrap lambda to {self.lambda_mask_bootstrap}")
 
         ### Temporal consistency loss
 
