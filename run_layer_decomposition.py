@@ -56,7 +56,8 @@ def main(args):
         conv_channels=args.conv_channels,
         do_adjustment=True, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
-        coarseness=args.coarseness
+        coarseness=args.coarseness,
+        shared_encoder=True
     )).to(args.device)
 
     model = LayerDecompositer(
