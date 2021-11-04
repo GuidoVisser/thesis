@@ -33,18 +33,26 @@ def create_decomposite_demo(roots: Union[str, list], fps=10, end_pause=3):
         for j in range(end_pause):
             img_array[i+j+1] = np.concatenate((img_array[i+j+1], img), axis=1)
 
-        for object in sorted(listdir(path.join(root, "foreground"))):
+        object_imgs = []
+        for object_idx, object in enumerate(sorted(listdir(path.join(root, "foreground")))):
             for i, fn in enumerate(sorted(glob.glob(path.join(root, "foreground", object, "*.png")))):
                 img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
                 alpha = np.stack([img[:, :, 3]]*3, axis=2) / 255
                 img = np.uint8(img[:, :, :3] * alpha)
-                img_array[i] = np.concatenate((img_array[i], img), axis=1)
-        
-        for j in range(end_pause):
-            img_array[i+j+1] = np.concatenate((img_array[i+j+1], img), axis=1)
+                if object_idx == 0:
+                    object_imgs.append(img)
+                else:
+                    object_imgs[i] = np.concatenate((object_imgs[i], img), axis=1)
 
-        img_array = [cv2.cvtColor(img, cv2.COLOR_RGB2BGR) for img in img_array]
+        object_imgs.extend([object_imgs[-1]] * end_pause)
+
+        img_array   = [cv2.cvtColor(img, cv2.COLOR_RGB2BGR) for img in img_array]
+        object_imgs = [cv2.cvtColor(img, cv2.COLOR_RGB2BGR) for img in object_imgs]
+
         img_array = np.stack(img_array)
+        object_imgs_array = np.stack(object_imgs)
+        
+        img_array = np.concatenate((img_array, object_imgs_array), axis=2)
 
         combined_array.append(img_array)
     
