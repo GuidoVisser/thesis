@@ -51,7 +51,6 @@ ptyprocess==0.7.0
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
 pybind11==2.6.2
-pycolmap @ file:///home/guido/Master_ai/Hierarchical-Localization/third_party/pycolmap
 Pygments==2.9.0
 pyparsing==2.4.7
 PyQt5==5.15.4
