@@ -64,38 +64,29 @@ def main(args):
         args.lambda_stabilization
     )
 
-    if isinstance(args.initial_mask, str):
-        num_mem_nets = 2
-    else:
-        raise ValueError("TODO: Make sure the number of objects is correctly passed to the memory network")
-    
-    # use 1 memory network for all layers
-    if args.experiment_config not in [1, 4]:
-        num_mem_nets = 1
-
     attention_memory = DataParallel(AttentionMemoryNetwork(
+        args.in_channels,
+        args.conv_channels,
         args.keydim,
         args.valdim,
-        num_mem_nets,
-        args.mem_freq,
         input_processor,
-        args.propagation_model
     )).to(args.device)
 
+
     memory_reader = MemoryReader(
+        args.in_channels,
+        args.conv_channels,
         args.keydim,
-        args.valdim,
-        num_mem_nets,
-        args.propagation_model,
-        args.experiment_config
+        args.valdim
     )
 
     network = DataParallel(LayerDecompositionUNet(
         memory_reader,
+        in_channels=args.in_channels,
+        conv_channels=args.conv_channels,
         do_adjustment=True, 
         max_frames=len(input_processor) + 1, # +1 because len(input_processor) specifies the number of PAIRS of frames
-        coarseness=args.coarseness,
-        experiment_config=args.experiment_config
+        coarseness=args.coarseness
     )).to(args.device)
 
     model = LayerDecompositer(
@@ -127,12 +118,12 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
-    dataset = "Jaap_Jelle"
-    video = "kruispunt_rijks"
+    dataset = "DAVIS_minisample"
+    video = "scooter-black"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", type=str, default=f"datasets/{dataset}/Annotations/{video}/combined/00006.png", 
+    directory_args.add_argument("--initial_mask", type=str, default=f"datasets/{dataset}/Annotations/480p/{video}/00000.png", 
         help="path to the initial mask")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
@@ -144,8 +135,8 @@ if __name__ == "__main__":
         help="Temporal coarseness of camera adjustment parameters")
 
     memory_network_args = parser.add_argument_group("memory_network")
-    memory_network_args.add_argument("--keydim", type=int, default=128, help="number of key channels in the attention memory network")
-    memory_network_args.add_argument("--valdim", type=int, default=512, help="number of value channels in the attention memory network")
+    memory_network_args.add_argument("--keydim", type=int, default=16, help="number of key channels in the attention memory network")
+    memory_network_args.add_argument("--valdim", type=int, default=32, help="number of value channels in the attention memory network")
     memory_network_args.add_argument("--mem_freq", type=int, default=9, help="specifies the interval between the frames that are added to the memory network")
 
     training_param_args = parser.add_argument_group("training_parameters")
@@ -153,20 +144,22 @@ if __name__ == "__main__":
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--memory_learning_rate", type=float, default=0.001, help="Learning rate for the memory encoder")
     training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
-    training_param_args.add_argument("--save_freq", type=int, default=30, help="Frequency at which the intermediate results are saved")
+    training_param_args.add_argument("--n_epochs", type=int, default=101, help="Number of epochs used for training")
+    training_param_args.add_argument("--save_freq", type=int, default=20, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
-    training_param_args.add_argument("--alpha_bootstr_thresh", type=float, default=5e-3, help="Threshold for the alpha bootstrap loss. If the loss comes under this the lambda is decreased")
+    training_param_args.add_argument("--alpha_bootstr_thresh", type=float, default=5e-4, help="Threshold for the alpha bootstrap loss. If the loss comes under this the lambda is decreased")
     training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
+    training_param_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
+    training_param_args.add_argument("--conv_channels", type=int, default=32, help="base number of convolution channels in the convolutional neural networks")
 
     lambdas = parser.add_argument_group("lambdas")
     lambdas.add_argument("--lambda_mask", type=float, default=50., help="starting value for the lambda of the alpha_mask_bootstrap loss")
     lambdas.add_argument("--lambda_recon_flow", type=float, default=1., help="lambda of the flow reconstruction loss")
     lambdas.add_argument("--lambda_recon_warp", type=float, default=0., help="lambda of the warped rgb reconstruction loss")
     lambdas.add_argument("--lambda_alpha_warp", type=float, default=0.005, help="lambda of the warped alpha estimation loss")
-    lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.005, help="lambda of the l0 part of the alpha regularization loss")
-    lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.01, help="lambda of the l1 part of the alpha regularization loss")
+    lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.025, help="lambda of the l0 part of the alpha regularization loss")
+    lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.05, help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization", type=float, default=0.001, help="lambda of the camera stabilization loss")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")

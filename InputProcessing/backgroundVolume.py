@@ -1,3 +1,4 @@
+from torch.serialization import save
 from InputProcessing.homography import HomographyHandler
 from os import path, listdir
 import cv2
@@ -5,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from typing import Tuple, Union
+from math import ceil
 
 from .utils.utils import get_scale_matrix, get_translation_matrix
 
@@ -12,16 +14,25 @@ class BackgroundVolume(object):
 
     def __init__(self,
                  save_dir: str,
+                 num_frames: int,
                  in_channels: int = 16,
+                 temporal_coarseness: int = 10,
                  frame_size: list = [864, 480]) -> None:
         super().__init__()
+        assert num_frames > temporal_coarseness, "Number of frames in the video must be greater than the temporal coarseness"
+
         self.save_dir  = save_dir
 
-        self.spatial_noise = torch.randn(1, in_channels - 3, frame_size[1] // 16, frame_size[0] // 16)
-        self.spatial_noise_upsampled = F.interpolate(self.spatial_noise, (frame_size[1], frame_size[0]), mode='bilinear')
+        self.spatial_noise = torch.randn(in_channels - 3, frame_size[1] // 16, frame_size[0] // 16)
+        self.spatial_noise_upsampled = F.interpolate(self.spatial_noise.unsqueeze(0), (frame_size[1], frame_size[0]), mode='bilinear')[0]
+
+        spatiotemporal_noise = torch.randn(in_channels - 1, ceil(num_frames/temporal_coarseness), frame_size[1] // 16, frame_size[0] // 16)
+        spatiotemporal_noise = F.interpolate(spatiotemporal_noise.unsqueeze(0), (num_frames, frame_size[1], frame_size[0]), mode='trilinear')[0]
+        self.spatiotemporal_noise = torch.cat((self.spatial_noise_upsampled[0:1].repeat(1, num_frames, 1, 1), spatiotemporal_noise))
 
         torch.save(self.spatial_noise, path.join(save_dir, "spatial_noise.pth"))
         torch.save(self.spatial_noise_upsampled, path.join(save_dir, "spatial_noise_upsampled.pth"))
+        torch.save(self.spatiotemporal_noise, path.join(save_dir, "spatiotemporal_noise.pth"))
         
         
         # self.frame_sequence = [path.join(image_dir, frame) 

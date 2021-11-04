@@ -54,7 +54,7 @@ class InputProcessor(object):
         self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
         self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device)
         self.homography_handler = HomographyHandler(out_root, self.img_dir, path.join(flow_dir, "dynamics_mask"), self.device, frame_size)
-        self.background_volume  = BackgroundVolume(background_dir, in_channels=in_channels, frame_size=frame_size)       
+        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, frame_size=frame_size)       
 
         self.load_composite_order(composite_order_fp)
         
@@ -96,24 +96,29 @@ class InputProcessor(object):
         object_flow     = torch.stack((object_flow_t0, object_flow_t1))         # [T, L-1, C, H, W] = [2, L-1, 2, H, W]
         background_flow = torch.stack((background_flow_t0, background_flow_t1)) # [T, C, H, W]      = [2, 2, H, W]
         
-        # Get noise input
-        background_noise = self.background_volume.spatial_noise_upsampled[0]
+        # Get spatial noise input
+        background_noise = self.background_volume.spatial_noise_upsampled
         background_noise = background_noise.unsqueeze(0).unsqueeze(0).repeat(2, 1, 1, 1, 1)
 
         background_uv_map_t0 = self.homography_handler.get_frame_uv(idx)
         background_uv_map_t1 = self.homography_handler.get_frame_uv(idx + 1)
         background_uv_map    = torch.stack((background_uv_map_t0, background_uv_map_t1))
 
-        noise_t0 = F.grid_sample(self.background_volume.spatial_noise, background_uv_map_t0.unsqueeze(0))[0]   
-        noise_t1 = F.grid_sample(self.background_volume.spatial_noise, background_uv_map_t1.unsqueeze(0))[0]
+        noise_t0 = F.grid_sample(self.background_volume.spatial_noise.unsqueeze(0), background_uv_map_t0.unsqueeze(0))[0]   
+        noise_t1 = F.grid_sample(self.background_volume.spatial_noise.unsqueeze(0), background_uv_map_t1.unsqueeze(0))[0]
         noise    = torch.stack((noise_t0, noise_t1)).unsqueeze(1).repeat(1, self.N_objects, 1, 1, 1)
+
+        # Get spatiotemporal noise input
+        attention_query_t0 = torch.cat((dynamics_t0.unsqueeze(0), self.background_volume.spatiotemporal_noise[1:, idx]))
+        attention_query_t1 = torch.cat((dynamics_t1.unsqueeze(0), self.background_volume.spatiotemporal_noise[1:, idx + 1]))
+        attention_query    = torch.stack((attention_query_t0, attention_query_t1))
 
         # Get model input
         zeros = torch.zeros((2, 1, 3, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)
-        background_input = torch.cat((zeros, background_noise), dim=2)
-        pids = binary_masks * torch.Tensor(self.composite_order[idx]).view(1, -1, 1, 1, 1) # [T, L-1, 1, H, W] = [2, L-1, 1, H, W]
+        background_input = torch.cat((zeros, background_noise), dim=2)#.repeat(1, 2, 1, 1, 1)
+        pids = binary_masks * torch.Tensor(self.composite_order[idx]).view(1, -1, 1, 1, 1) # [T, L-2, 1, H, W] = [2, L-2, 1, H, W]
         
-        input_tensor = torch.cat((pids, object_flow, noise), dim=2)       # [T, L-1, C, H, W] = [2, L-1, 16, H, W]                             
+        input_tensor = torch.cat((pids, object_flow, noise), dim=2)       # [T, L-2, C, H, W] = [2, L-1, 16, H, W]                             
         input_tensor = torch.cat((background_input, input_tensor), dim=1) # [T, L,   C, H, W] = [2, L,   16, H, W]
 
         # get parameters for jitter
@@ -126,8 +131,9 @@ class InputProcessor(object):
         flow_conf = self.apply_jitter_transform(flow_conf, params)
 
         # transform inputs
-        input_tensor      = self.apply_jitter_transform(input_tensor,      params)
-        background_flow   = self.apply_jitter_transform(background_flow,   params)
+        input_tensor      = self.apply_jitter_transform(input_tensor,    params)
+        background_flow   = self.apply_jitter_transform(background_flow, params)
+        attention_query   = self.apply_jitter_transform(attention_query, params)
         background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params)
         background_uv_map = background_uv_map.permute(0, 2, 3, 1)
 
@@ -146,7 +152,6 @@ class InputProcessor(object):
         jitter_grid = self.initialize_jitter_grid()
         jitter_grid = self.apply_jitter_transform(jitter_grid, params)
 
-
         targets = {
             "rgb": rgb,
             "flow": flow,
@@ -160,7 +165,7 @@ class InputProcessor(object):
             "background_uv_map": background_uv_map,
             "jitter_grid": jitter_grid,
             "index": torch.Tensor([idx, idx + 1]).long(),
-            "rgb": rgb
+            "attention_query": attention_query
         }
 
         # DEBUG
@@ -266,8 +271,7 @@ class InputProcessor(object):
         """
 
         self.jitter_parameters = []
-        for _ in range(len(self)):
-
+        for _ in range(len(self) + 2):
 
             width, height = self.frame_size
 
@@ -297,6 +301,7 @@ class InputProcessor(object):
                 "crop size": crop_size
             }
             self.jitter_parameters.append(params)
+
         return self.jitter_parameters
 
     def prepare_image_dir(self, video_dir, out_dir):
