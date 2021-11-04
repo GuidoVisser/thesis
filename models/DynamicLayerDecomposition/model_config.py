@@ -28,7 +28,8 @@ CONFIG = {
         'alpha_loss_l1_rolloff':     100,
         'in_channels':               16,
         'conv_channels':             64,
-        'noise_temporal_coarseness': 2
+        'noise_temporal_coarseness': 2,
+        'shared_encoder':            1
     },
     "memory_network" : {
         'keydim':     128, 
