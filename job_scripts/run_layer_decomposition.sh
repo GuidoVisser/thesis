@@ -9,7 +9,7 @@
 DT=`date +"%m_%d_%H_%M_%S"`
 
 # load modules
-module load 2021
+module load 2020
 module load Python/3.8.2-GCCcore-9.3.0
 
 # install dependencies
