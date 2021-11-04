@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 00:10:00
+#SBATCH -t 12:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -37,11 +37,11 @@ python $HOME/thesis/run_layer_decomposition.py \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --batch_size 8 \
-            --n_epochs 2001 \
-            --save_freq 500 \
+            --n_epochs 501 \
+            --save_freq 100 \
             --mem_freq 2 \
-            --lambda_alpha_l0 0.025 \
-            --lambda_alpha_l1 0.05 \
+            --lambda_alpha_l0 0.005 \
+            --lambda_alpha_l1 0.01 \
             --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension.'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
