@@ -42,6 +42,8 @@ def main(args):
         args.out_dir, 
         args.initial_mask, 
         args.composite_order, 
+        in_channels=args.in_channels,
+        noise_temporal_coarseness=args.noise_temporal_coarseness,
         do_jitter = True, 
         propagation_model = args.propagation_model, 
         flow_model = args.flow_model
@@ -136,8 +138,8 @@ if __name__ == "__main__":
         help="Temporal coarseness of camera adjustment parameters")
 
     memory_network_args = parser.add_argument_group("memory_network")
-    memory_network_args.add_argument("--keydim", type=int, default=16, help="number of key channels in the attention memory network")
-    memory_network_args.add_argument("--valdim", type=int, default=32, help="number of value channels in the attention memory network")
+    memory_network_args.add_argument("--keydim", type=int, default=64, help="number of key channels in the attention memory network")
+    memory_network_args.add_argument("--valdim", type=int, default=128, help="number of value channels in the attention memory network")
     memory_network_args.add_argument("--mem_freq", type=int, default=9, help="specifies the interval between the frames that are added to the memory network")
 
     training_param_args = parser.add_argument_group("training_parameters")
@@ -145,7 +147,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--memory_learning_rate", type=float, default=0.001, help="Learning rate for the memory encoder")
     training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=101, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=20, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
@@ -153,7 +155,8 @@ if __name__ == "__main__":
     training_param_args.add_argument("--alpha_loss_l1_rolloff", type=int, default=100, help="Number of epochs to use mask l1 regularization loss")
     training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
     training_param_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
-    training_param_args.add_argument("--conv_channels", type=int, default=32, help="base number of convolution channels in the convolutional neural networks")
+    training_param_args.add_argument("--conv_channels", type=int, default=64, help="base number of convolution channels in the convolutional neural networks")
+    training_param_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
 
     lambdas = parser.add_argument_group("lambdas")
     lambdas.add_argument("--lambda_mask", type=float, default=50., help="starting value for the lambda of the alpha_mask_bootstrap loss")

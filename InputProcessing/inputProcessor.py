@@ -23,6 +23,7 @@ class InputProcessor(object):
                  propagation_model: str,
                  flow_model: str,
                  in_channels: int = 16,
+                 noise_temporal_coarseness: int = 2,
                  device: str = "cuda",
                  frame_size: tuple=(448, 256),
                  do_jitter: bool = True,
@@ -54,7 +55,7 @@ class InputProcessor(object):
         self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
         self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device)
         self.homography_handler = HomographyHandler(out_root, self.img_dir, path.join(flow_dir, "dynamics_mask"), self.device, frame_size)
-        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, frame_size=frame_size)       
+        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, temporal_coarseness=noise_temporal_coarseness, frame_size=frame_size)       
 
         self.load_composite_order(composite_order_fp)
         

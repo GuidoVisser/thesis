@@ -16,7 +16,7 @@ class BackgroundVolume(object):
                  save_dir: str,
                  num_frames: int,
                  in_channels: int = 16,
-                 temporal_coarseness: int = 10,
+                 temporal_coarseness: int = 2,
                  frame_size: list = [864, 480]) -> None:
         super().__init__()
         assert num_frames > temporal_coarseness, "Number of frames in the video must be greater than the temporal coarseness"

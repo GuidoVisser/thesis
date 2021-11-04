@@ -69,7 +69,8 @@ class LayerDecompositer(nn.Module):
                 self.memory_net.module.set_global_contexts(jitter_params)
                 self.net.module.contexts = self.memory_net.module.global_context
 
-            print(f"Epoch: {epoch} / {self.n_epochs - 1}")
+            if torch.cuda.device_count() <= 1:
+                print(f"Epoch: {epoch} / {self.n_epochs - 1}")
             
             for iteration, (input, targets) in enumerate(self.dataloader):
 
@@ -92,8 +93,6 @@ class LayerDecompositer(nn.Module):
                     self.visualize_and_save_output(output, targets, frame_indices, epoch)
 
             self.memory_optimizer.step()
-            print(self.loss_module.lambda_mask_bootstrap)
-            print(self.loss_module.lambda_alpha_l1)
 
         torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
         torch.save(self.memory_net.state_dict(), path.join(self.results_root, "memory_weights.pth"))

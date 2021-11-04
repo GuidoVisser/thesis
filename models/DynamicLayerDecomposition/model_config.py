@@ -15,16 +15,20 @@ CONFIG = {
         'composite_order': None 
     },
     "training_parameters": {
-        'batch_size':           1, 
-        'learning_rate':        0.001,
-        'memory_learning_rate': 0.001,
-        'n_epochs':             300, 
-        'save_freq':            30, 
-        'n_gpus':               1, 
-        'seed':                 1, 
-        'device':               'cuda:0',
-        'alpha_bootstr_thresh': 5e-3,
-        'experiment_config':    1
+        'batch_size':                1, 
+        'learning_rate':             0.001,
+        'memory_learning_rate':      0.001,
+        'n_epochs':                  300, 
+        'save_freq':                 30, 
+        'n_gpus':                    1, 
+        'seed':                      1, 
+        'device':                    'cuda:0',
+        'experiment_config':         1,
+        'alpha_bootstr_rolloff':     50,
+        'alpha_loss_l1_rolloff':     100,
+        'in_channels':               16,
+        'conv_channels':             64,
+        'noise_temporal_coarseness': 2
     },
     "memory_network" : {
         'keydim':     128, 
