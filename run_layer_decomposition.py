@@ -135,8 +135,8 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.005, help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.01, help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization", type=float, default=0.001, help="lambda of the camera stabilization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_diff", type=float, default=0.0005, help="lambda of the difference part of the dynamics regularization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_corr", type=float, default=0.001, help="lambda of the correlation part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_diff", type=float, default=0.005, help="lambda of the difference part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_corr", type=float, default=0.01, help="lambda of the correlation part of the dynamics regularization loss")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 

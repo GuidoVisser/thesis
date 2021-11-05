@@ -149,8 +149,8 @@ class DecompositeLoss(nn.Module):
             binary_masks (torch.Tensor) [B', L - 2, 1, H, W]
         """
 
-        dynamics_layer      = alpha_layers[:, 1].unsqueeze(1) * .5 + .5  # [B',   1, 1, H, W]
-        object_layers       = alpha_layers[:, 2:] * .5 + .5              # [B', L-2, 1, H, W]
+        dynamics_layer = alpha_layers[:, 1].unsqueeze(1) * .5 + .5  # [B',   1, 1, H, W]
+        object_layers  = alpha_layers[:, 2:] * .5 + .5              # [B', L-2, 1, H, W]
 
         dynamics_layer.expand(object_layers.shape)
 
