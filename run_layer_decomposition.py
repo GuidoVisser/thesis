@@ -110,7 +110,6 @@ if __name__ == "__main__":
     memory_network_args = parser.add_argument_group("memory_network")
     memory_network_args.add_argument("--keydim", type=int, default=16, help="number of key channels in the attention memory network")
     memory_network_args.add_argument("--valdim", type=int, default=32, help="number of value channels in the attention memory network")
-    memory_network_args.add_argument("--mem_freq", type=int, default=9, help="specifies the interval between the frames that are added to the memory network")
 
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
