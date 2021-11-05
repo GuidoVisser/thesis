@@ -133,8 +133,8 @@ class LayerDecompositer(nn.Module):
                 background_rgb_dynamic   = torch.clone(rgba_layers[b, t, 1, :3]).detach()
                 background_alpha_dynamic = torch.clone(rgba_layers[b, t, 1, 3:]).detach()
 
-                # # Go from tripmap to binary mask
-                # background_alpha_dynamic = background_alpha_dynamic + 1 / 2
+                # Go from tripmap to binary mask
+                background_alpha_dynamic = background_alpha_dynamic * .5 + .5
 
                 # Get the full background
                 background_rgb = (1 - background_alpha_dynamic) * background_rgb_static + background_alpha_dynamic * background_rgb_dynamic

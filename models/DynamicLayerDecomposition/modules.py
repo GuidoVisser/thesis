@@ -354,7 +354,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
                 rgba, flow = self.render(layer_input, global_context)
                 alpha = self.get_alpha_from_rgba(rgba)
 
-                composite_rgba = rgba * alpha + composite_rgba * (1. - alpha)
+                composite_rgba = self.composite_rgba(composite_rgba, rgba)
                 composite_flow = flow * alpha + composite_flow * (1. - alpha)
 
                 # Temporal consistency
@@ -362,6 +362,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
                 rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:batch_size])
                 alpha_warped     = self.get_alpha_from_rgba(rgba_warped)
                 composite_warped = rgba_warped[:, :3] * alpha_warped + composite_warped * (1.0 - alpha_warped)
+                composite_warped = self.composite_rgb(composite_warped, rgba_warped[:, :3], alpha_warped)
 
             layers_rgba.append(rgba)
             layers_flow.append(flow)
@@ -419,3 +420,16 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         brightness_scale = F.grid_sample(brightness_scale, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
 
         return brightness_scale
+
+    def composite_rgba(self, composite, rgba):
+        comp = composite * .5 + .5
+        alpha = self.get_alpha_from_rgba(rgba)
+        new_layer = rgba * .5 + .5
+
+        return ((1. - alpha) * comp + alpha * new_layer) * 2 - 1
+
+    def composite_rgb(self, composite, rgb, alpha):
+        new_layer = rgb * .5 + .5
+        comp = composite * .5 + .5
+
+        return ((1. - alpha) * comp + alpha * new_layer) * 2 - 1

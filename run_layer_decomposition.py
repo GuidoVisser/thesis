@@ -115,7 +115,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=1001, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=251, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=50, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
@@ -135,8 +135,8 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.005, help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.01, help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization", type=float, default=0.001, help="lambda of the camera stabilization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_diff", type=float, default=0.005, help="lambda of the difference part of the dynamics regularization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_corr", type=float, default=0.01, help="lambda of the correlation part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_diff", type=float, default=0.05, help="lambda of the difference part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_corr", type=float, default=0.1, help="lambda of the correlation part of the dynamics regularization loss")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
