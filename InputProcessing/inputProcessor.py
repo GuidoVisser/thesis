@@ -163,6 +163,7 @@ class InputProcessor(object):
             "rgb": rgb,
             "flow": flow,
             "masks": masks,
+            "binary_masks": binary_masks,
             "flow_confidence": flow_conf
         }
 

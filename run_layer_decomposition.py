@@ -48,7 +48,9 @@ def main(args):
         args.lambda_alpha_warp,
         args.lambda_alpha_l0,
         args.lambda_alpha_l1,
-        args.lambda_stabilization
+        args.lambda_stabilization,
+        args.lambda_dynamics_reg_diff,
+        args.lambda_dynamics_reg_corr
     )
 
     network = DataParallel(LayerDecompositionAttentionMemoryNet(
@@ -106,8 +108,8 @@ if __name__ == "__main__":
         help="Temporal coarseness of camera adjustment parameters")
 
     memory_network_args = parser.add_argument_group("memory_network")
-    memory_network_args.add_argument("--keydim", type=int, default=64, help="number of key channels in the attention memory network")
-    memory_network_args.add_argument("--valdim", type=int, default=128, help="number of value channels in the attention memory network")
+    memory_network_args.add_argument("--keydim", type=int, default=16, help="number of key channels in the attention memory network")
+    memory_network_args.add_argument("--valdim", type=int, default=32, help="number of value channels in the attention memory network")
     memory_network_args.add_argument("--mem_freq", type=int, default=9, help="specifies the interval between the frames that are added to the memory network")
 
     training_param_args = parser.add_argument_group("training_parameters")
@@ -122,7 +124,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--alpha_loss_l1_rolloff", type=int, default=100, help="Number of epochs to use mask l1 regularization loss")
     training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
     training_param_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
-    training_param_args.add_argument("--conv_channels", type=int, default=64, help="base number of convolution channels in the convolutional neural networks")
+    training_param_args.add_argument("--conv_channels", type=int, default=32, help="base number of convolution channels in the convolutional neural networks")
     training_param_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
     training_param_args.add_argument("--shared_encoder", type=int, default=1, help="Specifies whether to use a shared memory/query encoder in the network")
 
@@ -134,6 +136,8 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.015, help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.03, help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization", type=float, default=0.001, help="lambda of the camera stabilization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_diff", type=float, default=0.0005, help="lambda of the difference part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_corr", type=float, default=0.001, help="lambda of the correlation part of the dynamics regularization loss")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
