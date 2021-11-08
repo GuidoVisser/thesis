@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 12:00:00
+#SBATCH -t 00:30:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -30,7 +30,7 @@ mkdir $TMPDIR/output_dir
 
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
-python $HOME/thesis/run_layer_decomposition.py \
+python $HOME/thesis/run_layer_decomposition_3d.py \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/$MASK_PATH \
             --out_dir $TMPDIR/output_dir \
