@@ -218,7 +218,7 @@ class HomographyHandler(object):
 
         return homographies, origin_size
 
-    def frame_homography_to_flow(self, frame_index):
+    def frame_homography_to_flow(self, frame_index: Union[int, slice]):
         """
         Calculate a flow field that 
         """
@@ -229,19 +229,40 @@ class HomographyHandler(object):
         ramp_ = torch.stack([ramp_u, ramp_v], 0)
         ramp = ramp_.reshape(2, -1)
 
-        H = self.calculate_homography_between_two_frames(frame_index + 1, frame_index)
 
-        # apply homography
-        [xt, yt] = homogeneous_2d_transform(ramp[0], ramp[1], H)
+        if isinstance(frame_index, slice):
+            flows = []
+            for idx in range(frame_index.start, frame_index.stop):
+                H = self.calculate_homography_between_two_frames(idx + 1, idx)
 
-        # restore shape
-        flow = torch.stack([xt.reshape(h, w), yt.reshape(h, w)], 0)
-        flow -= ramp_
+                # apply homography
+                [xt, yt] = homogeneous_2d_transform(ramp[0], ramp[1], H)
 
-        # scale from world to image space
-        flow[0] *= w / self.origin_size[0]
-        flow[1] *= h / self.origin_size[1]
-        
+                # restore shape
+                flow = torch.stack([xt.reshape(h, w), yt.reshape(h, w)], 0)
+                flow -= ramp_
+
+                # scale from world to image space
+                flow[0] *= w / self.origin_size[0]
+                flow[1] *= h / self.origin_size[1]
+            
+                flows.append(flow)
+
+            flow = torch.stack(flows, dim=-3)
+        else:
+            H = self.calculate_homography_between_two_frames(frame_index + 1, frame_index)
+            
+            # apply homography
+            [xt, yt] = homogeneous_2d_transform(ramp[0], ramp[1], H)
+            
+            # restore shape
+            flow = torch.stack([xt.reshape(h, w), yt.reshape(h, w)], 0)
+            flow -= ramp_
+            
+            # scale from world to image space
+            flow[0] *= w / self.origin_size[0]
+            flow[1] *= h / self.origin_size[1]
+
         return flow
 
     def align_frames(self, frames: list, indices: Union[list, None] = None) -> list:

@@ -6,7 +6,7 @@ from os import path
 from torch.nn.parallel import DataParallel
 from torch.utils.tensorboard import SummaryWriter
 
-from InputProcessing.inputProcessor import InputProcessor
+from InputProcessing.inputProcessor import InputProcessor, InputProcessor3D
 from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
 from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss
 from models.DynamicLayerDecomposition.modules import LayerDecompositionAttentionMemoryNet
@@ -23,7 +23,7 @@ def main(args):
 
     writer = SummaryWriter(args.out_dir)
 
-    input_processor = InputProcessor(
+    input_processor = InputProcessor3D(
         args.img_dir, 
         args.out_dir, 
         args.initial_mask, 
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=251, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=301, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=50, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
     training_param_args.add_argument("--conv_channels", type=int, default=32, help="base number of convolution channels in the convolutional neural networks")
     training_param_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
-    training_param_args.add_argument("--shared_encoder", type=int, default=1, help="Specifies whether to use a shared memory/query encoder in the network")
+    training_param_args.add_argument("--shared_encoder", type=int, default=0, help="Specifies whether to use a shared memory/query encoder in the network")
 
     lambdas = parser.add_argument_group("lambdas")
     lambdas.add_argument("--lambda_mask", type=float, default=50., help="starting value for the lambda of the alpha_mask_bootstrap loss")

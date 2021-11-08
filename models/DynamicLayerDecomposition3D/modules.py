@@ -5,26 +5,22 @@ import numpy as np
 
 from InputProcessing.flowHandler import FlowHandler
 
-class ConvBlock(nn.Module):
-    """Helper module consisting of a convolution, optional normalization and activation, with padding='same'.
-    
-    Adapted from Layered Neural Rendering (https://github.com/google/retiming)
-    """
+class ConvBlock3D(nn.Module):
 
-    def __init__(self, conv, in_channels, out_channels, ksize=4, stride=1, dil=1, norm=None, activation='relu'):
-        """Create a conv block.
+    def __init__(self, conv, in_channels, out_channels, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(1, 1, 1), norm=None, activation='relu'):
+        """Create a 3D conv block.
 
         Parameters:
-            conv (convolutional layer) - - the type of conv layer, e.g. Conv2d, ConvTranspose2d
-            in_channels (int) - - the number of input channels
-            out_channels (int) - - the number of output channels
-            ksize (int) - - the kernel size
-            stride (int) - - stride
-            dil (int) - - dilation
-            norm (norm layer) - - the type of normalization layer, e.g. BatchNorm2d, InstanceNorm2d
-            activation (str)  -- the type of activation: relu | leaky | tanh | none
+            conv (conv layer):  the type of conv layer, e.g. Conv3d, ConvTranspose3d
+            in_channels (int):  the number of input channels
+            out_channels (int): the number of output channels
+            ksize (tuple):      the kernel size
+            stride (tuple):     stride
+            dil (tuple):        dilation
+            norm (norm layer):  the type of normalization layer, e.g. BatchNorm3d, InstanceNorm3d
+            activation (str):   the type of activation: relu | leaky | tanh | none
         """
-        super(ConvBlock, self).__init__()
+        super().__init__()
         self.k = ksize
         self.s = stride
         self.d = dil
@@ -46,29 +42,36 @@ class ConvBlock(nn.Module):
 
     def forward(self, x):
         """Forward pass. Compute necessary padding and cropping because pytorch doesn't have pad=same."""
-        height, width = x.shape[-2:]
-        if isinstance(self.conv, nn.modules.ConvTranspose2d):
-            desired_height = height * self.s
-            desired_width = width * self.s
+        time_steps, height, width = x.shape[-3:]
+        if isinstance(self.conv, nn.modules.ConvTranspose3d):
+            desired_length = time_steps * self.s[0] 
+            desired_height = height * self.s[1]
+            desired_width  = width  * self.s[2]
+            padt = 0
             pady = 0
             padx = 0
         else:
-            desired_height = height // self.s
-            desired_width = width // self.s
-            pady = .5 * (self.s * (desired_height - 1) + (self.k - 1) * (self.d - 1) + self.k - height)
-            padx = .5 * (self.s * (desired_width - 1) + (self.k - 1) * (self.d - 1) + self.k - width)
-        x = F.pad(x, [int(np.floor(padx)), int(np.ceil(padx)), int(np.floor(pady)), int(np.ceil(pady))])
+            desired_length = time_steps // self.s[0]
+            desired_height = height     // self.s[1]
+            desired_width  = width      // self.s[2]
+            padt = .5 * (self.s[0] * (desired_length - 1) + (self.k[0] - 1) * (self.d[0] - 1) + self.k[0] - time_steps)
+            pady = .5 * (self.s[1] * (desired_height - 1) + (self.k[1] - 1) * (self.d[1] - 1) + self.k[1] - height)
+            padx = .5 * (self.s[2] * (desired_width  - 1) + (self.k[2] - 1) * (self.d[2] - 1) + self.k[2] - width)
+        x = F.pad(x, [int(np.floor(padx)), int(np.ceil(padx)), int(np.floor(pady)), int(np.ceil(pady)), int(np.floor(padt)), int(np.ceil(padt))])
         x = self.conv(x)
-        if x.shape[-2] != desired_height or x.shape[-1] != desired_width:
+        if x.shape[-3] != desired_length or x.shape[-2] != desired_height or x.shape[-1] != desired_width:
+            cropt = x.shape[-3] - desired_length
             cropy = x.shape[-2] - desired_height
             cropx = x.shape[-1] - desired_width
-            x = x[:, :, int(np.floor(cropy / 2.)):-int(np.ceil(cropy / 2.)),
-                int(np.floor(cropx / 2.)):-int(np.ceil(cropx / 2.))]
+            x = x[:, :, int(np.floor(cropt / 2.)):-int(np.ceil(cropt / 2.)),
+                        int(np.floor(cropy / 2.)):-int(np.ceil(cropy / 2.)),
+                        int(np.floor(cropx / 2.)):-int(np.ceil(cropx / 2.))]
         if self.norm:
             x = self.norm(x)
         if self.activation:
             x = self.activation(x)
         return x
+
 
 class KeyValueEncoder(nn.Module):
 
@@ -77,8 +80,8 @@ class KeyValueEncoder(nn.Module):
 
         self.encoder = encoder
 
-        self.key_layer = nn.Conv2d(conv_channels, keydim, kernel_size=3, padding=1)
-        self.val_layer = nn.Conv2d(conv_channels, valdim, kernel_size=3, padding=1)
+        self.key_layer = nn.Conv3d(conv_channels, keydim, kernel_size=(3, 3, 3), padding=1)
+        self.val_layer = nn.Conv3d(conv_channels, valdim, kernel_size=(3, 3, 3), padding=1)
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -108,17 +111,17 @@ class GlobalContextVolume(nn.Module):
         D_t = q(x_t) * G
 
         Args:
-            query (torch.Tensor[B x C_k x H, W])
+            query (torch.Tensor[B, C_k, T, H, W])
 
         Returns:
-            context_dist (torch.Tensor[B x C_v x H x W])
+            context_dist (torch.Tensor[B, C_v, T, H, W])
 
         """
-        B, _, H, W = query.shape
+        B, _, T, H, W = query.shape
 
-        query = query.view(B, -1, H*W)                          # -> [B x C_k x HW]
-        context_dist = torch.matmul(self.context_volume, query) # -> [B x C_v x HW]
-        context_dist = context_dist.view(B, -1, H, W)           # -> [B x C_v x H x W]
+        query = query.view(B, -1, T*H*W)                        # -> [B, C_k, THW]
+        context_dist = torch.matmul(self.context_volume, query) # -> [B, C_v, THW]
+        context_dist = context_dist.view(B, -1, T, H, W)        # -> [B, C_v, T, H, W]
 
         return context_dist
 
@@ -178,19 +181,19 @@ class MemoryEncoder(nn.Module):
         Takes as argument a key value pair and returns the corresponding context matrix
 
         The context is calculated according to:
-            C [B x C_v x C_k] = v [B x C_v x HW] @ k [B x HW x C_k] 
+            C [B x C_v x C_k] = v [B x C_v x THW] @ k [B x THW x C_k] 
 
         Args:
-            key   (Tensor[B x C_k x H x W])
-            value (Tensor[B x C_v x H x W])
+            key   (Tensor[B x C_k x T x H x W])
+            value (Tensor[B x C_v x T x H x W])
 
         Returns:
             context (Tensor[B x C_v x C_k])
         """
-        B, _, H, W = key.shape
+        B, _, T, H, W = key.shape
         
-        key   = key.view(B, -1, H*W).permute(0, 2, 1)
-        value = value.view(B, -1, H*W)
+        key   = key.view(B, -1, T*H*W).permute(0, 2, 1)
+        value = value.view(B, -1, T*H*W)
 
         context = torch.matmul(value, key)
 
@@ -209,10 +212,10 @@ class MemoryReader(nn.Module):
     def forward(self, input: torch.Tensor, global_context: GlobalContextVolume) -> torch.Tensor:
         """
         Args:
-            input (torch.Tensor[B x C x H x W])
+            input (torch.Tensor[B x C x T x H x W])
 
         Returns:
-            feature_map (torch.Tensor[B x 2 * C_v x H x W])
+            feature_map (torch.Tensor[B x 2 * C_v x T x H x W])
         """
 
         query, value, skips = self.query_encoder(input)
@@ -221,18 +224,18 @@ class MemoryReader(nn.Module):
 
         return global_features, value, skips
 
-class LayerDecompositionAttentionMemoryNet(nn.Module):
+class LayerDecomposition3DAttentionMemoryNet(nn.Module):
     def __init__(self, conv_channels=64, in_channels=16, valdim=128, keydim=64, max_frames=200, coarseness=10, do_adjustment=True, shared_encoder=True):
         super().__init__()
 
         # initialize foreground encoder and decoder
         self.query_backbone = nn.ModuleList([
-            ConvBlock(nn.Conv2d, in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
-            ConvBlock(nn.Conv2d, conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-            ConvBlock(nn.Conv2d, conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-            ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+            ConvBlock3D(nn.Conv3d, in_channels,       conv_channels,     ksize=(4, 4, 3), stride=(2, 2, 2)),                                                  # 1/2
+            ConvBlock3D(nn.Conv3d, conv_channels,     conv_channels * 2, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
+            ConvBlock3D(nn.Conv3d, conv_channels * 2, conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
+            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
+            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(2, 2, 1), norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
+            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(2, 2, 1), norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
                 
         self.memory_reader = MemoryReader(conv_channels * 4, keydim, valdim, self.query_backbone)
 
@@ -240,25 +243,25 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             self.memory_encoder = MemoryEncoder(conv_channels * 4, keydim, valdim, self.query_backbone)
         else:
             self.memory_backbone = nn.ModuleList([
-                ConvBlock(nn.Conv2d, in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
-                ConvBlock(nn.Conv2d, conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-                ConvBlock(nn.Conv2d, conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-                ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-                ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-                ConvBlock(nn.Conv2d, conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+                ConvBlock3D(nn.Conv3d, in_channels,       conv_channels,     ksize=(4, 4, 3), stride=(2, 2, 2)),                                                          # 1/2
+                ConvBlock3D(nn.Conv3d, conv_channels,     conv_channels * 2, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
+                ConvBlock3D(nn.Conv3d, conv_channels * 2, conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
+                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
+                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(2, 2, 1), norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
+                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(2, 2, 1), norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
 
             self.memory_encoder = MemoryEncoder(conv_channels * 4, keydim, valdim, self.memory_backbone)
 
         decoder_in_channels = conv_channels * 4 + valdim * 2
 
         self.decoder = nn.ModuleList([
-            ConvBlock(nn.ConvTranspose2d, decoder_in_channels,   conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/8
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/4
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d),  # 1/2
-            ConvBlock(nn.ConvTranspose2d, conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d)]) # 1
+            ConvBlock3D(nn.ConvTranspose3d, decoder_in_channels,   conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2), norm=nn.BatchNorm2d),  # 1/8
+            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2 * 4, conv_channels * 2, ksize=(4, 4, 3), stride=(2, 2, 2), norm=nn.BatchNorm2d),  # 1/4
+            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2 * 2, conv_channels,     ksize=(4, 4, 3), stride=(2, 2, 2), norm=nn.BatchNorm2d),  # 1/2
+            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2,     conv_channels,     ksize=(4, 4, 3), stride=(2, 2, 2), norm=nn.BatchNorm2d)]) # 1
 
-        self.final_rgba = ConvBlock(nn.Conv2d, conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock(nn.Conv2d, conv_channels, 2, ksize=4, stride=1, activation='none')
+        self.final_rgba = ConvBlock3D(nn.Conv3d, conv_channels, 4, ksize=(4, 4, 3), stride=(1, 1, 1), activation='tanh')
+        self.final_flow = ConvBlock3D(nn.Conv3d, conv_channels, 2, ksize=(4, 4, 3), stride=(1, 1, 1), activation='none')
 
         self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
@@ -277,10 +280,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         """
         global_features, x, skips = self.memory_reader(x, global_context)
 
-        if is_bg:
-            x = torch.cat((torch.zeros_like(global_features), x), dim=1)
-        else:
-            x = torch.cat((global_features, x), dim=1)
+        x = torch.cat((global_features, x), dim=1)
 
         # decoding
         for layer in self.decoder:          
@@ -308,7 +308,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         global_context = self.memory_encoder(spatiotemporal_noise)
 
-        batch_size, N_t, N_layers, channels, H, W = query_input.shape
+        batch_size, N_t, N_layers, channels, T, H, W = query_input.shape
 
         input_t0 = query_input[:, 0]
         input_t1 = query_input[:, 1]
@@ -320,10 +320,6 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         layers_rgba = []
         layers_flow = []
-
-        # For temporal consistency
-        layers_alpha_warped = []
-        composite_warped = None
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
@@ -346,9 +342,6 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
                 composite_rgba = rgba
                 flow = composite_flow
 
-                # Temporal consistency 
-                rgba_warped      = rgba[:batch_size]
-                composite_warped = rgba_warped[:, :3]
             # Object layers
             else:
                 rgba, flow = self.render(layer_input, global_context)
@@ -357,16 +350,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
                 composite_rgba = self.composite_rgba(composite_rgba, rgba)
                 composite_flow = flow * alpha + composite_flow * (1. - alpha)
 
-                # Temporal consistency
-                rgba_t1          = rgba[batch_size:]
-                rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:batch_size])
-                alpha_warped     = self.get_alpha_from_rgba(rgba_warped)
-                composite_warped = rgba_warped[:, :3] * alpha_warped + composite_warped * (1.0 - alpha_warped)
-                composite_warped = self.composite_rgb(composite_warped, rgba_warped[:, :3], alpha_warped)
-
             layers_rgba.append(rgba)
             layers_flow.append(flow)
-            layers_alpha_warped.append(rgba_warped[:, 3:4])
 
         if self.do_adjustment:
             # map output to [0, 1]
@@ -385,17 +370,14 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         layers_rgba         = torch.stack((layers_rgba[:batch_size], layers_rgba[batch_size:]), 1)
         layers_flow         = torch.stack(layers_flow, 1)
         layers_flow         = torch.stack((layers_flow[:batch_size], layers_flow[batch_size:]), 1)
-        layers_alpha_warped = torch.stack(layers_alpha_warped, 1)
         brightness_scale    = torch.stack((brightness_scale[:batch_size], brightness_scale[batch_size:]), 1)
         background_offset   = torch.stack((background_offset[:batch_size], background_offset[batch_size:]), 1)
 
         out = {
             "rgba_reconstruction": composite_rgba,          # [B, 2, 4, H, W]
             "flow_reconstruction": composite_flow,          # [B, 2, 2, H, w]
-            "reconstruction_warped": composite_warped,      # [B, 3, H, W]
             "layers_rgba": layers_rgba,                     # [B, 2, L, 4, H, W]
             "layers_flow": layers_flow,                     # [B, 2, L, 2, H, W]
-            "layers_alpha_warped": layers_alpha_warped,     # [B, L, 1, H, W]
             "brightness_scale": brightness_scale,           # [B, 2, 1, H, W]
             "background_offset": background_offset,         # [B, 2, 2, H, W]
         }

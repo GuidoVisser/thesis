@@ -115,12 +115,19 @@ class MaskHandler(object):
             else:
                 save_frame(mask_pred, path.join(save_dir, f"{initial_index - i:05}.png"))
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
+    def __getitem__(self, idx: Union[int, slice]) -> torch.Tensor:
+        
         masks = []
-
         for i_object in range(self.N_objects):
-            mask_path = path.join(self.mask_dir, f"{i_object:02}", f"{idx:05}.png")
-            masks.append(cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.frame_size))
+            if isinstance(idx, slice):
+                mask_paths = [path.join(self.mask_dir, f"{i_object:02}", f"{frame_idx:05}.png") for frame_idx in range(idx.start, idx.stop)]
+                object_masks = []
+                for mask_path in mask_paths:
+                    object_masks.append(cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.frame_size))
+                masks.append(np.stack(object_masks))
+            else:
+                mask_path = path.join(self.mask_dir, f"{i_object:02}", f"{idx:05}.png")
+                masks.append(cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.frame_size))
 
         masks = np.float32(np.stack(masks)) / 255.
         masks = torch.from_numpy(masks)

@@ -1,4 +1,5 @@
 from os import path
+from typing import Union
 import numpy as np
 import torch
 import cv2
@@ -50,7 +51,7 @@ class FlowHandler(object):
             self.calculate_full_video_flow()
 
     @torch.no_grad()
-    def __getitem__(self, frame_idx):
+    def __getitem__(self, frame_idx: Union[int, slice]):
         """
         Calculate the forward flow between the frame at `frame_idx` and the next after being stabalized using 
         a perspective warp with the homography
@@ -62,10 +63,20 @@ class FlowHandler(object):
 
         N_objects = object_masks.shape[0]
 
-        frame_path = path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo")
-        flow = torch.from_numpy(readFlow(frame_path)).permute(2, 0, 1)
-        conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
-        dynamics_mask = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"dynamics_mask/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
+        if isinstance(frame_idx, slice):
+            flows, confs, dynamics_masks = [], [], []
+            for idx in range(frame_idx.start, frame_idx.stop):
+                flows.append(torch.from_numpy(readFlow(path.join(self.output_dir, f"forward/flow/{idx:05}.flo"))).permute(2, 0, 1))
+                confs.append(torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.)
+                dynamics_masks.append(torch.from_numpy(cv2.imread(path.join(self.output_dir, f"dynamics_mask/{idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.)
+            flow = torch.stack(flows, dim=-3)
+            conf = torch.stack(confs, dim=-3)
+            dynamics_mask = torch.stack(dynamics_masks, dim=-3)
+        else:
+            frame_path = path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo")
+            flow = torch.from_numpy(readFlow(frame_path)).permute(2, 0, 1)
+            conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
+            dynamics_mask = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"dynamics_mask/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
 
         # background_mask = 1 - torch.minimum(torch.sum(object_masks, dim=0), torch.ones(object_masks.shape[1:]))
         # dynamics_mask = background_mask * dynamics_mask
@@ -248,7 +259,7 @@ class FlowHandler(object):
         """
         Return the object flow of all objects in the scene
         """
-        N_objects, _, _ =  masks.shape
+        N_objects =  masks.shape[0]
 
         object_flow = torch.stack([flow]*N_objects)
         object_flow  = object_flow * masks

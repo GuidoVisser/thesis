@@ -1,4 +1,5 @@
 from os import path, listdir
+from typing import Union
 import cv2
 import torch
 import numpy as np
@@ -18,9 +19,18 @@ class FrameIterator(object):
         self.frame_size = frame_size
         self.device = device
 
-    def __getitem__(self, idx):
-        img = torch.from_numpy(cv2.resize(np.float32(cv2.cvtColor(cv2.imread(self.images[idx]), cv2.COLOR_BGR2RGB)), self.frame_size)).permute(2, 0, 1) / 255.
-        img = img * 2 - 1
+    def __getitem__(self, idx: Union[int, slice]) -> torch.Tensor:
+        
+        if isinstance(idx, slice):
+            img_paths = self.images[idx]
+            img = []
+            for img_path in img_paths:
+                img.append(torch.from_numpy(cv2.resize(np.float32(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)), self.frame_size)).permute(2, 0, 1) / 255.)
+            img = torch.stack(img, dim=1)
+            img = img * 2 - 1
+        else:
+            img = torch.from_numpy(cv2.resize(np.float32(cv2.cvtColor(cv2.imread(self.images[idx]), cv2.COLOR_BGR2RGB)), self.frame_size)).permute(2, 0, 1) / 255.
+            img = img * 2 - 1
         
         return img
     
