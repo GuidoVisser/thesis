@@ -8,9 +8,9 @@ from torch.nn.parallel import DataParallel
 from torch.utils.tensorboard import SummaryWriter
 
 from InputProcessing.inputProcessor import InputProcessor
-from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
-from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss
-from models.DynamicLayerDecomposition.modules import LayerDecompositionAttentionMemoryNet
+from models.DynamicLayerDecomposition3D.layerDecomposition import LayerDecompositer
+from models.DynamicLayerDecomposition3D.loss_functions import DecompositeLoss
+from models.DynamicLayerDecomposition3D.modules import LayerDecomposition3DAttentionMemoryNet
 
 from utils.demo import create_decomposite_demo
 from utils.utils import create_dir, seed_all
@@ -34,6 +34,7 @@ def main(args):
         noise_temporal_coarseness=args.noise_temporal_coarseness,
         do_jitter = True, 
         timesteps=args.timesteps,
+        use_3d=True,
         propagation_model = args.propagation_model, 
         flow_model = args.flow_model,
         device=args.device
@@ -48,8 +49,6 @@ def main(args):
     loss_module = DecompositeLoss(
         args.lambda_mask,
         args.lambda_recon_flow,
-        args.lambda_recon_warp,
-        args.lambda_alpha_warp,
         args.lambda_alpha_l0,
         args.lambda_alpha_l1,
         args.lambda_stabilization,
@@ -57,13 +56,15 @@ def main(args):
         args.lambda_dynamics_reg_corr
     )
 
-    network = DataParallel(LayerDecompositionAttentionMemoryNet(
+    network = DataParallel(LayerDecomposition3DAttentionMemoryNet(
         in_channels=args.in_channels,
         conv_channels=args.conv_channels,
         do_adjustment=True, 
         max_frames=len(input_processor) + args.timesteps,
         coarseness=args.coarseness,
-        shared_encoder=bool(args.shared_encoder)
+        shared_encoder=bool(args.shared_encoder),
+        mem_freq=args.mem_freq,
+        timesteps=args.timesteps
     )).to(args.device)
 
     model = LayerDecompositer(
@@ -131,6 +132,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
     training_param_args.add_argument("--shared_encoder", type=int, default=1, help="Specifies whether to use a shared memory/query encoder in the network")
     training_param_args.add_argument("--timesteps", type=int, default=8, help="Temporal depth of the query input")
+    training_param_args.add_argument("--mem_freq", type=int, default=4, help="frequency of frames that are added to global context")
 
     lambdas = parser.add_argument_group("lambdas")
     lambdas.add_argument("--lambda_mask", type=float, default=50., help="starting value for the lambda of the alpha_mask_bootstrap loss")

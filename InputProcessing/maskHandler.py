@@ -135,7 +135,13 @@ class MaskHandler(object):
         binary_masks = (masks > 0.5).float()
         masks = masks * 2 - 1
         
-        trimaps = self.mask2trimap(masks)
+        if len(masks.shape) == 4:
+            trimaps = []
+            for i in range(masks.shape[1]):
+                trimaps.append(self.mask2trimap(masks[:, i]))
+            trimaps = torch.stack(trimaps, dim=1)
+        else:
+            trimaps = self.mask2trimap(masks)
 
         trimaps = trimaps.unsqueeze(1)
         binary_masks = binary_masks.unsqueeze(1)

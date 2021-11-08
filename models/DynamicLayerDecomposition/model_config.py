@@ -11,6 +11,7 @@ CONFIG = {
         'flow_model':        'models/third_party/weights/raft-things.pth'
     },
     "reconstruction_model": {
+        'convolutions':    '2D',
         'coarseness':      10, 
         'composite_order': None 
     },

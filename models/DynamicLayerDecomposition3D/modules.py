@@ -139,27 +139,27 @@ class GlobalContextVolume(nn.Module):
 
 class MemoryEncoder(nn.Module):
 
-    def __init__(self, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module) -> None:
+    def __init__(self, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module, mem_freq: int = 4, timesteps: int = 16) -> None:
         super().__init__()
 
         self.memory_encoder = KeyValueEncoder(conv_channels, keydim, valdim, backbone)
         self.global_context = GlobalContextVolume(keydim, valdim)
 
-        self.valdim          = valdim
-        self.keydim          = keydim
+        self.valdim    = valdim
+        self.keydim    = keydim
+        self.mem_freq  = mem_freq
+        self.timesteps = timesteps
 
     def forward(self, spatiotemporal_noise: torch.Tensor) -> GlobalContextVolume:
         """
-        Set the global context volumes from a set. This is equivalent to memorizing frames in a memory network
-        but because we are overfitting on a single video we do this with a number of frames at the start of each epoch
+        Set the global context volume for this epoch
         """
     
         local_contexts = []
 
-        # add frames to memory
-        for frame_idx in range(spatiotemporal_noise.shape[0]):
+        for frame_idx in range(0, spatiotemporal_noise.shape[2] - self.timesteps, self.mem_freq):
 
-            input = spatiotemporal_noise[frame_idx:frame_idx+1]
+            input = spatiotemporal_noise[:, :, frame_idx:frame_idx + self.timesteps]
 
             # encode frame and get context matrix
             key, value, _ = self.memory_encoder(input)
@@ -225,43 +225,43 @@ class MemoryReader(nn.Module):
         return global_features, value, skips
 
 class LayerDecomposition3DAttentionMemoryNet(nn.Module):
-    def __init__(self, conv_channels=64, in_channels=16, valdim=128, keydim=64, max_frames=200, coarseness=10, do_adjustment=True, shared_encoder=True):
+    def __init__(self, conv_channels=64, in_channels=16, valdim=128, keydim=64, max_frames=200, coarseness=10, mem_freq=4, timesteps=16, do_adjustment=True, shared_encoder=True):
         super().__init__()
 
         # initialize foreground encoder and decoder
         self.query_backbone = nn.ModuleList([
-            ConvBlock3D(nn.Conv3d, in_channels,       conv_channels,     ksize=(4, 4, 3), stride=(2, 2, 2)),                                                  # 1/2
-            ConvBlock3D(nn.Conv3d, conv_channels,     conv_channels * 2, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-            ConvBlock3D(nn.Conv3d, conv_channels * 2, conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(2, 2, 1), norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(2, 2, 1), norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+            ConvBlock3D(nn.Conv3d, in_channels,       conv_channels,     ksize=(4, 4, 4), stride=(2, 2, 2)),                                                  # 1/2
+            ConvBlock3D(nn.Conv3d, conv_channels,     conv_channels * 2, ksize=(4, 4, 4), stride=(1, 2, 2),                norm=nn.BatchNorm3d, activation='leaky'),  # 1/4
+            ConvBlock3D(nn.Conv3d, conv_channels * 2, conv_channels * 4, ksize=(4, 4, 4), stride=(2, 2, 2),                norm=nn.BatchNorm3d, activation='leaky'),  # 1/8
+            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(1, 2, 2),                norm=nn.BatchNorm3d, activation='leaky'),  # 1/16
+            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(1, 1, 1), dil=(2, 2, 2), norm=nn.BatchNorm3d, activation='leaky'),  # 1/16
+            ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(1, 1, 1), dil=(2, 2, 2), norm=nn.BatchNorm3d, activation='leaky')]) # 1/16
                 
         self.memory_reader = MemoryReader(conv_channels * 4, keydim, valdim, self.query_backbone)
 
         if shared_encoder:
-            self.memory_encoder = MemoryEncoder(conv_channels * 4, keydim, valdim, self.query_backbone)
+            self.memory_encoder = MemoryEncoder(conv_channels * 4, keydim, valdim, self.query_backbone, mem_freq, timesteps)
         else:
             self.memory_backbone = nn.ModuleList([
-                ConvBlock3D(nn.Conv3d, in_channels,       conv_channels,     ksize=(4, 4, 3), stride=(2, 2, 2)),                                                          # 1/2
-                ConvBlock3D(nn.Conv3d, conv_channels,     conv_channels * 2, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-                ConvBlock3D(nn.Conv3d, conv_channels * 2, conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2),                norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(2, 2, 1), norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 3), stride=(1, 1, 1), dil=(2, 2, 1), norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+                ConvBlock3D(nn.Conv3d, in_channels,       conv_channels,     ksize=(4, 4, 4), stride=(2, 2, 2)),                                                          # 1/2
+                ConvBlock3D(nn.Conv3d, conv_channels,     conv_channels * 2, ksize=(4, 4, 4), stride=(2, 2, 2),                norm=nn.BatchNorm3d, activation='leaky'),  # 1/4
+                ConvBlock3D(nn.Conv3d, conv_channels * 2, conv_channels * 4, ksize=(4, 4, 4), stride=(2, 2, 2),                norm=nn.BatchNorm3d, activation='leaky'),  # 1/8
+                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(2, 2, 2),                norm=nn.BatchNorm3d, activation='leaky'),  # 1/16
+                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(1, 1, 1), dil=(2, 2, 2), norm=nn.BatchNorm3d, activation='leaky'),  # 1/16
+                ConvBlock3D(nn.Conv3d, conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(1, 1, 1), dil=(2, 2, 2), norm=nn.BatchNorm3d, activation='leaky')]) # 1/16
 
-            self.memory_encoder = MemoryEncoder(conv_channels * 4, keydim, valdim, self.memory_backbone)
+            self.memory_encoder = MemoryEncoder(conv_channels * 4, keydim, valdim, self.memory_backbone, mem_freq, timesteps)
 
         decoder_in_channels = conv_channels * 4 + valdim * 2
 
         self.decoder = nn.ModuleList([
-            ConvBlock3D(nn.ConvTranspose3d, decoder_in_channels,   conv_channels * 4, ksize=(4, 4, 3), stride=(2, 2, 2), norm=nn.BatchNorm2d),  # 1/8
-            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2 * 4, conv_channels * 2, ksize=(4, 4, 3), stride=(2, 2, 2), norm=nn.BatchNorm2d),  # 1/4
-            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2 * 2, conv_channels,     ksize=(4, 4, 3), stride=(2, 2, 2), norm=nn.BatchNorm2d),  # 1/2
-            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2,     conv_channels,     ksize=(4, 4, 3), stride=(2, 2, 2), norm=nn.BatchNorm2d)]) # 1
+            ConvBlock3D(nn.ConvTranspose3d, decoder_in_channels,   conv_channels * 4, ksize=(4, 4, 4), stride=(1, 2, 2), norm=nn.BatchNorm3d),  # 1/8
+            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2 * 4, conv_channels * 2, ksize=(4, 4, 4), stride=(2, 2, 2), norm=nn.BatchNorm3d),  # 1/4
+            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2 * 2, conv_channels,     ksize=(4, 4, 4), stride=(1, 2, 2), norm=nn.BatchNorm3d),  # 1/2
+            ConvBlock3D(nn.ConvTranspose3d, conv_channels * 2,     conv_channels,     ksize=(4, 4, 4), stride=(2, 2, 2), norm=nn.BatchNorm3d)]) # 1
 
-        self.final_rgba = ConvBlock3D(nn.Conv3d, conv_channels, 4, ksize=(4, 4, 3), stride=(1, 1, 1), activation='tanh')
-        self.final_flow = ConvBlock3D(nn.Conv3d, conv_channels, 2, ksize=(4, 4, 3), stride=(1, 1, 1), activation='none')
+        self.final_rgba = ConvBlock3D(nn.Conv3d, conv_channels, 4, ksize=(4, 4, 4), stride=(1, 1, 1), activation='tanh')
+        self.final_flow = ConvBlock3D(nn.Conv3d, conv_channels, 2, ksize=(4, 4, 4), stride=(1, 1, 1), activation='none')
 
         self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
@@ -306,38 +306,33 @@ class LayerDecomposition3DAttentionMemoryNet(nn.Module):
         jitter_grid          = input["jitter_grid"]
         index                = input["index"]
 
-        global_context = self.memory_encoder(spatiotemporal_noise)
+        batch_size, N_layers, channels, T, H, W = query_input.shape
 
-        batch_size, N_t, N_layers, channels, T, H, W = query_input.shape
-
-        input_t0 = query_input[:, 0]
-        input_t1 = query_input[:, 1]
+        global_context = self.memory_encoder(spatiotemporal_noise.unsqueeze(0))
 
         composite_rgba = None
-        composite_flow = torch.cat((background_flow[:, 0], background_flow[:, 1]))
-
-        background_uv_map = torch.cat((background_uv_map[:, 0], background_uv_map[:, 1]))
+        composite_flow = background_flow
 
         layers_rgba = []
         layers_flow = []
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        jitter_grid = torch.cat((jitter_grid[:, 0], jitter_grid[:, 1]))
         background_offset = self.get_background_offset(jitter_grid, index)
         brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
 
         for i in range(N_layers):
-            layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
+            layer_input = query_input[:, i]
 
             # Background layer
             if i == 0:
+
                 rgba, flow = self.render(layer_input, global_context, is_bg=True)
                 alpha = self.get_alpha_from_rgba(rgba)
 
                 rgba = F.grid_sample(rgba, background_uv_map)               
                 if self.do_adjustment:
-                    rgba = FlowHandler.apply_flow(rgba, background_offset)
+                    rgba = self.apply_background_offset(rgba, background_offset)
 
                 composite_rgba = rgba
                 flow = composite_flow
@@ -347,7 +342,7 @@ class LayerDecomposition3DAttentionMemoryNet(nn.Module):
                 rgba, flow = self.render(layer_input, global_context)
                 alpha = self.get_alpha_from_rgba(rgba)
 
-                composite_rgba = self.composite_rgba(composite_rgba, rgba)
+                composite_rgba = self.composite_rgba(rgba, rgba)
                 composite_flow = flow * alpha + composite_flow * (1. - alpha)
 
             layers_rgba.append(rgba)
@@ -363,23 +358,17 @@ class LayerDecomposition3DAttentionMemoryNet(nn.Module):
             # map back to [-1, 1]
             composite_rgba = composite_rgba * 2 - 1
 
-        # stack in time dimension
-        composite_rgba      = torch.stack((composite_rgba[:batch_size], composite_rgba[batch_size:]), 1)
-        composite_flow      = torch.stack((composite_flow[:batch_size], composite_flow[batch_size:]), 1)
-        layers_rgba         = torch.stack(layers_rgba, 1)
-        layers_rgba         = torch.stack((layers_rgba[:batch_size], layers_rgba[batch_size:]), 1)
-        layers_flow         = torch.stack(layers_flow, 1)
-        layers_flow         = torch.stack((layers_flow[:batch_size], layers_flow[batch_size:]), 1)
-        brightness_scale    = torch.stack((brightness_scale[:batch_size], brightness_scale[batch_size:]), 1)
-        background_offset   = torch.stack((background_offset[:batch_size], background_offset[batch_size:]), 1)
+        # stack in layer dimension
+        layers_rgba = torch.stack(layers_rgba, 1)
+        layers_flow = torch.stack(layers_flow, 1)
 
         out = {
-            "rgba_reconstruction": composite_rgba,          # [B, 2, 4, H, W]
-            "flow_reconstruction": composite_flow,          # [B, 2, 2, H, w]
-            "layers_rgba": layers_rgba,                     # [B, 2, L, 4, H, W]
-            "layers_flow": layers_flow,                     # [B, 2, L, 2, H, W]
-            "brightness_scale": brightness_scale,           # [B, 2, 1, H, W]
-            "background_offset": background_offset,         # [B, 2, 2, H, W]
+            "rgba_reconstruction": composite_rgba,          # [B,    4, T, H, W]
+            "flow_reconstruction": composite_flow,          # [B,    2, T, H, w]
+            "layers_rgba": layers_rgba,                     # [B, L, 4, T, H, W]
+            "layers_flow": layers_flow,                     # [B, L, 2, T, H, W]
+            "brightness_scale": brightness_scale,           # [B,    1, T, H, W]
+            "background_offset": background_offset,         # [B,    2, T, H, W]
         }
         return out
 
@@ -391,15 +380,18 @@ class LayerDecomposition3DAttentionMemoryNet(nn.Module):
 
     def get_background_offset(self, jitter_grid, index):
         background_offset = F.interpolate(self.bg_offset, (self.max_frames, 4, 7), mode="trilinear")
-        background_offset = background_offset[0, :, index].transpose(0, 1)
-        background_offset = F.grid_sample(background_offset, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+        background_offset = background_offset[:, :, index].repeat(jitter_grid.shape[0], 1, 1, 1, 1)
+        background_offset = F.grid_sample(background_offset, jitter_grid.permute(0, 2, 3, 4, 1), align_corners=True)
+        
+        # There is no offset in temporal dimension
+        background_offset = torch.cat((torch.zeros_like(background_offset[:, 0:1]), background_offset), dim=1)
 
         return background_offset
 
     def get_brightness_scale(self, jitter_grid, index):
         brightness_scale = F.interpolate(self.brightness_scale, (self.max_frames, 4, 7), mode='trilinear', align_corners=True)
-        brightness_scale = brightness_scale[0, 0, index].unsqueeze(1)
-        brightness_scale = F.grid_sample(brightness_scale, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+        brightness_scale = brightness_scale[:, :, index].repeat(jitter_grid.shape[0], 1, 1, 1, 1)
+        brightness_scale = F.grid_sample(brightness_scale, jitter_grid.permute(0, 2, 3, 4, 1), align_corners=True)
 
         return brightness_scale
 
@@ -415,3 +407,23 @@ class LayerDecomposition3DAttentionMemoryNet(nn.Module):
         comp = composite * .5 + .5
 
         return ((1. - alpha) * comp + alpha * new_layer) * 2 - 1
+
+    def apply_background_offset(self, input, bg_offset):
+
+        batch_size, _, t, h, w = input.size()
+
+        # Calculate a base grid that functions as an identity sampler
+        temporal   = torch.linspace(-1.0, 1.0, t).view(1, 1, t, 1, 1).expand(batch_size, 1, t, h, w)
+        horizontal = torch.linspace(-1.0, 1.0, w).view(1, 1, 1, 1, w).expand(batch_size, 1, t, h, w)
+        vertical   = torch.linspace(-1.0, 1.0, h).view(1, 1, 1, h, 1).expand(batch_size, 1, t, h, w)
+        base_grid  = torch.cat([temporal, horizontal, vertical], dim=1).to(input.device)
+
+        # calculate a Delta grid based on the flow that offsets the base grid
+        flow_grid = torch.cat([bg_offset[:, 0:1],
+                               bg_offset[:, 1:2, :, :] / (w - 1.) / 2., 
+                               bg_offset[:, 2:3, :, :] / (h - 1.) / 2.], 1)
+
+        # construct full grid
+        grid = (base_grid + flow_grid).permute(0, 2, 3, 4, 1)
+
+        return F.grid_sample(input, grid, align_corners=True)

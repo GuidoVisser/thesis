@@ -96,7 +96,7 @@ class LayerDecompositer(nn.Module):
             reconstruction = output["rgba_reconstruction"]
             rgba_layers    = output["layers_rgba"]
             gt_image       = targets["rgb"]
-            output["layers_rgba"] = self.transfer_detail(reconstruction[:, :, :3], rgba_layers, gt_image)
+            output["layers_rgba"] = self.transfer_detail(reconstruction[:, :3], rgba_layers, gt_image)
 
             # Save results
             frame_indices = input["index"][:, 0].tolist()
@@ -117,21 +117,16 @@ class LayerDecompositer(nn.Module):
         gt_rgb = targets["rgb"]
 
         # NOTE: current_batch_size is not necessarily the same as self.batch_size at the end of an epoch
-        current_batch_size, _, n_layers, _, _, _ = rgba_layers.shape 
+        current_batch_size, n_layers, _, timesteps, _, _ = rgba_layers.shape 
 
         for b in range(current_batch_size):
-
-            if frame_indices[b] == 0:
-                timesteps = [0, 1]
-            else:
-                timesteps = [1]
             
-            for t in timesteps:
+            for t in range(timesteps):
 
                 # background
-                background_rgb_static    = torch.clone(rgba_layers[b, t, 0, :3]).detach()
-                background_rgb_dynamic   = torch.clone(rgba_layers[b, t, 1, :3]).detach()
-                background_alpha_dynamic = torch.clone(rgba_layers[b, t, 1, 3:]).detach()
+                background_rgb_static    = torch.clone(rgba_layers[b, 0, :3, t]).detach()
+                background_rgb_dynamic   = torch.clone(rgba_layers[b, 1, :3, t]).detach()
+                background_alpha_dynamic = torch.clone(rgba_layers[b, 1, 3:, t]).detach()
 
                 # Go from tripmap to binary mask
                 background_alpha_dynamic = background_alpha_dynamic * .5 + .5
@@ -139,16 +134,16 @@ class LayerDecompositer(nn.Module):
                 # Get the full background
                 background_rgb = (1 - background_alpha_dynamic) * background_rgb_static + background_alpha_dynamic * background_rgb_dynamic
 
-                reconstruction_rgb = torch.clone(reconstruction[b, t, :3]).detach()
-                gt_rgb_batch       = gt_rgb[b, t]
+                reconstruction_rgb = torch.clone(reconstruction[b, :3 , t]).detach()
+                gt_rgb_batch       = gt_rgb[b, :, t]
 
                 background_img        = cv2.cvtColor((background_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
                 background_img_static = cv2.cvtColor((background_rgb_static.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
                 reconstruction_img    = cv2.cvtColor((reconstruction_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
                 gt_rgb_img            = cv2.cvtColor((gt_rgb_batch.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
 
-                background_offset_img = torch.clone(background_offset[b, t]).detach().cpu().permute(1, 2, 0).numpy()
-                brightness_scale_img  = (torch.clone(brightness_scale[b, t]).detach().permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255
+                background_offset_img = torch.clone(background_offset[b, :, t]).detach().cpu().permute(1, 2, 0).numpy()
+                brightness_scale_img  = (torch.clone(brightness_scale[b, :, t]).detach().permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255
 
                 img_name = f"{(frame_indices[b] + t):05}.png"
                 epoch_name = f"{epoch:03}" if isinstance(epoch, int) else epoch
@@ -157,16 +152,16 @@ class LayerDecompositer(nn.Module):
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/reconstruction/{img_name}"), reconstruction_img)
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/ground_truth/{img_name}"), gt_rgb_img)
 
-                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_offset/{img_name}"), flow_to_image(background_offset_img, convert_to_bgr=True))
+                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_offset/{img_name}"), flow_to_image(background_offset_img[:, :, :2], convert_to_bgr=True))
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/brightness_scale/{img_name}"), brightness_scale_img)
 
                 for l in range(1, n_layers):
                     create_dirs(path.join(self.save_dir, f"{epoch_name}/foreground/{l:02}"),
                                 path.join(self.save_dir, f"{epoch_name}/alpha/{l:02}"),
                                 path.join(self.save_dir, f"{epoch_name}/flow/{l:02}"))
-                    foreground_rgba     = torch.clone(rgba_layers[b, t, l]).detach()
-                    foreground_flow    = torch.clone(flow_layers[b, t, l]).detach()
-                    foreground_alpha   = torch.clone(rgba_layers[b, t, l, 3]).detach()
+                    foreground_rgba    = torch.clone(rgba_layers[b, l, :, t]).detach()
+                    foreground_flow    = torch.clone(flow_layers[b, l, :, t]).detach()
+                    foreground_alpha   = torch.clone(rgba_layers[b, l, 3, t]).detach()
 
                     foreground_img      = cv2.cvtColor((foreground_rgba.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGBA2BGRA)
                     alpha_img           = (foreground_alpha.cpu().numpy() + 1) / 2. * 255
@@ -199,8 +194,8 @@ class LayerDecompositer(nn.Module):
 
         for i in range(n_layers - 2, 0, -1):
             layer_transmission = 1 - transmission_composite
-            rgba_with_detail[:, :, i, :3] += layer_transmission * residual
-            layer_alpha = rgba_layers[:, :, i, 3:4] * .5 + .5
+            rgba_with_detail[:, i, :3] += layer_transmission * residual
+            layer_alpha = rgba_layers[:, i, 3:4] * .5 + .5
             transmission_composite = layer_alpha + (1 - layer_alpha) * transmission_composite
         
         return torch.clamp(rgba_with_detail, -1, 1)

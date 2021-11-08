@@ -11,6 +11,7 @@ CONFIG = {
         'flow_model':        'models/third_party/weights/raft-things.pth'
     },
     "reconstruction_model": {
+        'convolutions':    '3D',
         'coarseness':      10, 
         'composite_order': None 
     },
@@ -29,7 +30,8 @@ CONFIG = {
         'in_channels':               16,
         'conv_channels':             64,
         'noise_temporal_coarseness': 2,
-        'shared_encoder':            1
+        'shared_encoder':            1,
+        'timesteps':                 16
     },
     "memory_network" : {
         'keydim':     128, 
@@ -38,8 +40,6 @@ CONFIG = {
     "lambdas": {
         "lambda_mask":              50.,
         "lambda_recon_flow":        1.,
-        "lambda_recon_warp":        0.,
-        "lambda_alpha_warp":        0.005,
         "lambda_alpha_l0":          0.005,
         "lambda_alpha_l1":          0.01,
         "lambda_stabilization":     0.001,

@@ -326,7 +326,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        jitter_grid = jitter_grid.permute(0, 2, 1, 3, 4).view(T*batch_size, 2, H, W)
+        jitter_grid = jitter_grid.permute(0, 2, 1, 3, 4).reshape(T*batch_size, 2, H, W)
 
         background_offset = self.get_background_offset(jitter_grid, index)
         brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
