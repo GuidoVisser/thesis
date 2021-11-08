@@ -35,36 +35,36 @@ class DecompositeLoss(nn.Module):
 
         # Ground truth values
         flow_gt         = targets["flow"]            # [B, 2, 2, H, W]
-        rgb_gt          = targets["rgb"]             # [B, 2, 3, H, W]
-        masks           = targets["masks"]           # [B, 2, L, 1, H, W]
-        binary_masks    = targets["binary_masks"]    # [B, 2, L, 1, H, W]
-        flow_confidence = targets["flow_confidence"] # [B, 2, 1, H, W]
+        rgb_gt          = targets["rgb"]             # [B, 3, 2, H, W]
+        masks           = targets["masks"]           # [B, L, 1, 2, H, W]
+        binary_masks    = targets["binary_masks"]    # [B, L, 1, 2, H, W]
+        flow_confidence = targets["flow_confidence"] # [B, 1, 2, H, W]
 
         ### Main loss
 
         # Model predictions
-        rgba_reconstruction = predictions["rgba_reconstruction"]        # [B, 2, 4, H, W]
+        rgba_reconstruction = predictions["rgba_reconstruction"]        # [B, 4, 2, H, W]
         flow_reconstruction = predictions["flow_reconstruction"]        # [B, 2, 2, H, w]
-        rgb_reconstruction  = rgba_reconstruction[:, :, :3]             # [B, 2, 3, H, W]
-        alpha_composite     = rgba_reconstruction[:, :, 3:]             # [B, 2, 1, H, W]
-        alpha_layers        = predictions["layers_rgba"][..., 3:, :, :] # [B, 2, L, 1, H, W]
+        rgb_reconstruction  = rgba_reconstruction[:, :3]                # [B, 3, 2, H, W]
+        alpha_composite     = rgba_reconstruction[:, 3:]                # [B, 1, 2, H, W]
+        alpha_layers        = predictions["layers_rgba"][:, :, 3:]      # [B, L, 1, 2, H, W]
 
         # Calculate main loss
         rgb_reconstruction_loss  = self.calculate_loss(rgb_reconstruction, rgb_gt)
         flow_reconstruction_loss = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
         mask_bootstrap_loss      = self.calculate_loss(alpha_layers, masks, mask_loss=True)
         alpha_reg_loss           = cal_alpha_reg(alpha_composite * 0.5 + 0.5, self.lambda_alpha_l1, self.lambda_alpha_l0)
-        dynamics_reg_loss        = self.cal_dynamics_reg(self.rearrange_t2b(alpha_layers), self.rearrange_t2b(binary_masks))
+        dynamics_reg_loss        = self.cal_dynamics_reg(alpha_layers, binary_masks)
 
         ### Temporal consistency loss
 
         # Model predictions
         alpha_layers_warped       = predictions["layers_alpha_warped"]   # [B, L, 1, H, W]
-        rgb_reconstruction_warped = predictions["reconstruction_warped"] # [B, 2, 4, H, W]
+        rgb_reconstruction_warped = predictions["reconstruction_warped"] # [B, 4, 2, H, W]
 
         # Calculate loss for temporal consistency
-        alpha_warp_loss              = self.calculate_loss(alpha_layers_warped, alpha_layers[:, 0], t2b=False)
-        rgb_reconstruction_warp_loss = self.calculate_loss(rgb_reconstruction_warped, rgb_reconstruction[:, 0], t2b=False)
+        alpha_warp_loss              = self.calculate_loss(alpha_layers_warped, alpha_layers[..., 0, :, :])
+        rgb_reconstruction_warp_loss = self.calculate_loss(rgb_reconstruction_warped, rgb_reconstruction[:, :, 0])
 
         ### Adjust for camera stabilization errors
 
@@ -114,21 +114,8 @@ class DecompositeLoss(nn.Module):
 
         return loss, loss_values
 
-    def rearrange_t2b(self, tensor):
-        """
-        Rearrange a tensor such that the time dimension is stacked in the batch dimension
 
-        [B, 2, ...] -> [B*2, ...]
-        """
-        assert tensor.size(1) == 2
-        return torch.cat((tensor[:, 0], tensor[:, 1]))
-
-    def calculate_loss(self, prediction, target, t2b=True, mask_loss=False):
-        
-        # Rearrange time dimension into batch dimension
-        if t2b:
-            prediction  = self.rearrange_t2b(prediction)
-            target      = self.rearrange_t2b(target)
+    def calculate_loss(self, prediction, target, mask_loss=False):
         
         # Calculate loss value
         if mask_loss:

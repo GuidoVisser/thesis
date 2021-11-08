@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from torch._C import device
 from torch.utils.data import DataLoader
 import torch
 import numpy as np
@@ -32,7 +33,8 @@ def main(args):
         noise_temporal_coarseness=args.noise_temporal_coarseness,
         do_jitter = True, 
         propagation_model = args.propagation_model, 
-        flow_model = args.flow_model
+        flow_model = args.flow_model,
+        device=args.device
     )
 
     data_loader = DataLoader(
@@ -114,7 +116,7 @@ if __name__ == "__main__":
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
-    training_param_args.add_argument("--device", type=str, default="cuda:0", help="CUDA device")
+    training_param_args.add_argument("--device", type=str, default="cpu", help="CUDA device")
     training_param_args.add_argument("--n_epochs", type=int, default=301, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=50, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")

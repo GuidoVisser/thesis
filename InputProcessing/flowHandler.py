@@ -360,7 +360,7 @@ class FlowHandler(object):
         )
 
         model = torch.nn.DataParallel(RAFT(config))
-        model.load_state_dict(torch.load(weights))
+        model.load_state_dict(torch.load(weights, map_location=torch.device('cpu')))
         model = model.module
         model.to(self.device)
         model.eval()

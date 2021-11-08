@@ -154,9 +154,9 @@ class MemoryEncoder(nn.Module):
         local_contexts = []
 
         # add frames to memory
-        for frame_idx in range(spatiotemporal_noise.shape[0]):
+        for frame_idx in range(spatiotemporal_noise.shape[1]):
 
-            input = spatiotemporal_noise[frame_idx:frame_idx+1]
+            input = spatiotemporal_noise[:, frame_idx].unsqueeze(0)
 
             # encode frame and get context matrix
             key, value, _ = self.memory_encoder(input)
@@ -308,15 +308,14 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         global_context = self.memory_encoder(spatiotemporal_noise)
 
-        batch_size, N_t, N_layers, channels, H, W = query_input.shape
+        batch_size, N_layers, channels, T, H, W = query_input.shape
 
-        input_t0 = query_input[:, 0]
-        input_t1 = query_input[:, 1]
+        query_input = query_input.permute(0, 3, 1, 2, 4, 5).view(T*batch_size, N_layers, channels, H, W)
 
         composite_rgba = None
-        composite_flow = torch.cat((background_flow[:, 0], background_flow[:, 1]))
+        composite_flow = background_flow.permute(0, 2, 1, 3, 4).view(T*batch_size, 2, H, W)
 
-        background_uv_map = torch.cat((background_uv_map[:, 0], background_uv_map[:, 1]))
+        background_uv_map = background_uv_map.view(T*batch_size, H, W, 2)
 
         layers_rgba = []
         layers_flow = []
@@ -327,12 +326,13 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        jitter_grid = torch.cat((jitter_grid[:, 0], jitter_grid[:, 1]))
+        jitter_grid = jitter_grid.permute(0, 2, 1, 3, 4).view(T*batch_size, 2, H, W)
+
         background_offset = self.get_background_offset(jitter_grid, index)
         brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
 
         for i in range(N_layers):
-            layer_input = torch.cat(([input_t0[:, i], input_t1[:, i]]))
+            layer_input = query_input[:, i]
 
             # Background layer
             if i == 0:
@@ -379,24 +379,24 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             composite_rgba = composite_rgba * 2 - 1
 
         # stack in time dimension
-        composite_rgba      = torch.stack((composite_rgba[:batch_size], composite_rgba[batch_size:]), 1)
-        composite_flow      = torch.stack((composite_flow[:batch_size], composite_flow[batch_size:]), 1)
+        composite_rgba      = torch.stack((composite_rgba[:batch_size], composite_rgba[batch_size:]), -3)
+        composite_flow      = torch.stack((composite_flow[:batch_size], composite_flow[batch_size:]), -3)
         layers_rgba         = torch.stack(layers_rgba, 1)
-        layers_rgba         = torch.stack((layers_rgba[:batch_size], layers_rgba[batch_size:]), 1)
+        layers_rgba         = torch.stack((layers_rgba[:batch_size], layers_rgba[batch_size:]), -3)
         layers_flow         = torch.stack(layers_flow, 1)
-        layers_flow         = torch.stack((layers_flow[:batch_size], layers_flow[batch_size:]), 1)
+        layers_flow         = torch.stack((layers_flow[:batch_size], layers_flow[batch_size:]), -3)
         layers_alpha_warped = torch.stack(layers_alpha_warped, 1)
-        brightness_scale    = torch.stack((brightness_scale[:batch_size], brightness_scale[batch_size:]), 1)
-        background_offset   = torch.stack((background_offset[:batch_size], background_offset[batch_size:]), 1)
+        brightness_scale    = torch.stack((brightness_scale[:batch_size], brightness_scale[batch_size:]), -3)
+        background_offset   = torch.stack((background_offset[:batch_size], background_offset[batch_size:]), -3)
 
         out = {
-            "rgba_reconstruction": composite_rgba,          # [B, 2, 4, H, W]
+            "rgba_reconstruction": composite_rgba,          # [B, 4, 2, H, W]
             "flow_reconstruction": composite_flow,          # [B, 2, 2, H, w]
             "reconstruction_warped": composite_warped,      # [B, 3, H, W]
-            "layers_rgba": layers_rgba,                     # [B, 2, L, 4, H, W]
-            "layers_flow": layers_flow,                     # [B, 2, L, 2, H, W]
+            "layers_rgba": layers_rgba,                     # [B, L, 4, 2, H, W]
+            "layers_flow": layers_flow,                     # [B, L, 2, 2, H, W]
             "layers_alpha_warped": layers_alpha_warped,     # [B, L, 1, H, W]
-            "brightness_scale": brightness_scale,           # [B, 2, 1, H, W]
+            "brightness_scale": brightness_scale,           # [B, 1, 2, H, W]
             "background_offset": background_offset,         # [B, 2, 2, H, W]
         }
         return out
@@ -433,3 +433,13 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         comp = composite * .5 + .5
 
         return ((1. - alpha) * comp + alpha * new_layer) * 2 - 1
+
+    def reorder_time2batch(self, input):
+        if len(input.shape) == 6:
+            b, l, c, t, h, w = input.shape
+            return input.permute(0, 3, 1, 2, 4, 5).view(b*t, l, c, h, w)
+        elif len(input.shape) == 5:
+            b, c, t, h, w = input.shape
+            return input.permute(0, 2, 1, 3, 4).view(b*t, c, h, w)
+        else:
+            raise NotImplementedError("Input shape is not supported")
