@@ -250,7 +250,6 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
             # Background layer
             if i == 0:
                 rgba, flow = self.render(layer_input, global_context, is_bg=True)
-                alpha = self.get_alpha_from_rgba(rgba)
 
                 rgba = F.grid_sample(rgba, background_uv_map)               
                 if self.do_adjustment:

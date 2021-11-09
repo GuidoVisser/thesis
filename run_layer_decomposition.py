@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from cv2 import NORM_MINMAX
 from torch._C import device
 from torch.utils.data import DataLoader
 import torch
@@ -31,6 +32,7 @@ def main(args):
         propagation_model=args.propagation_model, 
         flow_model=args.flow_model,
         in_channels=args.in_channels,
+        num_static_channels=args.num_static_channels,
         noise_temporal_coarseness=args.noise_temporal_coarseness,
         device=args.device,
         timesteps=args.timesteps,
@@ -129,6 +131,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--alpha_loss_l1_rolloff", type=int, default=100, help="Number of epochs to use mask l1 regularization loss")
     training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
     training_param_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
+    training_param_args.add_argument("--num_static_channels", type=int, default=5, help="number of input channels that are static in time")
     training_param_args.add_argument("--conv_channels", type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
     training_param_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
     training_param_args.add_argument("--shared_encoder", type=int, default=1, help="Specifies whether to use a shared memory/query encoder in the network")

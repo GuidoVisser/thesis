@@ -24,6 +24,7 @@ class InputProcessor(object):
                  propagation_model: str,
                  flow_model: str,
                  in_channels: int = 16,
+                 num_static_channels: int = 5,
                  noise_temporal_coarseness: int = 2,
                  device: str = "cuda",
                  timesteps: int = 2,
@@ -71,7 +72,7 @@ class InputProcessor(object):
         self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
         self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device)
         self.homography_handler = HomographyHandler(out_root, self.img_dir, path.join(flow_dir, "dynamics_mask"), self.device, frame_size)
-        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, temporal_coarseness=noise_temporal_coarseness, frame_size=frame_size)       
+        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, num_static_channels=num_static_channels, temporal_coarseness=noise_temporal_coarseness, frame_size=frame_size)       
 
         # Load a custom compositing order if it's given, otherwise initialize a new one
         self._initialize_composite_order(composite_order_fp)
@@ -134,7 +135,7 @@ class InputProcessor(object):
         if self.use_3d:
             t = torch.linspace(-1, 1, self.timesteps).unsqueeze(1).unsqueeze(1).unsqueeze(1).repeat(1, self.frame_size[1], self.frame_size[0], 1)
 
-            background_uv_map = torch.cat((t, background_uv_map), dim=-1)
+            background_uv_map = torch.cat((background_uv_map, t), dim=-1)
 
         # Construct query input        
         pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)             # [L-b, 1, T, H, W] 

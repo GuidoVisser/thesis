@@ -28,6 +28,7 @@ CONFIG = {
         'alpha_bootstr_rolloff':     50,
         'alpha_loss_l1_rolloff':     100,
         'in_channels':               16,
+        'num_static_channels':       5,
         'conv_channels':             64,
         'noise_temporal_coarseness': 2,
         'shared_encoder':            1,

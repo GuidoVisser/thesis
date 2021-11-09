@@ -10,6 +10,7 @@ from models.DynamicLayerDecomposition.modules.base_modules import MemoryReader
 from models.DynamicLayerDecomposition.modules.base_modules import KeyValueEncoder
 from models.DynamicLayerDecomposition.modules.base_modules import LayerDecompositionAttentionMemoryNet
 
+import cv2
 
 class ConvBlock3D(ConvBlock):
     """
@@ -246,8 +247,6 @@ class LayerDecompositionAttentionMemoryNet3D(LayerDecompositionAttentionMemoryNe
             if i == 0:
 
                 rgba, flow = self.render(layer_input, global_context)
-                alpha = self.get_alpha_from_rgba(rgba)
-
                 rgba = F.grid_sample(rgba, background_uv_map)               
                 if self.do_adjustment:
                     rgba = self._apply_background_offset(rgba, background_offset)
@@ -260,7 +259,7 @@ class LayerDecompositionAttentionMemoryNet3D(LayerDecompositionAttentionMemoryNe
                 rgba, flow = self.render(layer_input, global_context)
                 alpha = self.get_alpha_from_rgba(rgba)
 
-                composite_rgba = self.composite_rgba(rgba, rgba)
+                composite_rgba = self.composite_rgba(composite_rgba, rgba)
                 composite_flow = flow * alpha + composite_flow * (1. - alpha)
 
             layers_rgba.append(rgba)
@@ -341,7 +340,7 @@ class LayerDecompositionAttentionMemoryNet3D(LayerDecompositionAttentionMemoryNe
             temporal   = torch.linspace(-1.0, 1.0, t).view(1, 1, t, 1, 1).expand(batch_size, 1, t, h, w)
             horizontal = torch.linspace(-1.0, 1.0, w).view(1, 1, 1, 1, w).expand(batch_size, 1, t, h, w)
             vertical   = torch.linspace(-1.0, 1.0, h).view(1, 1, 1, h, 1).expand(batch_size, 1, t, h, w)
-            self.base_grid_bg_offset  = torch.cat([temporal, horizontal, vertical], dim=1).to(input.device)
+            self.base_grid_bg_offset  = torch.cat([horizontal, vertical, temporal], dim=1).to(input.device)
 
         # current batch size may be smaller than normal batch size at the end of an epoch
         base_grid = self.base_grid_bg_offset[:batch_size]
