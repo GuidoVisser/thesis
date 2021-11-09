@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from os import path
+from datetime import datetime
 
 from torch.utils.tensorboard.writer import SummaryWriter
 
@@ -43,6 +44,8 @@ class LayerDecompositer(nn.Module):
     def run_training(self):
         
         for epoch in range(self.n_epochs):
+
+            t0 = datetime.now()
             
             if epoch % self.save_freq == 0:
                 self.create_save_dirs(epoch)
@@ -52,9 +55,6 @@ class LayerDecompositer(nn.Module):
 
             if epoch == self.mask_bootstrap_rolloff:
                 self.loss_module.lambda_mask_bootstrap = 0
-
-            if torch.cuda.device_count() <= 10:
-                print(f"Epoch: {epoch} / {self.n_epochs - 1}")
             
             for iteration, (input, targets) in enumerate(self.dataloader):
 
@@ -75,6 +75,10 @@ class LayerDecompositer(nn.Module):
                 if epoch % self.save_freq == 0:
                     frame_indices = input["index"][:, 0].tolist()
                     self.visualize_and_save_output(output, targets, frame_indices, epoch)
+
+            if torch.cuda.device_count() <= 10:
+                t1 = datetime.now()
+                print(f"Epoch: {epoch} / {self.n_epochs - 1} done in {(t1 - t0).total_seconds()} seconds")
 
         torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
 
