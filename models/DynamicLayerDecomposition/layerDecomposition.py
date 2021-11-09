@@ -205,7 +205,7 @@ class LayerDecompositer(nn.Module):
         n_layers = rgba_layers.shape[1]
         n_bg_layers = 2 if self.separate_bg else 1
 
-        for i in range(n_layers - n_bg_layers, 0, -1):
+        for i in range(n_layers - 1, n_bg_layers - 1, -1):
             layer_transmission = 1 - transmission_composite
             rgba_with_detail[:, i, :3] += layer_transmission * residual
             layer_alpha = rgba_layers[:, i, 3:4] * .5 + .5

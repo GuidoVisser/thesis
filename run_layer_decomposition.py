@@ -23,6 +23,7 @@ def main(args):
     seed_all(args.seed)
 
     writer = SummaryWriter(args.out_dir)
+    separate_bg = True
 
     input_processor = InputProcessor(
         args.img_dir, 
@@ -37,7 +38,7 @@ def main(args):
         device=args.device,
         timesteps=args.timesteps,
         use_3d=False,
-        separate_bg=True,
+        separate_bg=separate_bg,
         frame_size=(args.frame_width, args.frame_height),
         do_jitter=True, 
         jitter_rate=args.jitter_rate
@@ -81,7 +82,8 @@ def main(args):
         results_root=args.out_dir, 
         batch_size=args.batch_size,
         n_epochs=args.n_epochs,
-        save_freq=args.save_freq
+        save_freq=args.save_freq,
+        separate_bg=separate_bg
     )
 
     model.run_training()
@@ -123,7 +125,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=101, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=50, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
