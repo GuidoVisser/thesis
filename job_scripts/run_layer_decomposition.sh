@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 6:00:00
+#SBATCH -t 24:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -42,7 +42,6 @@ python $HOME/thesis/run_layer_decomposition.py \
             --conv_channels 64 \
             --keydim 64 \
             --valdim 128 \
-            --mem_freq 4 \
             --timesteps 8 \
             --alpha_bootstr_rolloff 50 \
             --alpha_loss_l1_rolloff 100 \
