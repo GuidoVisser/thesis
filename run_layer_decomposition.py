@@ -9,8 +9,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from InputProcessing.inputProcessor import InputProcessor
 from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
-from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss
-from models.DynamicLayerDecomposition.modules import LayerDecompositionAttentionMemoryNet
+from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss2D
+from models.DynamicLayerDecomposition.modules.modules_2d import LayerDecompositionAttentionMemoryNet2D
 
 from utils.demo import create_decomposite_demo
 from utils.utils import create_dir, seed_all
@@ -19,24 +19,26 @@ from models.DynamicLayerDecomposition.model_config import CONFIG, update_config,
 
 def main(args):
 
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
+    seed_all(args.seed)
 
     writer = SummaryWriter(args.out_dir)
 
-    # seed_all(0)
     input_processor = InputProcessor(
         args.img_dir, 
         args.out_dir, 
         args.initial_mask, 
         args.composite_order, 
+        propagation_model=args.propagation_model, 
+        flow_model=args.flow_model,
         in_channels=args.in_channels,
         noise_temporal_coarseness=args.noise_temporal_coarseness,
-        do_jitter = True, 
+        device=args.device,
         timesteps=args.timesteps,
-        propagation_model = args.propagation_model, 
-        flow_model = args.flow_model,
-        device=args.device
+        use_3d=False,
+        separate_bg=True,
+        frame_size=(args.frame_width, args.frame_height),
+        do_jitter=True, 
+        jitter_rate=args.jitter_rate
     )
 
     data_loader = DataLoader(
@@ -45,7 +47,7 @@ def main(args):
         shuffle=True
     )
 
-    loss_module = DecompositeLoss(
+    loss_module = DecompositeLoss2D(
         args.lambda_mask,
         args.lambda_recon_flow,
         args.lambda_recon_warp,
@@ -57,7 +59,7 @@ def main(args):
         args.lambda_dynamics_reg_corr
     )
 
-    network = DataParallel(LayerDecompositionAttentionMemoryNet(
+    network = DataParallel(LayerDecompositionAttentionMemoryNet2D(
         in_channels=args.in_channels,
         conv_channels=args.conv_channels,
         do_adjustment=True, 
@@ -119,7 +121,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=301, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=101, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=50, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
@@ -130,7 +132,10 @@ if __name__ == "__main__":
     training_param_args.add_argument("--conv_channels", type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
     training_param_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
     training_param_args.add_argument("--shared_encoder", type=int, default=1, help="Specifies whether to use a shared memory/query encoder in the network")
-    training_param_args.add_argument("--timesteps", type=int, default=8, help="Temporal depth of the query input")
+    training_param_args.add_argument("--timesteps", type=int, default=2, help="Temporal depth of the query input")
+    training_param_args.add_argument("--frame_height", type=int, default=256, help="target height of the frames")
+    training_param_args.add_argument("--frame_width", type=int, default=448, help="target width of the frames")
+    training_param_args.add_argument("--jitter_rate", type=float, default=0.75, help="rate of applying jitter to the input")
 
     lambdas = parser.add_argument_group("lambdas")
     lambdas.add_argument("--lambda_mask", type=float, default=50., help="starting value for the lambda of the alpha_mask_bootstrap loss")

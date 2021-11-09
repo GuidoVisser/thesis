@@ -30,7 +30,11 @@ CONFIG = {
         'in_channels':               16,
         'conv_channels':             64,
         'noise_temporal_coarseness': 2,
-        'shared_encoder':            1
+        'shared_encoder':            1,
+        'timesteps':                 16,
+        'frame_height':              256,
+        'frame_width':               448,
+        'jitter_rate':               0.75
     },
     "memory_network" : {
         'keydim':     128, 
