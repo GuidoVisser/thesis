@@ -37,8 +37,8 @@ python $HOME/thesis/run_layer_decomposition_3d.py \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --batch_size 4 \
-            --n_epochs 251 \
-            --save_freq 50 \
+            --n_epochs 1001 \
+            --save_freq 250 \
             --conv_channels 64 \
             --keydim 64 \
             --valdim 128 \
