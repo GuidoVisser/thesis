@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -n 1
-#SBATCH -t 14:00:00
+#SBATCH -t 18:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -37,15 +37,17 @@ python $HOME/thesis/run_layer_decomposition_3d.py \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --batch_size 4 \
-            --n_epochs 251 \
-            --save_freq 100 \
+            --n_epochs 1001 \
+            --save_freq 250 \
             --conv_channels 64 \
             --keydim 64 \
             --valdim 128 \
             --mem_freq 4 \
             --timesteps 8 \
-            --lambda_alpha_l0 0.015 \
-            --lambda_alpha_l1 0.03 \
+            --alpha_bootstrap_rolloff 20 \
+            --alpha_loss_l1_rolloff 40 \
+            --lambda_alpha_l0 0.005 \
+            --lambda_alpha_l1 0.01 \
             --lambda_dynamics_reg_corr 0.0 \
             --lambda_dynamics_reg_diff 0.0 \
             --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension.'
