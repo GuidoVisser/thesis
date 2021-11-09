@@ -45,8 +45,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --timesteps 8 \
             --alpha_bootstr_rolloff 50 \
             --alpha_loss_l1_rolloff 100 \
-            --lambda_alpha_l0 0.015 \
-            --lambda_alpha_l1 0.03 \
+            --lambda_alpha_l0 0.020 \
+            --lambda_alpha_l1 0.04 \
             --lambda_dynamics_reg_corr 0.0 \
             --lambda_dynamics_reg_diff 0.0 \
             --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension.'
