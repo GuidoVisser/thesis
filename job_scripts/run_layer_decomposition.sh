@@ -44,8 +44,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 128 \
             --mem_freq 4 \
             --timesteps 8 \
-            --alpha_bootstr_rolloff 20 \
-            --alpha_loss_l1_rolloff 40 \
+            --alpha_bootstr_rolloff 50 \
+            --alpha_loss_l1_rolloff 100 \
             --lambda_alpha_l0 0.015 \
             --lambda_alpha_l1 0.03 \
             --lambda_dynamics_reg_corr 0.0 \
