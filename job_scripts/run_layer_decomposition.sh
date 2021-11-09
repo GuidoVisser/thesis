@@ -36,14 +36,14 @@ python $HOME/thesis/run_layer_decomposition_3d.py \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
-            --batch_size 8 \
-            --n_epochs 1 \
+            --batch_size 4 \
+            --n_epochs 251 \
             --save_freq 100 \
             --conv_channels 64 \
             --keydim 64 \
             --valdim 128 \
             --mem_freq 4 \
-            --timesteps 16 \
+            --timesteps 8 \
             --lambda_alpha_l0 0.015 \
             --lambda_alpha_l1 0.03 \
             --lambda_dynamics_reg_corr 0.0 \
