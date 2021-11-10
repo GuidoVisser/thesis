@@ -20,6 +20,11 @@ from models.DynamicLayerDecomposition.model_config import CONFIG, update_config,
 
 def main(args):
 
+    # In 2D case only 2 timesteps are supported
+    if args.timesteps != 2:
+        print("In 2D case only 2 timesteps are supported. Setting timesteps to 2.")
+        args.timesteps = 2
+
     seed_all(args.seed)
 
     writer = SummaryWriter(args.out_dir)
