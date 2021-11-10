@@ -30,23 +30,23 @@ mkdir $TMPDIR/output_dir
 
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
-python $HOME/thesis/run_layer_decomposition.py \
+python $HOME/thesis/run_layer_decomposition_3d.py \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/$MASK_PATH \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
-            --batch_size 6 \
-            --n_epochs 2001 \
-            --save_freq 250 \
+            --batch_size 4 \
+            --n_epochs 251 \
+            --save_freq 50 \
             --conv_channels 64 \
             --keydim 64 \
             --valdim 128 \
             --timesteps 8 \
             --alpha_bootstr_rolloff 50 \
             --alpha_loss_l1_rolloff 100 \
-            --lambda_alpha_l0 0.020 \
-            --lambda_alpha_l1 0.04 \
+            --lambda_alpha_l0 0.005 \
+            --lambda_alpha_l1 0.01 \
             --lambda_dynamics_reg_corr 0.0 \
             --lambda_dynamics_reg_diff 0.0 \
             --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension.'
