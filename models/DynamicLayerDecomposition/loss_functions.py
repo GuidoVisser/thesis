@@ -125,10 +125,10 @@ class DecompositeLoss3D(DecompositeLoss):
                  lambda_dynamics_reg_corr: float = 0.001,
                  lambda_dynamics_reg_diff: float = 0.001) -> None:
         
-        super().__init__(lambda_alpha_l0,
-                         lambda_alpha_l1,
-                         lambda_mask,
+        super().__init__(lambda_mask,
                          lambda_recon_flow,
+                         lambda_alpha_l0,
+                         lambda_alpha_l1,
                          lambda_stabilization,
                          lambda_dynamics_reg_corr,
                          lambda_dynamics_reg_diff)

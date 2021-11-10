@@ -252,7 +252,7 @@ class InputProcessor(object):
         u = torch.linspace(-1, 1, steps=self.frame_size[0]).unsqueeze(0).unsqueeze(0).repeat(self.timesteps, self.frame_size[1], 1)
         v = torch.linspace(-1, 1, steps=self.frame_size[1]).unsqueeze(0).unsqueeze(-1).repeat(self.timesteps, 1, self.frame_size[0])
         
-        return torch.stack([t, u, v], 0)
+        return torch.stack([u, v, t], 0)
 
     def apply_jitter_transform(self, input, params):
         """
