@@ -10,6 +10,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from utils.utils import create_dir, create_dirs
 from models.third_party.RAFT.utils.flow_viz import flow_to_image
+from InputProcessing.patchSampler import PatchSampler
 
 class LayerDecompositer(nn.Module):
     def __init__(self,
@@ -42,6 +43,14 @@ class LayerDecompositer(nn.Module):
         self.mask_loss_l1_rolloff = mask_loss_l1_rolloff
         self.writer = summary_writer
         self.separate_bg = separate_bg
+
+        self.patch_sampler = PatchSampler(
+            include_fg_rate=0.5, 
+            patches_per_input=20, 
+            patch_size=(50, 50), 
+            frame_size=(448, 256), 
+            img_root=f"{results_root}/images"
+        )
 
     def run_training(self):
         
@@ -78,7 +87,7 @@ class LayerDecompositer(nn.Module):
                     frame_indices = input["index"][:, 0].tolist()
                     self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
 
-            if torch.cuda.device_count() <= 10:
+            if torch.cuda.device_count() <= 1:
                 t1 = datetime.now()
                 print(f"Epoch: {epoch} / {self.n_epochs - 1} done in {(t1 - t0).total_seconds()} seconds")
 
