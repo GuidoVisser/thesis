@@ -50,7 +50,7 @@ class LayerDecompositer(nn.Module):
             t0 = datetime.now()
             
             if epoch % self.save_freq == 0:
-                self.create_save_dirs(epoch)
+                self.create_save_dirs(f"intermediate/{epoch}")
             
             if epoch == self.mask_loss_l1_rolloff:
                 self.loss_module.lambda_alpha_l1 = 0.
@@ -76,7 +76,7 @@ class LayerDecompositer(nn.Module):
 
                 if epoch % self.save_freq == 0:
                     frame_indices = input["index"][:, 0].tolist()
-                    self.visualize_and_save_output(output, targets, frame_indices, epoch)
+                    self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
 
             if torch.cuda.device_count() <= 10:
                 t1 = datetime.now()
@@ -87,7 +87,7 @@ class LayerDecompositer(nn.Module):
     @torch.no_grad()
     def decomposite(self):
 
-        self.create_save_dirs("inference")
+        self.create_save_dirs("final")
 
         for (input, targets) in self.dataloader:
 
@@ -106,7 +106,7 @@ class LayerDecompositer(nn.Module):
 
             # Save results
             frame_indices = input["index"][:, 0].tolist()
-            self.visualize_and_save_output(output, targets, frame_indices, "inference")
+            self.visualize_and_save_output(output, targets, frame_indices, "final")
 
     def visualize_and_save_output(self, model_output, targets, frame_indices, epoch):
         """

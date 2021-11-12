@@ -1,9 +1,6 @@
 from argparse import ArgumentParser
-from cv2 import NORM_MINMAX
-from torch._C import device
 from torch.utils.data import DataLoader
 import torch
-import numpy as np
 from os import path
 from torch.nn.parallel import DataParallel
 from torch.utils.tensorboard import SummaryWriter
@@ -11,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from InputProcessing.inputProcessor import InputProcessor
 from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
 from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss2D
-from models.DynamicLayerDecomposition.modules.modules_2d import LayerDecompositionAttentionMemoryNet2D
+from models.DynamicLayerDecomposition.layer_decomposition_networks import LayerDecompositionAttentionMemoryNet2D
 
 from utils.demo import create_decomposite_demo
 from utils.utils import create_dir, seed_all
@@ -94,11 +91,11 @@ def main(args):
     model.run_training()
 
     # Set up for inference
-    print("Epoch: inference")
+    print("Epoch: final")
     input_processor.do_jitter = False
     
     model.decomposite()
-    create_decomposite_demo(path.join(args.out_dir, "decomposition/inference"))
+    create_decomposite_demo(path.join(args.out_dir, "decomposition/final"))
 
 if __name__ == "__main__":
     print("started")

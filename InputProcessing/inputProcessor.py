@@ -70,7 +70,7 @@ class InputProcessor(object):
         #   at initialization and save the results for fast retrieval
         self.frame_iterator     = FrameIterator(self.img_dir, frame_size, device=self.device)
         self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
-        self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device)
+        self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device, iters=50)
         self.homography_handler = HomographyHandler(out_root, self.img_dir, path.join(flow_dir, "dynamics_mask"), self.device, frame_size)
         self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, num_static_channels=num_static_channels, temporal_coarseness=noise_temporal_coarseness, frame_size=frame_size)       
 

@@ -129,4 +129,4 @@ if __name__ == "__main__":
 
     # create_decomposite_demo(file_paths, fps, end_pause)
 
-    visualize_attention_map("results/layer_decomposition_dynamic/scooter-black/decomposition/inference", channels=list(range(100)))
+    visualize_attention_map("results/layer_decomposition_dynamic/scooter-black/decomposition/final", channels=list(range(100)))

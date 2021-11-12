@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from InputProcessing.inputProcessor import InputProcessor
 from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
 from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss3D
-from models.DynamicLayerDecomposition.layer_decomposition_networks import LayerDecompositionAttentionMemoryNet3D
+from models.DynamicLayerDecomposition.layer_decomposition_networks import LayerDecompositionAttentionMemoryNetCombined
 
 from utils.demo import create_decomposite_demo
 from utils.utils import create_dir, seed_all
@@ -18,9 +18,9 @@ from models.DynamicLayerDecomposition.model_config import CONFIG, update_config,
 def main(args):
 
     seed_all(args.seed)
-    separate_bg = False
 
     writer = SummaryWriter(args.out_dir)
+    separate_bg = False
 
     input_processor = InputProcessor(
         args.img_dir, 
@@ -57,15 +57,13 @@ def main(args):
         args.lambda_dynamics_reg_corr
     )
 
-    network = DataParallel(LayerDecompositionAttentionMemoryNet3D(
+    network = DataParallel(LayerDecompositionAttentionMemoryNetCombined(
         in_channels=args.in_channels,
         conv_channels=args.conv_channels,
         do_adjustment=True, 
         max_frames=len(input_processor) + args.timesteps,
         coarseness=args.coarseness,
-        shared_encoder=bool(args.shared_encoder),
-        mem_freq=args.mem_freq,
-        timesteps=args.timesteps
+        shared_encoder=bool(args.shared_encoder)
     )).to(args.device)
 
     model = LayerDecompositer(
@@ -122,20 +120,19 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
-    training_param_args.add_argument("--save_freq", type=int, default=50, help="Frequency at which the intermediate results are saved")
+    training_param_args.add_argument("--n_epochs", type=int, default=101, help="Number of epochs used for training")
+    training_param_args.add_argument("--save_freq", type=int, default=10, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
     training_param_args.add_argument("--alpha_bootstr_rolloff", type=int, default=50, help="Number of epochs to use mask bootstrap loss")
     training_param_args.add_argument("--alpha_loss_l1_rolloff", type=int, default=100, help="Number of epochs to use mask l1 regularization loss")
     training_param_args.add_argument("--experiment_config", type=int, default=2, help="configuration id for the experiment that is being run")
     training_param_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
-    training_param_args.add_argument("--num_static_channels", type=int, default=0, help="number of input channels that are static in time")
+    training_param_args.add_argument("--num_static_channels", type=int, default=5, help="number of input channels that are static in time")
     training_param_args.add_argument("--conv_channels", type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
     training_param_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
     training_param_args.add_argument("--shared_encoder", type=int, default=1, help="Specifies whether to use a shared memory/query encoder in the network")
     training_param_args.add_argument("--timesteps", type=int, default=8, help="Temporal depth of the query input")
-    training_param_args.add_argument("--mem_freq", type=int, default=4, help="frequency of frames that are added to global context")
     training_param_args.add_argument("--frame_height", type=int, default=256, help="target height of the frames")
     training_param_args.add_argument("--frame_width", type=int, default=448, help="target width of the frames")
     training_param_args.add_argument("--jitter_rate", type=float, default=0.75, help="rate of applying jitter to the input")
