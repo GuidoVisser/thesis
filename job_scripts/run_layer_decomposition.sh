@@ -47,8 +47,8 @@ python $HOME/thesis/run_layer_decomposition_2d_3d.py \
             --alpha_loss_l1_rolloff 100 \
             --lambda_alpha_l0 0.005 \
             --lambda_alpha_l1 0.01 \
-            --lambda_dynamics_reg_corr 0.0 \
-            --lambda_dynamics_reg_diff 0.0 \
+            --lambda_dynamics_reg_corr 0.05 \
+            --lambda_dynamics_reg_diff 0.1 \
             --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension.'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
