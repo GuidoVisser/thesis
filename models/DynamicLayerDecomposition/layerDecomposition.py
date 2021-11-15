@@ -18,6 +18,7 @@ class LayerDecompositer(nn.Module):
                  loss_module: nn.Module,
                  network: nn.Module,
                  summary_writer: SummaryWriter,
+                 patch_sampler: PatchSampler,
                  learning_rate: float,
                  mask_bootstrap_rolloff: int,
                  mask_loss_l1_rolloff: int,
@@ -44,13 +45,7 @@ class LayerDecompositer(nn.Module):
         self.writer = summary_writer
         self.separate_bg = separate_bg
 
-        self.patch_sampler = PatchSampler(
-            include_fg_rate=0.5, 
-            patches_per_input=20, 
-            patch_size=(50, 50), 
-            frame_size=(448, 256), 
-            img_root=f"{results_root}/images"
-        )
+        self.patch_sampler = patch_sampler
 
     def run_training(self):
         

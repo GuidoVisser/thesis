@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.modules.batchnorm import BatchNorm2d
 
 from InputProcessing.flowHandler import FlowHandler
 from models.DynamicLayerDecomposition.modules.base_modules import *
@@ -478,16 +479,16 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
 
             self.memory_encoder = MemoryEncoder2D(conv_channels * 4, keydim, valdim, memory_backbone)
 
-        decoder_in_channels = conv_channels * 4 + valdim * 2
+        self.dynamics_layer = ConvBlock3D(valdim * 2, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=True)
 
         self.decoder = nn.ModuleList([
-            ConvBlock3D(decoder_in_channels,   conv_channels * 4, ksize=(4, 4, 4), stride=(1, 2, 2), norm=nn.BatchNorm3d, transposed=True),  # 1/8
-            ConvBlock3D(conv_channels * 2 * 4, conv_channels * 2, ksize=(4, 4, 4), stride=(1, 2, 2), norm=nn.BatchNorm3d, transposed=True),  # 1/4
-            ConvBlock3D(conv_channels * 2 * 2, conv_channels,     ksize=(4, 4, 4), stride=(1, 2, 2), norm=nn.BatchNorm3d, transposed=True),  # 1/2
-            ConvBlock3D(conv_channels * 2,     conv_channels,     ksize=(4, 4, 4), stride=(1, 2, 2), norm=nn.BatchNorm3d, transposed=True)]) # 1
+            ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
+            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/4
+            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/2
+            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
-        self.final_rgba = ConvBlock3D(conv_channels, 4, ksize=(4, 4, 4), stride=(1, 1, 1), activation='tanh')
-        self.final_flow = ConvBlock3D(conv_channels, 2, ksize=(4, 4, 4), stride=(1, 1, 1), activation='none')
+        self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
 
         self.base_grid_bg_offset = None
 
@@ -501,22 +502,56 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
 
         Returns RGBa for the input layer and the final feature maps.
         """
-        global_features = []
-        values = []
+        T = x.shape[-3]
+
+        outputs = []
         skips = []
+        for t in range(T):
+            global_features, x_t, skips_t = self.memory_reader(x[..., t, :, :], global_context)
 
-        for t in range(x.shape[-3]):
-            global_features_t, value, skips_t = self.memory_reader(x[..., t, :, :], global_context)
-
-            global_features.append(global_features_t)
-            values.append(value)
+            x_t = torch.cat((global_features, x_t), dim=1)
+            
+            outputs.append(x_t)
             skips.append(skips_t)
 
-        global_features = torch.stack(global_features, dim=-3)
-        x               = torch.stack(values,          dim=-3)
-        skips           = self._stack_skips(skips)
+        x = torch.stack(outputs, dim=-3)
 
-        x = torch.cat((global_features, x), dim=1)
+        x = self.dynamics_layer(x)
+
+        rgba = []
+        flow = []
+        for t in range(T):
+            # decoding
+            x_t = x[..., t, :, :]
+            skips_t = skips[t]
+
+            for layer in self.decoder:
+                x_t = torch.cat((x_t, skips_t.pop()), 1)
+                x_t = layer(x_t)
+        
+            # finalizing render
+            rgba.append(self.final_rgba(x_t))
+            flow.append(self.final_flow(x_t))
+
+        rgba = torch.stack(rgba, dim=-3)
+        flow = torch.stack(flow, dim=-3)
+
+        return rgba, flow
+
+    def render_background(self, x: torch.Tensor, global_context: GlobalContextVolume2D):
+        """
+        Pass inputs of a single layer through the network
+
+        Parameters:
+            x (torch.Tensor):       sampled texture concatenated with person IDs
+            context (torch.Tensor): a context tensor read from the attention memory of the corresponding object layer
+
+        Returns RGBa for the input layer and the final feature maps.
+        """
+
+        _, _, t, _, _ = x.shape
+
+        _, x, skips = self.memory_reader(x[..., 0, :, :], global_context)
 
         # decoding
         for layer in self.decoder:          
@@ -524,8 +559,8 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
             x = layer(x)
 
         # finalizing render
-        rgba = self.final_rgba(x)
-        flow = self.final_flow(x)
+        rgba = self.final_rgba(x).unsqueeze(2).repeat(1, 1, t, 1, 1)
+        flow = self.final_flow(x).unsqueeze(2).repeat(1, 1, t, 1, 1)
 
         return rgba, flow
 
@@ -565,7 +600,7 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
             # Background layer
             if i == 0:
 
-                rgba, flow = self.render(layer_input, global_context)
+                rgba, flow = self.render_background(layer_input, global_context)
                 rgba = F.grid_sample(rgba, background_uv_map)
                 if self.do_adjustment:
                     rgba = self._apply_background_offset(rgba, background_offset)

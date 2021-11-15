@@ -6,6 +6,7 @@ from torch.nn.parallel import DataParallel
 from torch.utils.tensorboard import SummaryWriter
 
 from InputProcessing.inputProcessor import InputProcessor
+from InputProcessing.patchSampler import PatchSampler
 from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
 from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss3D
 from models.DynamicLayerDecomposition.layer_decomposition_networks import LayerDecompositionAttentionMemoryNetCombined
@@ -20,7 +21,7 @@ def main(args):
     seed_all(args.seed)
 
     writer = SummaryWriter(args.out_dir)
-    separate_bg = False
+    separate_bg = True
 
     input_processor = InputProcessor(
         args.img_dir, 
@@ -40,6 +41,14 @@ def main(args):
         do_jitter=True, 
         jitter_rate=args.jitter_rate
     )
+
+    patch_sampler = PatchSampler(
+            include_fg_rate=args.foreground_rate, 
+            patches_per_input=args.patches_per_input, 
+            patch_size=(args.patch_size, args.patch_size), 
+            frame_size=(args.frame_width, args.frame_height), 
+            img_root=f"{args.out_dir}/images"
+        )
 
     data_loader = DataLoader(
         input_processor, 
@@ -71,6 +80,7 @@ def main(args):
         loss_module, 
         network, 
         writer,
+        patch_sampler,
         args.learning_rate, 
         args.alpha_bootstr_rolloff,
         args.alpha_loss_l1_rolloff,
@@ -120,7 +130,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=101, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=501, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=10, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
@@ -136,6 +146,9 @@ if __name__ == "__main__":
     training_param_args.add_argument("--frame_height", type=int, default=256, help="target height of the frames")
     training_param_args.add_argument("--frame_width", type=int, default=448, help="target width of the frames")
     training_param_args.add_argument("--jitter_rate", type=float, default=0.75, help="rate of applying jitter to the input")
+    training_param_args.add_argument("--foreground_rate", type=float, default=0.5, help="rate at which the foreground is included in the patch sampling")
+    training_param_args.add_argument("--patches_per_input", type=int, default=50, help="Number of patches that are sampled for every input")
+    training_param_args.add_argument("--patch_size", type=int, default=64, help="width and height of the patches that are sampled")
 
     lambdas = parser.add_argument_group("lambdas")
     lambdas.add_argument("--lambda_mask", type=float, default=50., help="starting value for the lambda of the alpha_mask_bootstrap loss")
