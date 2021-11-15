@@ -36,7 +36,7 @@ python $HOME/thesis/run_layer_decomposition_2d_3d.py \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
-            --batch_size 8 \
+            --batch_size 6 \
             --n_epochs 1001 \
             --save_freq 250 \
             --conv_channels 64 \
