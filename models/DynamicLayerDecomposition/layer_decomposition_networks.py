@@ -126,7 +126,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
             if i == 0:
                 rgba, flow = self.render(layer_input, global_context, is_bg=True)
 
-                rgba = F.grid_sample(rgba, background_uv_map)               
+                rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 if self.do_adjustment:
                     rgba = FlowHandler.apply_flow(rgba, background_offset)
 
@@ -339,7 +339,7 @@ class LayerDecompositionAttentionMemoryNet3D(LayerDecompositionAttentionMemoryNe
             if i == 0:
 
                 rgba, flow = self.render(layer_input, global_context)
-                rgba = F.grid_sample(rgba, background_uv_map)               
+                rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)               
                 if self.do_adjustment:
                     rgba = self._apply_background_offset(rgba, background_offset)
 
@@ -549,18 +549,25 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
         Returns RGBa for the input layer and the final feature maps.
         """
 
-        _, _, t, _, _ = x.shape
+        _, _, T, _, _ = x.shape
 
-        _, x, skips = self.memory_reader(x[..., 0, :, :], global_context)
+        rgba = []
+        flow = []
 
-        # decoding
-        for layer in self.decoder:          
-            x = torch.cat((x, skips.pop()), 1)
-            x = layer(x)
+        for t in range(T):
+            _, x_t, skips = self.memory_reader(x[:, :, t], global_context)
 
-        # finalizing render
-        rgba = self.final_rgba(x).unsqueeze(2).repeat(1, 1, t, 1, 1)
-        flow = self.final_flow(x).unsqueeze(2).repeat(1, 1, t, 1, 1)
+            # decoding
+            for layer in self.decoder:          
+                x_t = torch.cat((x_t, skips.pop()), 1)
+                x_t = layer(x_t)
+
+            # finalizing render
+            rgba.append(self.final_rgba(x_t))
+            flow.append(self.final_flow(x_t))
+
+        rgba = torch.stack(rgba, dim=-3)
+        flow = torch.stack(flow, dim=-3)
 
         return rgba, flow
 
@@ -601,12 +608,18 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
             if i == 0:
 
                 rgba, flow = self.render_background(layer_input, global_context)
-                rgba = F.grid_sample(rgba, background_uv_map)
+                rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 if self.do_adjustment:
                     rgba = self._apply_background_offset(rgba, background_offset)
 
                 composite_rgba = rgba
                 flow = composite_flow
+
+                for t_ in range(composite_rgba.shape[2]):
+                    img = composite_rgba[0, :, t_].clone().detach().cpu().permute(1, 2, 0).numpy()
+                    cv2.imshow(f"{t_}", img)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
 
             # Object layers
             else:
