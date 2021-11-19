@@ -554,20 +554,16 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
         rgba = []
         flow = []
 
-        for t in range(T):
-            _, x_t, skips = self.memory_reader(x[:, :, t], global_context)
+        _, x, skips = self.memory_reader(x[:, :, 0], global_context)
+        
+        # decoding
+        for layer in self.decoder:          
+            x = torch.cat((x, skips.pop()), 1)
+            x = layer(x)
 
-            # decoding
-            for layer in self.decoder:          
-                x_t = torch.cat((x_t, skips.pop()), 1)
-                x_t = layer(x_t)
-
-            # finalizing render
-            rgba.append(self.final_rgba(x_t))
-            flow.append(self.final_flow(x_t))
-
-        rgba = torch.stack(rgba, dim=-3)
-        flow = torch.stack(flow, dim=-3)
+        # finalizing render
+        rgba = self.final_rgba(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
+        flow = self.final_flow(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
 
         return rgba, flow
 
@@ -614,12 +610,6 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
 
                 composite_rgba = rgba
                 flow = composite_flow
-
-                for t_ in range(composite_rgba.shape[2]):
-                    img = composite_rgba[0, :, t_].clone().detach().cpu().permute(1, 2, 0).numpy()
-                    cv2.imshow(f"{t_}", img)
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
 
             # Object layers
             else:
