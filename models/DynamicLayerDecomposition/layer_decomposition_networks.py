@@ -121,9 +121,9 @@ class Omnimatte(nn.Module):
                 composite_warped = rgba_warped[:, :3]
             # Omnimatte doesn't have a dynamic background layer
             if i == 1:
-                rgba        = torch.zeros_like(rgba)
-                flow        = torch.zeros_like(flow)
-                rgba_warped = torch.zeros_like(rgba[:B])
+                rgba        = -1 * torch.ones_like(rgba)
+                flow        = -1 * torch.ones_like(flow)
+                rgba_warped = -1 * torch.ones_like(rgba[:B])
             # Object layers
             else:
                 composite_rgba = rgba * alpha + composite_rgba * (1. - alpha)
