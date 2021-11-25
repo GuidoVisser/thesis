@@ -37,7 +37,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
-            --batch_size 6 \
+            --batch_size 4 \
             --n_epochs 1001 \
             --save_freq 250 \
             --conv_channels 64 \
@@ -48,8 +48,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --alpha_loss_l1_rolloff 100 \
             --lambda_alpha_l0 0.005 \
             --lambda_alpha_l1 0.01 \
-            --lambda_dynamics_reg_corr 0.05 \
-            --lambda_dynamics_reg_diff 0.1 \
+            --lambda_dynamics_reg_corr 0.005 \
+            --lambda_dynamics_reg_diff 0.01 \
             --description 'Dynamic model with 2001 epochs and high memory frequency. TopkSTM pretrained backbones are used for the memory backbones with channels for object masks included. The context is added to the input of the decoder of the reconstruction UNet in the channel dimension.'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
