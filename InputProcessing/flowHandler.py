@@ -65,7 +65,7 @@ class FlowHandler(object):
 
         if isinstance(frame_idx, slice):
             flows, confs, dynamics_masks = [], [], []
-            for idx in range(frame_idx.start, frame_idx.stop):
+            for idx in range(frame_idx.start or 0, frame_idx.stop or len(self), frame_idx.step or 1):
                 flows.append(torch.from_numpy(readFlow(path.join(self.output_dir, f"forward/flow/{idx:05}.flo"))).permute(2, 0, 1))
                 confs.append(torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.)
                 dynamics_masks.append(torch.from_numpy(cv2.imread(path.join(self.output_dir, f"dynamics_mask/{idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.)

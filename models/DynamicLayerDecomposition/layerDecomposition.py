@@ -3,14 +3,13 @@ import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
-from os import path, sep
+from os import path
 from datetime import datetime
 
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from utils.utils import create_dir, create_dirs
+from utils.utils import create_dirs
 from models.third_party.RAFT.utils.flow_viz import flow_to_image
-from InputProcessing.patchSampler import PatchSampler
 
 class LayerDecompositer(nn.Module):
     def __init__(self,
@@ -18,7 +17,6 @@ class LayerDecompositer(nn.Module):
                  loss_module: nn.Module,
                  network: nn.Module,
                  summary_writer: SummaryWriter,
-                 patch_sampler: PatchSampler,
                  learning_rate: float,
                  mask_bootstrap_rolloff: int,
                  mask_loss_l1_rolloff: int,
@@ -45,8 +43,6 @@ class LayerDecompositer(nn.Module):
         self.writer = summary_writer
         self.separate_bg = separate_bg
 
-        self.patch_sampler = patch_sampler
-
     def run_training(self):
         
         for epoch in range(self.n_epochs):
@@ -69,6 +65,8 @@ class LayerDecompositer(nn.Module):
 
                 # set targets to the same device as the output
                 device = next(iter(output.values())).get_device()
+                if device == -1:
+                    device = "cpu"
                 targets = {k:v.to(device) for (k, v) in targets.items()}
 
                 loss, loss_values = self.loss_module(output, targets)
@@ -86,7 +84,7 @@ class LayerDecompositer(nn.Module):
                 t1 = datetime.now()
                 print(f"Epoch: {epoch} / {self.n_epochs - 1} done in {(t1 - t0).total_seconds()} seconds")
 
-        torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
+        torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))           
 
     @torch.no_grad()
     def decomposite(self):

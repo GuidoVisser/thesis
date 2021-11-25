@@ -14,20 +14,14 @@ See options/base_options.py and options/train_options.py for more training optio
 """
 import time
 
-from torch.serialization import save
 from models.third_party.Omnimatte.options.train_options import TrainOptions
 from models.third_party.Omnimatte.third_party.data import create_dataset
 from models.third_party.Omnimatte.third_party.models import create_model
 from models.third_party.Omnimatte.third_party.util.visualizer import Visualizer
 import torch
 import numpy as np
-from InputProcessing.inputProcessor import InputProcessor
-
-from models.third_party.Omnimatte.utils import flow_to_image
 
 from argparse import ArgumentParser
-
-import cv2
 
 
 def main(args):
@@ -41,23 +35,6 @@ def main(args):
     dataset_size = len(dataset)
     print('The number of training images = %d' % dataset_size)
 
-    input_processor = InputProcessor(
-        args.img_dir, 
-        args.out_dir, 
-        args.initial_mask, 
-        args.composite_order, 
-        do_adjustment=args.do_adjustment, 
-        propagation_model=args.propagation_model, 
-        flow_model=args.flow_model
-    )
-
-    dataloader = torch.utils.data.DataLoader(
-        input_processor,
-        batch_size=opt.batch_size,
-        shuffle=not opt.serial_batches,
-        num_workers=int(opt.num_threads),
-        persistent_workers=int(opt.num_threads) > 0)
-
     opt.n_epochs       = int(opt.n_steps / np.ceil(dataset_size / opt.batch_size))
     opt.n_epochs_decay = int(opt.n_steps_decay / np.ceil(dataset_size / opt.batch_size))
 
@@ -65,10 +42,10 @@ def main(args):
     model.setup(opt)  # regular setup: load and print networks; create schedulers
     visualizer = Visualizer(opt)
 
-    train(model, dataset, visualizer, opt, input_processor)
+    train(model, dataset, visualizer, opt)
 
 
-def train(model, dataset, visualizer, opt, ip):
+def train(model, dataset, visualizer, opt):
     dataset_size = len(dataset)
     total_iters = 0  # the total number of training iterations
 
@@ -78,46 +55,7 @@ def train(model, dataset, visualizer, opt, ip):
         
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
         model.update_lambdas(epoch)
-        for i, omnimatte_input in enumerate(dataset):  # inner loop within one epoch
-
-
-            # idx = omnimatte_input["index"][0, 0].item()
-            # ip_input = ip[idx]
-
-            # print("####################")
-            # print(f"Jitter true: {ip_input['jitter_true']}")
-            # for thing in omnimatte_input.keys():
-            #     if thing == "image_path":
-            #         continue
-            #     if thing == "input":
-            #         same_pid = torch.allclose(omnimatte_input[thing][0, :1], ip_input[thing][:1])
-            #         same_flow = torch.allclose(omnimatte_input[thing][0, 1:3], ip_input[thing][1:3])
-            #         same_noise = torch.allclose(omnimatte_input[thing][0, 3:], ip_input[thing][3:])
-            #         print(f"thing - pid: {same_pid}")
-            #         print(f"thing - flow: {same_flow}")
-            #         print(f"thing - noise: {same_noise}")
-            #     else:
-            #         same = torch.allclose(omnimatte_input[thing][0], ip_input[thing])
-            #         print(f"{thing}: {same}")
-
-            # image_o = torch.clone(omnimatte_input["image"][0, :3]).detach().cpu().permute(1, 2, 0).numpy() * .5 + .5
-            # image_i = torch.clone(ip_input["image"][:3]).detach().cpu().permute(1, 2, 0).numpy() * .5 + .5
-
-            # bg_flow_o = flow_to_image(torch.clone(omnimatte_input["bg_flow"][0, :2]).detach().cpu().permute(1, 2, 0).numpy())
-            # bg_flow_i = flow_to_image(torch.clone(ip_input["bg_flow"][:2]).detach().cpu().permute(1, 2, 0).numpy())
-
-
-            # cv2.imshow("image omni", image_o)
-            # cv2.imshow("image ik", image_i)
-            # cv2.imshow("bg flow omni", bg_flow_o)
-            # cv2.imshow("bg flow ik", bg_flow_i)
-
-            # cv2.waitKey(0)
-            # cv2.destroyAllWindows()
-            data = omnimatte_input
-
-            # if data["index"][0, 0] > 11:
-            #     continue
+        for i, data in enumerate(dataset):  # inner loop within one epoch
 
             iter_start_time = time.time()   # timer for computation per iteration
 

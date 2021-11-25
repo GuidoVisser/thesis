@@ -18,7 +18,7 @@ class MaskHandler(object):
     def __init__(self,
                  img_dir: str,
                  mask_dir: str,
-                 initial_masks: Union[str, list],
+                 initial_masks: list,
                  frame_size: list,
                  device: str = "cuda",
                  propagation_model:str = "models/third_party/weights/propagation_model.pth",
@@ -28,10 +28,6 @@ class MaskHandler(object):
         # set hyperparameters
         self.frame_size       = frame_size
         self.binary_threshold = binary_threshold
-
-        # set up directories and correct input for masks
-        if isinstance(initial_masks, str):
-            initial_masks = [initial_masks]
         
         self.N_objects = len(initial_masks)
         self.img_dir   = img_dir
@@ -43,8 +39,21 @@ class MaskHandler(object):
             save_dir = path.join(self.mask_dir, f"{i:02}")
             if not path.exists(save_dir):
                 create_dir(save_dir)
-                self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir)
-                self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir, forward=False)
+
+                # if the path points to a single mask, propagate it through the video
+                if path.isfile(initial_masks[i]):
+                    self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir)
+                    self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir, forward=False)
+                
+                # if the path points to a directory with masks, resize them and use them
+                elif path.isdir(initial_masks[i]):
+                    for frame in sorted(listdir(initial_masks[i])):
+                        fn = path.join(initial_masks[i], frame)
+                        img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
+                        img = cv2.resize(img, frame_size)
+                        cv2.imwrite(path.join(save_dir, frame), img)
+                else:
+                    raise ValueError(f"{initial_masks[i]} is neither a valid directory or file")
          
     @torch.no_grad()
     def propagate(self, initial_mask, top_k, mem_freq, model_device, memory_device, model_weights, save_dir, forward=True):
@@ -120,7 +129,7 @@ class MaskHandler(object):
         masks = []
         for i_object in range(self.N_objects):
             if isinstance(idx, slice):
-                mask_paths = [path.join(self.mask_dir, f"{i_object:02}", f"{frame_idx:05}.png") for frame_idx in range(idx.start, idx.stop)]
+                mask_paths = [path.join(self.mask_dir, f"{i_object:02}", f"{frame_idx:05}.png") for frame_idx in range(idx.start or 0, idx.stop or len(self), idx.step or 1)]
                 object_masks = []
                 for mask_path in mask_paths:
                     object_masks.append(cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.frame_size))

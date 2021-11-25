@@ -30,7 +30,8 @@ mkdir $TMPDIR/output_dir
 
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
-python $HOME/thesis/run_layer_decomposition_2d_3d.py \
+python $HOME/thesis/run_layer_decomposition.py \
+            --model_type 3d_bottleneck \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/$MASK_PATH \
             --out_dir $TMPDIR/output_dir \
@@ -42,7 +43,7 @@ python $HOME/thesis/run_layer_decomposition_2d_3d.py \
             --conv_channels 64 \
             --keydim 64 \
             --valdim 128 \
-            --timesteps 8 \
+            --timesteps 4 \
             --alpha_bootstr_rolloff 50 \
             --alpha_loss_l1_rolloff 100 \
             --lambda_alpha_l0 0.005 \

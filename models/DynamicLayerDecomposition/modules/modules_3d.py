@@ -87,11 +87,11 @@ class MemoryEncoder3D(MemoryEncoder):
     """
     Memory Encoder usable with 3D convolutions
     """
-    def __init__(self, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module, mem_freq: int = 4, timesteps: int = 16) -> None:
+    def __init__(self, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module, gcv: GlobalContextVolume, mem_freq: int = 4, timesteps: int = 16) -> None:
         super().__init__(keydim, valdim)
 
         self.memory_encoder = KeyValueEncoder(nn.Conv3d, conv_channels, keydim, valdim, backbone)
-        self.global_context = GlobalContextVolume3D(keydim, valdim)
+        self.global_context = gcv(keydim, valdim)
 
         self.timesteps = timesteps
         self.mem_freq  = mem_freq
@@ -104,7 +104,7 @@ class MemoryEncoder3D(MemoryEncoder):
             spatiotemoral_noise (torch.Tensor): noise tensor of the entire video
             frame_idx (int): index of first frame in the input
         """
-        return spatiotemporal_noise[:, :, frame_idx:frame_idx + self.timesteps]
+        return spatiotemporal_noise[..., frame_idx:frame_idx + self.timesteps, :, :]
 
     def _get_frame_idx_iterator(self, length_video: int):
         """

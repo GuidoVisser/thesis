@@ -32,21 +32,23 @@ class InputProcessor(object):
                  separate_bg: bool = False,
                  frame_size: tuple=(448, 256),
                  do_jitter: bool = True,
-                 jitter_rate: float = 0.75
+                 jitter_rate: float = 0.75,
+                 gt_in_memory: bool = True
                 ) -> None:
         super().__init__()
 
         # initialize attributes
-        self.device         = device
-        self.frame_size     = frame_size
-        self.in_channels    = in_channels
-        self.do_jitter      = do_jitter
-        self.jitter_rate    = jitter_rate
-        self.jitter_mode    = 'bilinear'
-        self.timesteps      = timesteps
-        self.use_3d         = use_3d
-        self.separate_bg    = separate_bg
-        self.num_bg_layers  = 2 if separate_bg else 1
+        self.device        = device
+        self.frame_size    = frame_size
+        self.in_channels   = in_channels
+        self.do_jitter     = do_jitter
+        self.jitter_rate   = jitter_rate
+        self.jitter_mode   = 'bilinear'
+        self.timesteps     = timesteps
+        self.use_3d        = use_3d
+        self.separate_bg   = separate_bg
+        self.num_bg_layers = 2 if separate_bg else 1
+        self.gt_in_memory  = gt_in_memory 
 
         if isinstance(initial_mask, str):
             self.N_objects = 1
@@ -76,6 +78,9 @@ class InputProcessor(object):
 
         # Load a custom compositing order if it's given, otherwise initialize a new one
         self._initialize_composite_order(composite_order_fp)
+
+        # placeholder for memory input
+        self.memory_input = None
         
     def __getitem__(self, idx):
         """
@@ -151,8 +156,16 @@ class InputProcessor(object):
 
         query_input = torch.cat((background_input, query_input)) # [L, C, T, H, W]
 
-        # get full spatiotemporal noise input of the entire video
-        spatiotemporal_noise = torch.cat((torch.zeros_like(spatiotemporal_noise[:3]), spatiotemporal_noise)) # [C, F, H, W]
+        # get memory input for the entire video; store in memory rather than reload every iteration
+        if self.memory_input == None:
+            # -- use ground truth as input
+            if self.gt_in_memory:
+                rgb_memory_input = self.frame_iterator[:len(self.flow_handler)]         # [3, F-1, H, W]
+                flow_memory_input, _, _, _ = self.flow_handler[:len(self.flow_handler)] # [2, F-1, H, W]
+                self.memory_input = torch.cat((rgb_memory_input, flow_memory_input))         # [5, F-1, H, W]
+            # -- use noise as input
+            else:
+                self.memory_input = torch.cat((torch.zeros_like(spatiotemporal_noise[:3]), spatiotemporal_noise)) # [C, F, H, W]
 
         # get parameters for jitter
         params = self.get_jitter_parameters()
@@ -197,7 +210,7 @@ class InputProcessor(object):
 
         model_input = {
             "query_input": query_input,
-            "spatiotemporal_noise": spatiotemporal_noise,
+            "memory_input": self.memory_input,
             "background_flow": background_flow,
             "background_uv_map": background_uv_map,
             "jitter_grid": jitter_grid,

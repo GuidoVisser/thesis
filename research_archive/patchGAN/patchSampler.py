@@ -49,25 +49,26 @@ class PatchSampler(object):
 
         self.img_paths = [path.join(img_root, fn) for fn in sorted(listdir(img_root))]
 
-    def __call__(self, rgba_layers: dict, ground_truth: dict) -> dict:
+    def __call__(self, rgba_layers: torch.Tensor, rgba_layers_improved: torch.Tensor, ground_truth: torch.Tensor) -> dict:
         """
         Forward pass of the module
         """
         
-        B, L, C, T, H, W = rgba_layers.shape
+        # B, L, C, T, H, W = rgba_layers.shape
 
-        rgba_layers_  = rgba_layers.permute(0, 3, 1, 2, 4, 5).view(B*T, L, C, H, W)
-        ground_truth_ = ground_truth.permute(0, 2, 1, 3, 4).view(B*T, 3, H, W) 
+        # rgba_layers_  = rgba_layers.permute(0, 3, 1, 2, 4, 5).view(B*T, L, C, H, W)
+        # ground_truth_ = ground_truth.permute(0, 2, 1, 3, 4).view(B*T, 3, H, W) 
 
-        batch_size = rgba_layers_.shape[0]
+        batch_size = rgba_layers.shape[0]
 
         # Get target patches
         target_patches = self._get_target_patches(batch_size)
 
         # Get patches of composites and ground truth
-        composite_patches, alpha_patches, ground_truth_patches = self._get_rgba_patches(rgba_layers_, ground_truth_)
+        improved_composite_patches, composite_patches, alpha_patches, ground_truth_patches = self._get_rgba_patches(rgba_layers_improved, rgba_layers, ground_truth)
 
         out = {
+            "improved_composite_patches": improved_composite_patches,
             "composite_patches": composite_patches,
             "alpha_patches": alpha_patches,
             "ground_truth_patches": ground_truth_patches,
@@ -109,7 +110,7 @@ class PatchSampler(object):
         return target_patches
 
 
-    def _get_rgba_patches(self, rgba_layers: torch.Tensor, ground_truth: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _get_rgba_patches(self, rgba_layers_improved: torch.Tensor, rgba_layers: torch.Tensor, ground_truth: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Get a set of random patches from the rgba layers with random permutations of compositing and corresponding ground truth patches
 
@@ -119,7 +120,8 @@ class PatchSampler(object):
         """
 
         composites_rgb, composites_alpha = self._get_composites(rgba_layers)
-        composite_patches, alpha_patches, ground_truth_patches = [], [], []
+        impr_composites_rgb, _ = self._get_composites(rgba_layers_improved)
+        impr_composite_patches, composite_patches, alpha_patches, ground_truth_patches = [], [], [], []
 
         for _ in range(self.patches_per_input):
         
@@ -128,17 +130,22 @@ class PatchSampler(object):
             else:
                 random_choice = randint(1, len(composites_rgb)-1)
 
-            composite_patch, alpha_patch, ground_truth_patch = self._get_random_patches(composites_rgb[random_choice], composites_alpha[random_choice], ground_truth)
+            impr_composite_patch, composite_patch, alpha_patch, ground_truth_patch = self._get_random_patches(impr_composites_rgb[random_choice], 
+                                                                                                                composites_rgb[random_choice], 
+                                                                                                                composites_alpha[random_choice], 
+                                                                                                                ground_truth)
             
+            impr_composite_patches.append(impr_composite_patch)
             composite_patches.append(composite_patch)
             alpha_patches.append(alpha_patch)
             ground_truth_patches.append(ground_truth_patch)
 
-        composite_patches    = torch.cat(composite_patches)
-        alpha_patches        = torch.cat(alpha_patches)
-        ground_truth_patches = torch.cat(ground_truth_patches)
+        composite_patches      = torch.cat(composite_patches)
+        alpha_patches          = torch.cat(alpha_patches)
+        ground_truth_patches   = torch.cat(ground_truth_patches)
+        impr_composite_patches = torch.cat(impr_composite_patches)
 
-        return composite_patches, alpha_patches, ground_truth_patches
+        return impr_composite_patches, composite_patches, alpha_patches, ground_truth_patches
 
     def _get_random_patches(self, *inputs: list) -> list:
         """

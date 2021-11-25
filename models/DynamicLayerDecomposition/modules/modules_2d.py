@@ -35,7 +35,10 @@ class ConvBlock2D(ConvBlock):
             pady = .5 * (self.s * (desired_height - 1) + (self.k - 1) * (self.d - 1) + self.k - height)
             padx = .5 * (self.s * (desired_width - 1) + (self.k - 1) * (self.d - 1) + self.k - width)
         x = F.pad(x, [int(np.floor(padx)), int(np.ceil(padx)), int(np.floor(pady)), int(np.ceil(pady))])
-        x = self.conv(x)
+        try:
+            x = self.conv(x)
+        except:
+            x = 1
         if x.shape[-2] != desired_height or x.shape[-1] != desired_width:
             cropy = x.shape[-2] - desired_height
             cropx = x.shape[-1] - desired_width
@@ -81,11 +84,11 @@ class MemoryEncoder2D(MemoryEncoder):
     """
     Memory Encoder usable with 2D convolutions
     """
-    def __init__(self, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module) -> None:
+    def __init__(self, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module, gcv: GlobalContextVolume) -> None:
         super().__init__(keydim, valdim)
 
         self.memory_encoder = KeyValueEncoder(nn.Conv2d, conv_channels, keydim, valdim, backbone)
-        self.global_context = GlobalContextVolume2D(keydim, valdim)
+        self.global_context = gcv(keydim, valdim)
 
     def _get_input(self, spatiotemporal_noise: torch.Tensor, frame_idx: int) -> torch.Tensor:
         """
