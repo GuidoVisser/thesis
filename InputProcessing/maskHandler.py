@@ -37,6 +37,7 @@ class MaskHandler(object):
         # propagate each object mask through video
         for i in range(self.N_objects):
             save_dir = path.join(self.mask_dir, f"{i:02}")
+            print(initial_masks[i])
             if not path.exists(save_dir):
                 create_dir(save_dir)
 
