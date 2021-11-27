@@ -32,6 +32,7 @@ mkdir $TMPDIR/output_dir
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
             --model_type 3d_bottleneck \
+            --shared_encoder \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/$MASK_PATH \
             --out_dir $TMPDIR/output_dir \
