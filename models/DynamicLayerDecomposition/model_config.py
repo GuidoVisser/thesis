@@ -1,8 +1,9 @@
+from argparse import Namespace
 import os
 import re
 
 CONFIG = {
-    "description": "no description given",
+    "description": "no description given ",
     "directories": {
         'out_dir':           'results/layer_decomposition_dynamic/tennis', 
         'initial_mask':      'datasets/DAVIS/Annotations/480p/tennis/00000.png', 
@@ -58,12 +59,16 @@ CONFIG = {
     }
 }
 
-def update_config(args, config):
+def update_config(args: Namespace, config: dict) -> dict:
     """
     Update the config with the current settings
 
     Args:
         args (namespace): namespace containing settings of the model
+        config (dict): dictionary containing the new config settings
+
+    Returns:
+        config (dict): updated configuration
     """
     def recursive_update(arg_dict, dictionary):
         for key, value in dictionary.items():
@@ -79,10 +84,17 @@ def update_config(args, config):
     return config
 
 
-def save_config(filepath, config):
+def save_config(filepath: str, config: dict, mode: str = "a") -> None:
     """
-    Save the config to a .txt file so the experiment settings can be reveiwed later
+    Save the config to a .txt file so the experiment settings can be reviewed later
+
+    Args:
+        filepath (str): path to save location
+        config (dict): configuration to be saved
+        mode (str): mode of saving, either 'append' or 'read'
     """
+    assert mode in ["a", "w"], f"incorrect mode given. Expected either 'a' or 'w' but got '{mode}'."
+
     def recursive_write(input, io_stream, depth):
 
         for (item, value) in input.items():
@@ -97,9 +109,84 @@ def save_config(filepath, config):
                 io_stream.write(f"{first_part} -- {value}\n")
 
 
-    with open(filepath, "a") as txt_file:
+    with open(filepath, mode) as txt_file:
         recursive_write(config, txt_file, 0)
+
+def load_config(filepath: str) -> dict:
+    """
+    Load the config from a .txt file
+    
+    Args:
+        filepath (str): path to config file
+    
+    Returns:
+        config (dict): new configuration
+    """
+
+    with open(filepath, "r") as f:
+        lines = f.readlines()
+
+    config = {}
+    header = ""
+    is_description = False
+    for line in lines:
+        if line.startswith("\t") or line.startswith(" "):
+            if is_description:
+                config["description"] += line.strip("\n \t") + " "
+            else:
+                key, value = line.split("--")
+                key = key.strip("\t ")
+                value = value.strip("\n ")
+
+                if value == "None":
+                    value = None
+                elif type(CONFIG[header][key]) == bool:
+                    value = value == "True"
+                elif value.startswith("["):
+                    value = [entry.strip("[] \'") for entry in value.split(",")]
+                else:
+                    value = type(CONFIG[header][key])(value)
+                config[header][key] = value
+        elif line.startswith("description"):
+            is_description = True
+            config["description"] = ""
+        else:
+            header = line.strip(": \n")
+            config[header] = {}
+            is_description = False
+
+    return config
+
+def read_config(args: Namespace, config: dict) -> Namespace:
+    """
+    Override the namespace arguments with the values in the given config dictionary
+
+    Args:
+        args (Namespace)
+        config (dict)
+
+    returns:
+        args (Namespace)
+    """
+
+    def recursive_update(arg_dict, dictionary):
+        for key, value in dictionary.items():
+            if isinstance(value, dict):
+                recursive_update(arg_dict, value)
+            elif key in arg_dict:
+                arg_dict[key] = dictionary[key]
+            else:
+                continue
+
+    # create a dictionary liaison version of the NameSpace args 
+    # Updating the liaison will immediately update the corresponding values in args
+    liaison = vars(args)
+    recursive_update(liaison, config)
+
+    return args
 
 
 if __name__ == "__main__":
     save_config(os.getcwd() + "/test.txt", CONFIG)
+
+    CONFIG = load_config(os.getcwd() + "/test.txt")

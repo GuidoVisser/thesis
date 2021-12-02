@@ -13,7 +13,7 @@ from models.DynamicLayerDecomposition.layer_decomposition_networks import *
 
 from utils.demo import create_decomposite_demo
 from utils.utils import create_dir, seed_all
-from models.DynamicLayerDecomposition.model_config import CONFIG, update_config, save_config 
+from models.DynamicLayerDecomposition.model_config import *
 
 
 def init_dataloader(args, separate_bg, use_3d):
@@ -145,6 +145,9 @@ def init_model(args, dataloader, loss_module, writer, separate_bg):
     if args.device != "cpu":
         network = DataParallel(network).to(args.device)
 
+    if args.continue_from != "":
+        network.load_state_dict(torch.load(f"{args.continue_from}/reconstruction_weights.pth"))
+
     model = LayerDecompositer(
         dataloader, 
         loss_module, 
@@ -162,7 +165,7 @@ def init_model(args, dataloader, loss_module, writer, separate_bg):
 
     return model
 
-def main(args):
+def main(args, start_epoch):
 
     # set seeds
     seed_all(args.seed)
@@ -193,7 +196,7 @@ def main(args):
     model = init_model(args, dataloader, loss_module, writer, separate_bg)
 
     # run training
-    model.run_training()
+    model.run_training(start_epoch)
 
     # Set up for inference
     print("Epoch: final")
@@ -218,7 +221,8 @@ if __name__ == "__main__":
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
-    
+    directory_args.add_argument("--continue_from", type=str, default="", help="root directory of training run from which you wish to continue")
+
     model_args = parser.add_argument_group("model")
     model_args.add_argument("--model_type", type=str, default="omnimatte", choices=["3d_bottleneck", "combined", "2d", "3d", "omnimatte"], help="The type of decomposition network to use")
     model_args.add_argument("--shared_encoder", action="store_true", help="Specifies whether to use a shared memory/query encoder in the network")
@@ -243,7 +247,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=251, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=10, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=70, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
@@ -269,10 +273,23 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # update and save arguments
-    create_dir(args.out_dir)
-    CONFIG = update_config(args, CONFIG)
-    save_config(f"{args.out_dir}/config.txt", CONFIG)
+    # update and save arguments   
+    if args.continue_from != "":
+        CONFIG = load_config(f"{args.continue_from}/config.txt")
 
-    main(args)
+        # initialize epoch count
+        start_epoch = CONFIG["training_parameters"]["n_epochs"] + 1
+        CONFIG["training_parameters"]["n_epochs"] += args.n_epochs
+        
+        # update namespace
+        args = read_config(args, CONFIG)
+        save_config(f"{args.out_dir}/config.txt", CONFIG)
+    else:
+        create_dir(args.out_dir)
+        start_epoch = 0
+        CONFIG = update_config(args, CONFIG)
+        save_config(f"{args.out_dir}/config.txt", CONFIG)
+    
+
+    main(args, start_epoch)
     print("done")

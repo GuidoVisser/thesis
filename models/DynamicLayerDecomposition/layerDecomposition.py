@@ -43,9 +43,9 @@ class LayerDecompositer(nn.Module):
         self.writer = summary_writer
         self.separate_bg = separate_bg
 
-    def run_training(self):
+    def run_training(self, start_epoch=0):
         
-        for epoch in range(self.n_epochs):
+        for epoch in range(start_epoch, self.n_epochs):
 
             t0 = datetime.now()
             
