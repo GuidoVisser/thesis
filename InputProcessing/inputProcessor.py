@@ -17,6 +17,7 @@ from .homography import HomographyHandler
 
 class InputProcessor(object):
     def __init__(self,
+                 model_type: str,
                  video: str,
                  out_root: str,
                  initial_mask: Union[str, list],
@@ -75,6 +76,9 @@ class InputProcessor(object):
         self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device, iters=50)
         self.homography_handler = HomographyHandler(out_root, self.img_dir, path.join(flow_dir, "dynamics_mask"), self.device, frame_size)
         self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, num_static_channels=num_static_channels, temporal_coarseness=noise_temporal_coarseness, frame_size=frame_size)       
+
+        if model_type == "omnimatte":
+            self.flow_handler.max_value = 1.
 
         # Load a custom compositing order if it's given, otherwise initialize a new one
         self._initialize_composite_order(composite_order_fp)
@@ -162,7 +166,7 @@ class InputProcessor(object):
             if self.gt_in_memory:
                 rgb_memory_input = self.frame_iterator[:len(self.flow_handler)]         # [3, F-1, H, W]
                 flow_memory_input, _, _, _ = self.flow_handler[:len(self.flow_handler)] # [2, F-1, H, W]
-                self.memory_input = torch.cat((rgb_memory_input, flow_memory_input))         # [5, F-1, H, W]
+                self.memory_input = torch.cat((rgb_memory_input, flow_memory_input))    # [5, F-1, H, W]
             # -- use noise as input
             else:
                 self.memory_input = torch.cat((torch.zeros_like(spatiotemporal_noise[:3]), spatiotemporal_noise)) # [C, F, H, W]

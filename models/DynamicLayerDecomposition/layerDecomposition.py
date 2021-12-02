@@ -173,7 +173,7 @@ class LayerDecompositer(nn.Module):
                                 path.join(self.save_dir, f"{epoch_name}/alpha/{l:02}"),
                                 path.join(self.save_dir, f"{epoch_name}/flow/{l:02}"))
                     foreground_rgba    = torch.clone(rgba_layers[b, l, :, t]).detach()
-                    foreground_flow    = torch.clone(flow_layers[b, l, :, t]).detach()
+                    foreground_flow    = torch.clone(flow_layers[b, l, :, t]).detach() * self.dataloader.dataset.flow_handler.max_value
                     foreground_alpha   = torch.clone(rgba_layers[b, l, 3, t]).detach()
 
                     foreground_img      = cv2.cvtColor((foreground_rgba.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGBA2BGRA)

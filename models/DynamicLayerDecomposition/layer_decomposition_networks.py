@@ -28,7 +28,7 @@ class Omnimatte(nn.Module):
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)])
         
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
 
         self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
@@ -213,8 +213,10 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
     """
     Layer Decomposition Attention Memory Net with 2D convolutions
     """
-    def __init__(self, conv_channels=64, in_channels=16, valdim=128, keydim=64, max_frames=200, coarseness=10, do_adjustment=True, shared_encoder=True):
+    def __init__(self, flow_max, conv_channels=64, in_channels=16, valdim=128, keydim=64, max_frames=200, coarseness=10, do_adjustment=True, shared_encoder=True):
         super().__init__(max_frames, coarseness, do_adjustment)
+
+        self.flow_max = flow_max
 
         # initialize foreground encoder and decoder
         query_backbone = nn.ModuleList([
@@ -249,7 +251,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
         
     def render(self, x: torch.Tensor, global_context: GlobalContextVolume, is_bg=False):
         """
@@ -346,7 +348,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
 
                 # Temporal consistency
                 rgba_t1          = rgba[B:]
-                rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:B])
+                rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:B] * self.flow_max)
                 alpha_warped     = self.get_alpha_from_rgba(rgba_warped)
                 composite_warped = self.composite_rgb(composite_warped, rgba_warped[:, :3], alpha_warped)
 
@@ -472,7 +474,7 @@ class LayerDecompositionAttentionMemoryNet3D(LayerDecompositionAttentionMemoryNe
             ConvBlock3D(conv_channels * 2,     conv_channels,     ksize=(4, 4, 4), stride=(2, 2, 2), norm=nn.BatchNorm3d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock3D(conv_channels, 4, ksize=(4, 4, 4), stride=(1, 1, 1), activation='tanh')
-        self.final_flow = ConvBlock3D(conv_channels, 2, ksize=(4, 4, 4), stride=(1, 1, 1), activation='none')
+        self.final_flow = ConvBlock3D(conv_channels, 2, ksize=(4, 4, 4), stride=(1, 1, 1), activation='tanh')
 
         self.base_grid_bg_offset = None
 
@@ -689,7 +691,7 @@ class LayerDecompositionAttentionMemoryNetCombined(LayerDecompositionAttentionMe
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
 
         self.base_grid_bg_offset = None
 
@@ -961,7 +963,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
 
         self.base_grid_bg_offset = None
 

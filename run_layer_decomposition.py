@@ -22,6 +22,7 @@ def init_dataloader(args, separate_bg, use_3d):
     """
 
     input_processor = InputProcessor(
+        args.model_type,
         args.img_dir, 
         args.out_dir, 
         args.initial_mask, 
@@ -86,6 +87,7 @@ def init_model(args, dataloader, loss_module, writer, separate_bg):
 
     if args.model_type == "2d":
         network = LayerDecompositionAttentionMemoryNet2D(
+            dataloader.dataset.flow_handler.max_value,
             in_channels=args.in_channels,
             conv_channels=args.conv_channels,
             valdim=args.valdim,
@@ -212,19 +214,19 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
-    dataset = "Jaap_Jelle"
-    video = "kruispunt_rijks"
+    dataset = "DAVIS_minisample"
+    video = "scooter-black"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/combined/00006.png"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00000.png"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
     directory_args.add_argument("--continue_from", type=str, default="", help="root directory of training run from which you wish to continue")
 
     model_args = parser.add_argument_group("model")
-    model_args.add_argument("--model_type", type=str, default="omnimatte", choices=["3d_bottleneck", "combined", "2d", "3d", "omnimatte"], help="The type of decomposition network to use")
+    model_args.add_argument("--model_type", type=str, default="3d_bottleneck", choices=["3d_bottleneck", "combined", "2d", "3d", "omnimatte"], help="The type of decomposition network to use")
     model_args.add_argument("--shared_encoder", action="store_true", help="Specifies whether to use a shared memory/query encoder in the network")
     model_args.add_argument("--conv_channels", type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
     model_args.add_argument("--keydim", type=int, default=8, help="number of key channels in the attention memory network")
@@ -247,7 +249,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=10, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=251, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=70, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
