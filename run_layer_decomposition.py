@@ -222,7 +222,7 @@ if __name__ == "__main__":
     model_args = parser.add_argument_group("model")
     model_args.add_argument("--model_type", type=str, default="omnimatte", choices=["3d_bottleneck", "combined", "2d", "3d", "omnimatte"], help="The type of decomposition network to use")
     model_args.add_argument("--shared_encoder", action="store_true", help="Specifies whether to use a shared memory/query encoder in the network")
-    model_args.add_argument("--conv_channels", type=int, default=64, help="base number of convolution channels in the convolutional neural networks")
+    model_args.add_argument("--conv_channels", type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
     model_args.add_argument("--keydim", type=int, default=8, help="number of key channels in the attention memory network")
     model_args.add_argument("--valdim", type=int, default=16, help="number of value channels in the attention memory network")
     model_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
