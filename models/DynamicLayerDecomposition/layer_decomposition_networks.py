@@ -964,6 +964,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
+        self.final_depth = ConvBlock2D(conv_channels, 1, ksize=4, stride=1, activation='tanh')
 
         self.base_grid_bg_offset = None
 
@@ -993,8 +994,9 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         x = self.dynamics_layer(x)
 
-        rgba = []
-        flow = []
+        rgba  = []
+        flow  = []
+        depth = []
         for t in range(T):
             # decoding
             x_t = x[..., t, :, :]
@@ -1007,11 +1009,13 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             # finalizing render
             rgba.append(self.final_rgba(x_t))
             flow.append(self.final_flow(x_t))
+            depth.append(self.final_depth(x_t))
 
-        rgba = torch.stack(rgba, dim=-3)
-        flow = torch.stack(flow, dim=-3)
+        rgba  = torch.stack(rgba, dim=-3)
+        flow  = torch.stack(flow, dim=-3)
+        depth = torch.stack(depth, dim=-3)
 
-        return rgba, flow
+        return rgba, flow, depth
 
     def render_background(self, x: torch.Tensor, global_context: GlobalContextVolume2D):
         """
@@ -1026,9 +1030,6 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         _, _, T, _, _ = x.shape
 
-        rgba = []
-        flow = []
-
         _, x, skips = self.memory_reader(x[:, :, 0], global_context)
         
         # decoding
@@ -1037,10 +1038,11 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             x = layer(x)
 
         # finalizing render
-        rgba = self.final_rgba(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
-        flow = self.final_flow(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
+        rgba  = self.final_rgba(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
+        flow  = self.final_flow(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
+        depth = self.final_depth(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
 
-        return rgba, flow
+        return rgba, flow, depth
 
 
     def forward(self, input: dict) -> dict:
@@ -1066,6 +1068,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         layers_rgba = []
         layers_flow = []
+        layers_depth = []
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
@@ -1078,24 +1081,29 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             # Background layer
             if i == 0:
 
-                rgba, flow = self.render_background(layer_input, global_context)
+                rgba, flow, depth = self.render_background(layer_input, global_context)
                 rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 if self.do_adjustment:
                     rgba = self._apply_background_offset(rgba, background_offset)
 
                 composite_rgba = rgba
                 flow = composite_flow
+                composite_depth = depth
 
             # Object layers
             else:
-                rgba, flow = self.render(layer_input, global_context)
+                rgba, flow, depth = self.render(layer_input, global_context)
                 alpha = self.get_alpha_from_rgba(rgba)
 
                 composite_rgba = self.composite_rgba(composite_rgba, rgba)
                 composite_flow = flow * alpha + composite_flow * (1. - alpha)
 
+                binary_alpha = torch.where(alpha > .5, 1, 0)
+                composite_depth = depth * binary_alpha + composite_depth * (1. - binary_alpha)
+
             layers_rgba.append(rgba)
             layers_flow.append(flow)
+            layers_depth.append(depth)
 
         if self.do_adjustment:
             # map output to [0, 1]
@@ -1108,14 +1116,17 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             composite_rgba = composite_rgba * 2 - 1
 
         # stack in layer dimension
-        layers_rgba = torch.stack(layers_rgba, 1)
-        layers_flow = torch.stack(layers_flow, 1)
+        layers_rgba  = torch.stack(layers_rgba, 1)
+        layers_flow  = torch.stack(layers_flow, 1)
+        layers_depth = torch.stack(layers_depth, 1)
 
         out = {
             "rgba_reconstruction": composite_rgba,          # [B,    4, T, H, W]
             "flow_reconstruction": composite_flow,          # [B,    2, T, H, w]
+            "depth_reconstruction": composite_depth,        # [B,    1, T, H, W]
             "layers_rgba": layers_rgba,                     # [B, L, 4, T, H, W]
             "layers_flow": layers_flow,                     # [B, L, 2, T, H, W]
+            "layers_depth": layers_depth,                   # [B, L, 1, T, H, W]
             "brightness_scale": brightness_scale,           # [B,    1, T, H, W]
             "background_offset": background_offset,         # [B,    2, T, H, W]
         }

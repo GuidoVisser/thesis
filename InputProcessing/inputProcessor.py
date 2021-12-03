@@ -5,6 +5,7 @@ import numpy as np
 import torch.nn.functional as F
 from os import path
 from typing import Union
+from InputProcessing.depthHandler import DepthHandler
 
 from utils.video_utils import opencv_folder_to_video
 from utils.utils import create_dirs
@@ -24,6 +25,7 @@ class InputProcessor(object):
                  composite_order_fp: Union[str, None],
                  propagation_model: str,
                  flow_model: str,
+                 depth_model: str,
                  in_channels: int = 16,
                  num_static_channels: int = 5,
                  noise_temporal_coarseness: int = 2,
@@ -62,8 +64,9 @@ class InputProcessor(object):
         self.img_dir   = path.join(out_root, "images")
         mask_dir       = path.join(out_root, "masks")
         flow_dir       = path.join(out_root, "flow")
+        depth_dir      = path.join(out_root, "depth")
         background_dir = path.join(out_root, "background")
-        create_dirs(self.img_dir, mask_dir, flow_dir, background_dir)
+        create_dirs(self.img_dir, mask_dir, flow_dir, depth_dir, background_dir)
 
         # save resized ground truth frames in the input directory
         self._prepare_image_dir(video, self.img_dir)
@@ -75,7 +78,8 @@ class InputProcessor(object):
         self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
         self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device, iters=50)
         self.homography_handler = HomographyHandler(out_root, self.img_dir, path.join(flow_dir, "dynamics_mask"), self.device, frame_size)
-        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, num_static_channels=num_static_channels, temporal_coarseness=noise_temporal_coarseness, frame_size=frame_size)       
+        self.depth_handler      = DepthHandler(self.img_dir, depth_dir, device, self.mask_handler, frame_size, depth_model)
+        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, num_static_channels=num_static_channels, temporal_coarseness=noise_temporal_coarseness, frame_size=frame_size)        
 
         if model_type == "omnimatte":
             self.flow_handler.max_value = 1.
@@ -117,11 +121,16 @@ class InputProcessor(object):
         flow, flow_conf, object_flow, _ = self.flow_handler[idx:idx + self.timesteps] 
         background_flow = self.homography_handler.frame_homography_to_flow(slice(idx, idx+self.timesteps)) 
 
+        # Get depth input
+        # depth:             [C, T, H, W]
+        # object_depth: [L-b, C, T, H, W]
+        depth, object_depth = self.depth_handler[idx:idx + self.timesteps]
+
         # Add background layers to masks
         masks = torch.cat((torch.zeros_like(masks[0:1]).repeat(self.num_bg_layers, 1, 1, 1, 1), masks))
 
         # Get spatial noise input if a separate static background is used
-        # background_noise:  [1, C-3, T, H, W]
+        # background_noise:  [1, C-4, T, H, W]
         # background_uv_map: [T, H, W, 2]
         if self.separate_bg:
             background_noise = self.background_volume.spatial_noise_upsampled
@@ -133,8 +142,8 @@ class InputProcessor(object):
         background_uv_map  = torch.stack(background_uv_maps)
 
         # Get spatiotemporal noise input
-        # spatiotemporal_noise:   [C-3, F, H, W]
-        # spatiotemporal_noise_t: [C-3, T, H, W]
+        # spatiotemporal_noise:   [C-4, F, H, W]
+        # spatiotemporal_noise_t: [C-4, T, H, W]
         spatiotemporal_noise = self.background_volume.spatiotemporal_noise 
 
         # NOTE: time dimension is treated as batch dimension in grid_sample because we want to only sample in spatial dimensions
@@ -147,10 +156,10 @@ class InputProcessor(object):
             background_uv_map = torch.cat((background_uv_map, t), dim=-1)
 
         # Construct query input        
-        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)             # [L-b, 1, T, H, W] 
-        query_input = torch.cat((pids, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)), dim=1)   # [L-b, C, T, H, W]
+        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)                         # [L-b, 1, T, H, W] 
+        query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)), dim=1) # [L-b, C, T, H, W]
 
-        zeros = torch.zeros((1, 3, self.timesteps, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [1, 3, T, H, W]
+        zeros = torch.zeros((1, 4, self.timesteps, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [1, 4, T, H, W]
         if self.separate_bg:
             static_background_input  = torch.cat((zeros, background_noise), dim=1)                                # [1, C, T, H, W]
             dynamic_background_input = torch.cat((zeros, spatiotemporal_noise_t.unsqueeze(0)), dim=1)             # [1, C, T, H, W]
@@ -169,7 +178,7 @@ class InputProcessor(object):
                 self.memory_input = torch.cat((rgb_memory_input, flow_memory_input))    # [5, F-1, H, W]
             # -- use noise as input
             else:
-                self.memory_input = torch.cat((torch.zeros_like(spatiotemporal_noise[:3]), spatiotemporal_noise)) # [C, F, H, W]
+                self.memory_input = torch.cat((torch.zeros_like(spatiotemporal_noise[:4]), spatiotemporal_noise)) # [C, F, H, W]
 
         # get parameters for jitter
         params = self.get_jitter_parameters()
@@ -177,6 +186,7 @@ class InputProcessor(object):
         # transform targets
         rgb       = self.apply_jitter_transform(rgb,       params)
         flow      = self.apply_jitter_transform(flow,      params)
+        depth     = self.apply_jitter_transform(depth,     params)
         masks     = self.apply_jitter_transform(masks,     params)
         flow_conf = self.apply_jitter_transform(flow_conf, params)
 
@@ -207,6 +217,7 @@ class InputProcessor(object):
         targets = {
             "rgb": rgb,
             "flow": flow,
+            "depth": depth,
             "masks": masks,
             "binary_masks": binary_masks,
             "flow_confidence": flow_conf

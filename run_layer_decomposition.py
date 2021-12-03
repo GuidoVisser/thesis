@@ -29,6 +29,7 @@ def init_dataloader(args, separate_bg, use_3d):
         args.composite_order, 
         propagation_model=args.propagation_model, 
         flow_model=args.flow_model,
+        depth_model= args.depth_model,
         in_channels=args.in_channels,
         num_static_channels=args.num_static_channels,
         noise_temporal_coarseness=args.noise_temporal_coarseness,
@@ -71,6 +72,7 @@ def init_loss_module(args):
         loss_module = DecompositeLoss3D(
             args.lambda_mask,
             args.lambda_recon_flow,
+            args.lambda_recon_depth,
             args.lambda_alpha_l0,
             args.lambda_alpha_l1,
             args.lambda_stabilization,
@@ -219,7 +221,7 @@ if __name__ == "__main__":
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00000.png"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/480p/{video}/00000.png"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/JPEGImages/480p/{video}", 
         help="path to the directory in which the video frames are stored")
@@ -260,6 +262,7 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_mask", type=float, default=50., help="starting value for the lambda of the alpha_mask_bootstrap loss")
     lambdas.add_argument("--lambda_recon_flow", type=float, default=1., help="lambda of the flow reconstruction loss")
     lambdas.add_argument("--lambda_recon_warp", type=float, default=0., help="lambda of the warped rgb reconstruction loss")
+    lambdas.add_argument("--lambda_recon_depth", type=float, default=0.5, help="lambda of the depth reconstruction loss")
     lambdas.add_argument("--lambda_alpha_warp", type=float, default=0.005, help="lambda of the warped alpha estimation loss")
     lambdas.add_argument("--lambda_alpha_l0", type=float, default=0.005, help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1", type=float, default=0.01, help="lambda of the l1 part of the alpha regularization loss")
@@ -271,7 +274,9 @@ if __name__ == "__main__":
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
         help="path to the weights of the mask propagation model")
     pretrained_model_args.add_argument("--flow_model", type=str, default="models/third_party/weights/raft-things.pth",
-        help="path to the optical flow estimation model")
+        help="path to the weights of the optical flow estimation model")
+    pretrained_model_args.add_argument("--depth_model", type=str, default="models/third_party/weights/monodepth_resnet18_001.pth",
+        help="path to the weights of the depth estimation model")
 
     args = parser.parse_args()
 

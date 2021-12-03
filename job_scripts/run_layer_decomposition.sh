@@ -24,6 +24,7 @@ cp -RT $HOME/thesis/datasets/$DATASET/Annotations/$VIDEO/combined/$MASK_PATH $TM
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
+cp $HOME/thesis/models/third_party/weights/monodepth.pth $TMPDIR/weights/depth_model.pth
 
 #Create output directory on scratch
 mkdir $TMPDIR/output_dir
@@ -38,6 +39,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
+            --depth_model $TMPDIR/weights/depth_model.pth
             --batch_size 4 \
             --n_epochs 1001 \
             --save_freq 250 \
