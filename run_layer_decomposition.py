@@ -93,7 +93,7 @@ def init_model(args, dataloader, loss_module, writer, separate_bg):
             valdim=args.valdim,
             keydim=args.keydim,
             do_adjustment=True, 
-            max_frames=len(dataloader) + args.timesteps,
+            max_frames=len(dataloader.dataset.frame_iterator),
             coarseness=args.coarseness,
             shared_encoder=args.shared_encoder
             )
@@ -104,7 +104,7 @@ def init_model(args, dataloader, loss_module, writer, separate_bg):
             valdim=args.valdim,
             keydim=args.keydim,
             do_adjustment=True, 
-            max_frames=len(dataloader) + args.timesteps,
+            max_frames=len(dataloader.dataset.frame_iterator),
             coarseness=args.coarseness,
             shared_encoder=args.shared_encoder,
             mem_freq=args.mem_freq,
@@ -117,7 +117,7 @@ def init_model(args, dataloader, loss_module, writer, separate_bg):
             valdim=args.valdim,
             keydim=args.keydim,
             do_adjustment=True, 
-            max_frames=len(dataloader) + args.timesteps,
+            max_frames=len(dataloader.dataset.frame_iterator),
             coarseness=args.coarseness,
             timesteps=args.timesteps,
             mem_freq=args.mem_freq,
@@ -130,7 +130,7 @@ def init_model(args, dataloader, loss_module, writer, separate_bg):
             valdim=args.valdim,
             keydim=args.keydim,
             do_adjustment=True, 
-            max_frames=len(dataloader) + args.timesteps,
+            max_frames=len(dataloader.dataset.frame_iterator),
             coarseness=args.coarseness,
             shared_encoder=args.shared_encoder,
             gt_in_memory=args.gt_in_memory
@@ -139,7 +139,7 @@ def init_model(args, dataloader, loss_module, writer, separate_bg):
         network = Omnimatte(
             in_channels=args.in_channels,
             conv_channels=args.conv_channels,
-            max_frames=len(dataloader) + args.timesteps,
+            max_frames=len(dataloader.dataset.frame_iterator),
             coarseness=args.coarseness,
             do_adjustment=True
         )
