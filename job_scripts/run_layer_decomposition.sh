@@ -32,8 +32,8 @@ mkdir $TMPDIR/output_dir
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
-            --model_type 3d_bottleneck \
-            --shared_encoder \
+            --model_setup 1 \
+            --memory_setyp 1 \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/$MASK_PATH \
             --out_dir $TMPDIR/output_dir \
@@ -41,8 +41,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --depth_model $TMPDIR/weights/depth_model.pth
             --batch_size 4 \
-            --n_epochs 1001 \
-            --save_freq 250 \
+            --n_epochs 250 \
+            --save_freq 50 \
             --conv_channels 64 \
             --keydim 64 \
             --valdim 128 \

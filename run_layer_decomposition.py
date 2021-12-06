@@ -23,8 +23,8 @@ class ExperimentRunner(object):
     Experiments are defined by the model setup and memory setup
 
     Model setup (default is 2D convolutions):
-    1. strided 3D convolutions in memory encoder 
-    2. strided 3D convolutions in memory encoder. The encoders share weights
+    1. Non strided 3D convolutions in memory encoder 
+    2. strided 3D convolutions in memory encoder
     3. A single 3D convolution as bottleneck after the context is added
     4. A single 3D convolution as bottleneck after the context is added. The encoder share weights
     5. No 3D convolutions are added
