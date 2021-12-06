@@ -21,6 +21,7 @@ def default_config():
             'conv_channels':             64,
             'keydim':                    128, 
             'valdim':                    512,
+            'topk':                      64,
             'use_2d_loss_module':        False,
             'no_static_background':      False,
             'memory_t_strided':          False
