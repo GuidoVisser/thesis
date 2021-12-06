@@ -47,12 +47,6 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --alpha_bootstr_rolloff 50 \
-            --alpha_loss_l1_rolloff 100 \
-            --lambda_alpha_l0 0.005 \
-            --lambda_alpha_l1 0.01 \
-            --lambda_dynamics_reg_corr 0.005 \
-            --lambda_dynamics_reg_diff 0.01 \
             --description '2d reconstruction model with one 3d convolution layer in the middle that is only used for the dynamic layers'
 echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 

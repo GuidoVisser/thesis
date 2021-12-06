@@ -76,7 +76,7 @@ class GlobalContextVolume2D(GlobalContextVolume):
         context_dist = context_dist.view(B, -1, H, W)           # -> [B x C_v x H x W]
 
         if self.topk is not None:
-            context_dist = torch.topk(context_dist, self.topk, dim=1)
+            context_dist = torch.topk(context_dist, self.topk, dim=1).values
 
         return context_dist
 

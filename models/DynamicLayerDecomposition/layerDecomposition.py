@@ -52,12 +52,6 @@ class LayerDecompositer(nn.Module):
             if epoch % self.save_freq == 0:
                 self.create_save_dirs(f"intermediate/{epoch}")
             
-            if epoch == self.mask_loss_l1_rolloff:
-                self.loss_module.lambda_alpha_l1 = 0.
-
-            if epoch == self.mask_bootstrap_rolloff:
-                self.loss_module.lambda_mask_bootstrap = 0
-            
             for iteration, (input, targets) in enumerate(self.dataloader):
 
                 self.optimizer.zero_grad()
@@ -79,6 +73,8 @@ class LayerDecompositer(nn.Module):
                 if epoch % self.save_freq == 0:
                     frame_indices = input["index"][:, 0].tolist()
                     self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
+
+            self.loss_module.update_lambdas()
 
             if torch.cuda.device_count() <= 1:
                 t1 = datetime.now()

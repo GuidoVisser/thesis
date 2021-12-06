@@ -300,7 +300,7 @@ class LayerDecompositionAttentionMemoryNet3D(LayerDecompositionAttentionMemoryNe
         """
         global_features, x, skips = self.memory_reader(x, global_context)
 
-        x = torch.cat((global_features.values, x), dim=1)
+        x = torch.cat((global_features, x), dim=1)
 
         # decoding
         for layer in self.decoder:          
@@ -376,7 +376,7 @@ class LayerDecompositionAttentionMemoryNet3DMemoryEncoder(LayerDecompositionAtte
         for t in range(T):
             global_features, x_t, skips_t = self.memory_reader(x[..., t, :, :], global_context)
 
-            x_t = torch.cat((global_features.values, x_t), dim=1)
+            x_t = torch.cat((global_features, x_t), dim=1)
             
             outputs.append(x_t)
             skips.append(skips_t)
@@ -513,7 +513,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         for t in range(T):
             global_features, x_t, skips_t = self.memory_reader(x[..., t, :, :], global_context)
 
-            x_t = torch.cat((global_features.values, x_t), dim=1)
+            x_t = torch.cat((global_features, x_t), dim=1)
             
             outputs.append(x_t)
             skips.append(skips_t)
@@ -635,7 +635,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
         if is_bg:
             x = torch.cat((torch.zeros_like(global_features), x), dim=1)
         else:
-            x = torch.cat((global_features.values, x), dim=1)
+            x = torch.cat((global_features, x), dim=1)
 
         # decoding
         for layer in self.decoder:          

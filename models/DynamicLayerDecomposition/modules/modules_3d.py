@@ -81,7 +81,7 @@ class GlobalContextVolume3D(GlobalContextVolume):
         context_dist = context_dist.view(B, -1, T, H, W)        # -> [B, C_v, T, H, W]
 
         if self.topk is not None:
-            context_dist = torch.topk(context_dist, self.topk, dim=1)
+            context_dist = torch.topk(context_dist, self.topk, dim=1).values
 
         return context_dist
 

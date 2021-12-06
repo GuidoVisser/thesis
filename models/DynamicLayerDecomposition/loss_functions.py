@@ -2,8 +2,45 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from typing import Tuple
+from typing import Protocol, Tuple
 
+
+class LambdaScheduler(object):
+    """
+    Scheduler for the lambda values
+    """
+
+    def __init__(self, lambda_schedule: list) -> None:
+        super().__init__()
+
+        assert len(lambda_schedule) % 2 == 1, "Input needs to be list of odd length"
+
+        self.iteration = 0
+        self.value = float(lambda_schedule[0])
+        self.schedule = self.create_schedule(lambda_schedule[1:])
+
+    def create_schedule(self, lambda_schedule: list):
+        """
+        Gets an input in the form of a list if the form
+
+        [update_iteration_1, next_value_1, update_iteration, next_value_2, ....]
+
+        creates a dict in the form
+        {
+            "update_iteration_1": next_value_1,
+            "update_iteration_2: next_value_2,
+            ...
+        }
+        """
+        return {str(lambda_schedule[i]):lambda_schedule[i+1] for i in range(0, len(lambda_schedule), 2)}
+
+    def update(self):
+        """
+        Update the iteration count and set the new lambda value if necessary
+        """
+        self.iteration += 1
+        if self.iteration in self.schedule.keys():
+            self.value = float(self.schedule[str(self.iteration)])
 
 class DecompositeLoss(nn.Module):
     """
@@ -12,27 +49,27 @@ class DecompositeLoss(nn.Module):
     Handles loss computations
     """
     def __init__(self,
-                 lambda_mask: float = 50.,
-                 lambda_recon_flow: float = 1.,
-                 lambda_recon_depth: float = 0.5,
-                 lambda_alpha_l0: float = 0.005,
-                 lambda_alpha_l1: float = 0.01,
-                 lambda_stabilization: float = 0.001,
-                 lambda_dynamics_reg_corr: float = 0.001,
-                 lambda_dynamics_reg_diff: float = 0.001) -> None:
+                 lambda_mask,
+                 lambda_recon_flow,
+                 lambda_recon_depth,
+                 lambda_alpha_l0,
+                 lambda_alpha_l1,
+                 lambda_stabilization,
+                 lambda_dynamics_reg_corr,
+                 lambda_dynamics_reg_diff) -> None:
         super().__init__()
 
         self.criterion = nn.L1Loss()
         self.mask_criterion = MaskLoss()
 
-        self.lambda_alpha_l0          = lambda_alpha_l0
-        self.lambda_alpha_l1          = lambda_alpha_l1
-        self.lambda_mask_bootstrap    = lambda_mask
-        self.lambda_recon_flow        = lambda_recon_flow
-        self.lambda_recon_depth       = lambda_recon_depth
-        self.lambda_stabilization     = lambda_stabilization
-        self.lambda_dynamics_reg_corr = lambda_dynamics_reg_corr
-        self.lambda_dynamics_reg_diff = lambda_dynamics_reg_diff
+        self.lambda_alpha_l0          = LambdaScheduler(lambda_alpha_l0)
+        self.lambda_alpha_l1          = LambdaScheduler(lambda_alpha_l1)
+        self.lambda_mask_bootstrap    = LambdaScheduler(lambda_mask)
+        self.lambda_recon_flow        = LambdaScheduler(lambda_recon_flow)
+        self.lambda_recon_depth       = LambdaScheduler(lambda_recon_depth)
+        self.lambda_stabilization     = LambdaScheduler(lambda_stabilization)
+        self.lambda_dynamics_reg_corr = LambdaScheduler(lambda_dynamics_reg_corr)
+        self.lambda_dynamics_reg_diff = LambdaScheduler(lambda_dynamics_reg_diff)
 
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
@@ -86,8 +123,8 @@ class DecompositeLoss(nn.Module):
 
         dynamics_layer.expand(object_layers.shape)
 
-        alpha_diff = self.lambda_dynamics_reg_diff * torch.maximum((object_layers - dynamics_layer), torch.zeros_like(dynamics_layer))
-        alpha_corr = self.lambda_dynamics_reg_corr * (object_layers * dynamics_layer)
+        alpha_diff = self.lambda_dynamics_reg_diff.value * torch.maximum((object_layers - dynamics_layer), torch.zeros_like(dynamics_layer))
+        alpha_corr = self.lambda_dynamics_reg_corr.value * (object_layers * dynamics_layer)
 
         loss = torch.mean((1 - binary_masks) * (alpha_corr + alpha_diff))
 
@@ -104,13 +141,17 @@ class DecompositeLoss(nn.Module):
         """
 
         loss = 0.
-        if self.lambda_alpha_l1 > 0:
-            loss += self.lambda_alpha_l1 * torch.mean(prediction)
-        if self.lambda_alpha_l0 > 0:
+        if self.lambda_alpha_l1.value > 0:
+            loss += self.lambda_alpha_l1.value * torch.mean(prediction)
+        if self.lambda_alpha_l0.value > 0:
             # Pseudo L0 loss using a squished sigmoid curve.
             l0_prediction = (torch.sigmoid(prediction * 5.0) - 0.5) * 2.0
-            loss += self.lambda_alpha_l0 * torch.mean(l0_prediction)
+            loss += self.lambda_alpha_l0.value * torch.mean(l0_prediction)
         return loss
+
+    def update_lambdas(self):
+        return NotImplemented
+
 
 class DecompositeLoss3D(DecompositeLoss):
     """
@@ -119,14 +160,14 @@ class DecompositeLoss3D(DecompositeLoss):
     Handles loss computations
     """
     def __init__(self,
-                 lambda_mask: float = 50.,
-                 lambda_recon_flow: float = 1.,
-                 lambda_recon_depth: float = 0.5,
-                 lambda_alpha_l0: float = 0.005,
-                 lambda_alpha_l1: float = 0.01,
-                 lambda_stabilization: float = 0.001,
-                 lambda_dynamics_reg_corr: float = 0.001,
-                 lambda_dynamics_reg_diff: float = 0.001) -> None:
+                 lambda_mask,
+                 lambda_recon_flow,
+                 lambda_recon_depth,
+                 lambda_alpha_l0,
+                 lambda_alpha_l1,
+                 lambda_stabilization,
+                 lambda_dynamics_reg_corr,
+                 lambda_dynamics_reg_diff) -> None:
         
         super().__init__(lambda_mask,
                          lambda_recon_flow,
@@ -191,10 +232,10 @@ class DecompositeLoss3D(DecompositeLoss):
         loss = rgb_reconstruction_loss + \
                alpha_reg_loss + \
                dynamics_reg_loss + \
-               self.lambda_recon_flow     * flow_reconstruction_loss + \
-               self.lambda_recon_depth    * depth_reconstruction_loss + \
-               self.lambda_mask_bootstrap * mask_bootstrap_loss + \
-               self.lambda_stabilization  * stabilization_loss
+               self.lambda_recon_flow.value     * flow_reconstruction_loss + \
+               self.lambda_recon_depth.value    * depth_reconstruction_loss + \
+               self.lambda_mask_bootstrap.value * mask_bootstrap_loss + \
+               self.lambda_stabilization.value  * stabilization_loss
 
         # create dict of all separate losses for logging
         loss_values = {
@@ -202,24 +243,33 @@ class DecompositeLoss3D(DecompositeLoss):
             "rgb_reconstruction_loss":        rgb_reconstruction_loss.item(),
             "alpha_regularization_loss":      alpha_reg_loss.item(),
             "dynamics_regularization_loss":   dynamics_reg_loss.item(),
-            "flow_reconstruction_loss":       self.lambda_recon_flow     * flow_reconstruction_loss.item(),
-            "depth_reconstruction_loss":      self.lambda_recon_depth    * depth_reconstruction_loss.item(),
-            "mask_bootstrap_loss":            self.lambda_mask_bootstrap * mask_bootstrap_loss.item(),
-            "camera_stabilization_loss":      self.lambda_stabilization  * stabilization_loss.item(),
+            "flow_reconstruction_loss":       self.lambda_recon_flow.value     * flow_reconstruction_loss.item(),
+            "depth_reconstruction_loss":      self.lambda_recon_depth.value    * depth_reconstruction_loss.item(),
+            "mask_bootstrap_loss":            self.lambda_mask_bootstrap.value * mask_bootstrap_loss.item(),
+            "camera_stabilization_loss":      self.lambda_stabilization.value  * stabilization_loss.item(),
             "brightness_regularization_loss": brightness_regularization_loss.item(),
             "background_offset_loss":         background_offset_loss.item(),
-            "lambda_flow_reconstruction":     self.lambda_recon_flow,
-            "lambda_depth_reconstruction":    self.lambda_recon_depth,
-            "lambda_mask_bootstrap":          self.lambda_mask_bootstrap,
-            "lambda_stabilization":           self.lambda_stabilization,
-            "lambda_alpha_l0":                self.lambda_alpha_l0,
-            "lambda_alpha_l1":                self.lambda_alpha_l1,
-            "lambda_dynamics_reg_diff":       self.lambda_dynamics_reg_diff,
-            "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr
+            "lambda_flow_reconstruction":     self.lambda_recon_flow.value,
+            "lambda_depth_reconstruction":    self.lambda_recon_depth.value,
+            "lambda_mask_bootstrap":          self.lambda_mask_bootstrap.value,
+            "lambda_stabilization":           self.lambda_stabilization.value,
+            "lambda_alpha_l0":                self.lambda_alpha_l0.value,
+            "lambda_alpha_l1":                self.lambda_alpha_l1.value,
+            "lambda_dynamics_reg_diff":       self.lambda_dynamics_reg_diff.value,
+            "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr.value
         }
 
         return loss, loss_values
 
+    def update_lambdas(self):
+        self.lambda_alpha_l0.update()
+        self.lambda_alpha_l1.update()
+        self.lambda_mask_bootstrap.update()
+        self.lambda_recon_flow.update()
+        self.lambda_recon_depth.update()
+        self.lambda_stabilization.update()
+        self.lambda_dynamics_reg_corr.update()
+        self.lambda_dynamics_reg_diff.update()
 
 class DecompositeLoss2D(DecompositeLoss):
     """
@@ -229,16 +279,16 @@ class DecompositeLoss2D(DecompositeLoss):
     Adds some loss functions for temporal consistency in the output
     """
     def __init__(self,
-                 lambda_mask: float = 50.,
-                 lambda_recon_flow: float = 1.,
-                 lambda_recon_depth: float = .5,
-                 lambda_recon_warp: float = 0.,
-                 lambda_alpha_warp: float = 0.005,
-                 lambda_alpha_l0: float = 0.005,
-                 lambda_alpha_l1: float = 0.01,
-                 lambda_stabilization: float = 0.001,
-                 lambda_dynamics_reg_corr: float = 0.001,
-                 lambda_dynamics_reg_diff: float = 0.001) -> None:
+                 lambda_mask,
+                 lambda_recon_flow,
+                 lambda_recon_depth,
+                 lambda_recon_warp,
+                 lambda_alpha_warp,
+                 lambda_alpha_l0,
+                 lambda_alpha_l1,
+                 lambda_stabilization,
+                 lambda_dynamics_reg_corr,
+                 lambda_dynamics_reg_diff) -> None:
         super().__init__(lambda_mask, 
                          lambda_recon_flow, 
                          lambda_recon_depth,
@@ -248,8 +298,8 @@ class DecompositeLoss2D(DecompositeLoss):
                          lambda_dynamics_reg_corr,
                          lambda_dynamics_reg_diff)
 
-        self.lambda_recon_warp        = lambda_recon_warp
-        self.lambda_alpha_warp        = lambda_alpha_warp
+        self.lambda_recon_warp = LambdaScheduler(lambda_recon_warp)
+        self.lambda_alpha_warp = LambdaScheduler(lambda_alpha_warp)
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -315,12 +365,12 @@ class DecompositeLoss2D(DecompositeLoss):
         loss = rgb_reconstruction_loss + \
                alpha_reg_loss + \
                dynamics_reg_loss + \
-               self.lambda_recon_flow     * flow_reconstruction_loss + \
-               self.lambda_recon_depth    * depth_reconstruction_loss + \
-               self.lambda_mask_bootstrap * mask_bootstrap_loss + \
-               self.lambda_alpha_warp     * alpha_warp_loss + \
-               self.lambda_recon_warp     * rgb_reconstruction_warp_loss + \
-               self.lambda_stabilization  * stabilization_loss
+               self.lambda_recon_flow.value     * flow_reconstruction_loss + \
+               self.lambda_recon_depth.value    * depth_reconstruction_loss + \
+               self.lambda_mask_bootstrap.value * mask_bootstrap_loss + \
+               self.lambda_alpha_warp.value     * alpha_warp_loss + \
+               self.lambda_recon_warp.value     * rgb_reconstruction_warp_loss + \
+               self.lambda_stabilization.value  * stabilization_loss
 
         # create dict of all separate losses for logging
         loss_values = {
@@ -328,28 +378,39 @@ class DecompositeLoss2D(DecompositeLoss):
             "rgb_reconstruction_loss":        rgb_reconstruction_loss.item(),
             "alpha_regularization_loss":      alpha_reg_loss.item(),
             "dynamics_regularization_loss":   dynamics_reg_loss.item(),
-            "flow_reconstruction_loss":       self.lambda_recon_flow     * flow_reconstruction_loss.item(),
-            "depth_reconstruction_loss":      self.lambda_recon_depth    * depth_reconstruction_loss.item(),
-            "mask_bootstrap_loss":            self.lambda_mask_bootstrap * mask_bootstrap_loss.item(),
-            "alpha_warp_loss":                self.lambda_alpha_warp     * alpha_warp_loss.item(),
-            "rgb_reconstruction_warp_loss":   self.lambda_recon_warp     * rgb_reconstruction_warp_loss.item(),
-            "camera_stabilization_loss":      self.lambda_stabilization  * stabilization_loss.item(),
+            "flow_reconstruction_loss":       self.lambda_recon_flow.value     * flow_reconstruction_loss.item(),
+            "depth_reconstruction_loss":      self.lambda_recon_depth.value    * depth_reconstruction_loss.item(),
+            "mask_bootstrap_loss":            self.lambda_mask_bootstrap.value * mask_bootstrap_loss.item(),
+            "alpha_warp_loss":                self.lambda_alpha_warp.value     * alpha_warp_loss.item(),
+            "rgb_reconstruction_warp_loss":   self.lambda_recon_warp.value     * rgb_reconstruction_warp_loss.item(),
+            "camera_stabilization_loss":      self.lambda_stabilization.value  * stabilization_loss.item(),
             "brightness_regularization_loss": brightness_regularization_loss.item(),
             "background_offset_loss":         background_offset_loss.item(),
-            "lambda_flow_reconstruction":     self.lambda_recon_flow,
-            "lambda_depth_reconstruction":    self.lambda_recon_depth,
-            "lambda_mask_bootstrap":          self.lambda_mask_bootstrap,
-            "lambda_alpha_warp":              self.lambda_alpha_warp,
-            "lambda_stabilization":           self.lambda_stabilization,
-            "lambda_warped_reconstruction":   self.lambda_recon_warp,
-            "lambda_alpha_l0":                self.lambda_alpha_l0,
-            "lambda_alpha_l1":                self.lambda_alpha_l1,
-            "lambda_dynamics_reg_diff":       self.lambda_dynamics_reg_diff,
-            "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr
+            "lambda_flow_reconstruction":     self.lambda_recon_flow.value,
+            "lambda_depth_reconstruction":    self.lambda_recon_depth.value,
+            "lambda_mask_bootstrap":          self.lambda_mask_bootstrap.value,
+            "lambda_alpha_warp":              self.lambda_alpha_warp.value,
+            "lambda_stabilization":           self.lambda_stabilization.value,
+            "lambda_warped_reconstruction":   self.lambda_recon_warp.value,
+            "lambda_alpha_l0":                self.lambda_alpha_l0.value,
+            "lambda_alpha_l1":                self.lambda_alpha_l1.value,
+            "lambda_dynamics_reg_diff":       self.lambda_dynamics_reg_diff.value,
+            "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr.value
         }
 
         return loss, loss_values
 
+    def update_lambdas(self):
+        self.lambda_alpha_l0.update()
+        self.lambda_alpha_l1.update()
+        self.lambda_mask_bootstrap.update()
+        self.lambda_recon_flow.update()
+        self.lambda_recon_depth.update()
+        self.lambda_stabilization.update()
+        self.lambda_dynamics_reg_corr.update()
+        self.lambda_dynamics_reg_diff.update()
+        self.lambda_recon_warp.update()
+        self.lambda_alpha_warp.update()
 
 ##############################################################################################################
 # Adapted from Omnimatte: https://github.com/erikalu/omnimatte/tree/018e56a64f389075e548966e4547fcc404e98986 #
