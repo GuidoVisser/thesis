@@ -33,7 +33,7 @@ mkdir $TMPDIR/output_dir
 echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
             --model_setup 1 \
-            --memory_setyp 1 \
+            --memory_setup 3 \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/$MASK_PATH \
             --out_dir $TMPDIR/output_dir \
