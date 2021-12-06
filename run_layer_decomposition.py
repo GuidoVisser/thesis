@@ -254,8 +254,6 @@ class ExperimentRunner(object):
             network, 
             writer,
             self.args.learning_rate, 
-            self.args.alpha_bootstr_rolloff,
-            self.args.alpha_loss_l1_rolloff,
             results_root=self.args.out_dir, 
             batch_size=self.args.batch_size,
             n_epochs=self.args.n_epochs,

@@ -18,8 +18,6 @@ class LayerDecompositer(nn.Module):
                  network: nn.Module,
                  summary_writer: SummaryWriter,
                  learning_rate: float,
-                 mask_bootstrap_rolloff: int,
-                 mask_loss_l1_rolloff: int,
                  results_root: str,
                  batch_size: int,
                  n_epochs: int,
@@ -38,8 +36,6 @@ class LayerDecompositer(nn.Module):
         self.n_epochs = n_epochs
         self.save_freq = save_freq
         self.batch_size = batch_size
-        self.mask_bootstrap_rolloff = mask_bootstrap_rolloff
-        self.mask_loss_l1_rolloff = mask_loss_l1_rolloff
         self.writer = summary_writer
         self.separate_bg = separate_bg
 
