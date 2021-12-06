@@ -17,41 +17,23 @@ from .homography import HomographyHandler
 
 
 class InputProcessor(object):
-    def __init__(self,
-                 model_type: str,
-                 video: str,
-                 out_root: str,
-                 initial_mask: Union[str, list],
-                 composite_order_fp: Union[str, None],
-                 propagation_model: str,
-                 flow_model: str,
-                 depth_model: str,
-                 in_channels: int = 16,
-                 num_static_channels: int = 5,
-                 noise_temporal_coarseness: int = 2,
-                 device: str = "cuda",
-                 timesteps: int = 2,
-                 use_3d: bool = False,
-                 separate_bg: bool = False,
-                 frame_size: tuple=(448, 256),
-                 do_jitter: bool = True,
-                 jitter_rate: float = 0.75,
-                 gt_in_memory: bool = True
+    def __init__(self, args, do_jitter: bool = True,
                 ) -> None:
         super().__init__()
 
         # initialize attributes
-        self.device        = device
-        self.frame_size    = frame_size
-        self.in_channels   = in_channels
-        self.do_jitter     = do_jitter
-        self.jitter_rate   = jitter_rate
-        self.jitter_mode   = 'bilinear'
-        self.timesteps     = timesteps
-        self.use_3d        = use_3d
-        self.separate_bg   = separate_bg
-        self.num_bg_layers = 2 if separate_bg else 1
-        self.gt_in_memory  = gt_in_memory 
+        self.timesteps                 = args.timesteps
+        self.use_3d                    = not args.use_2d_loss_module
+        self.frame_size                = (args.frame_width, args.frame_height)
+        self.do_jitter                 = do_jitter
+        self.jitter_rate               = args.jitter_rate
+        self.jitter_mode               = 'bilinear'
+        self.num_bg_layers             = 1 if args.no_static_background else 2
+
+        # directories
+        video = args.img_dir
+        out_root = args.out_dir
+        initial_mask = args.initial_mask
 
         if isinstance(initial_mask, str):
             self.N_objects = 1
@@ -61,34 +43,34 @@ class InputProcessor(object):
         self.N_layers = self.N_objects + self.num_bg_layers
 
         # create input directories
-        self.img_dir   = path.join(out_root, "images")
+        img_dir        = path.join(out_root, "images")
         mask_dir       = path.join(out_root, "masks")
         flow_dir       = path.join(out_root, "flow")
         depth_dir      = path.join(out_root, "depth")
         background_dir = path.join(out_root, "background")
-        create_dirs(self.img_dir, mask_dir, flow_dir, depth_dir, background_dir)
+        create_dirs(img_dir, mask_dir, flow_dir, depth_dir, background_dir)
 
         # save resized ground truth frames in the input directory
-        self._prepare_image_dir(video, self.img_dir)
+        self._prepare_image_dir(video, img_dir)
 
         # create helper classes 
         #   These helpers prepare the mask propagation, homography estimation and optical flow calculation 
         #   at initialization and save the results for fast retrieval
-        self.frame_iterator     = FrameIterator(self.img_dir, frame_size, device=self.device)
-        self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, frame_size, device=self.device, propagation_model=propagation_model)
-        self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=flow_model, device=self.device, iters=50)
-        self.homography_handler = HomographyHandler(out_root, self.img_dir, path.join(flow_dir, "dynamics_mask"), self.device, frame_size)
-        self.depth_handler      = DepthHandler(self.img_dir, depth_dir, device, self.mask_handler, frame_size, depth_model)
-        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=in_channels, num_static_channels=num_static_channels, temporal_coarseness=noise_temporal_coarseness, frame_size=frame_size)        
+        self.frame_iterator     = FrameIterator(img_dir, self.frame_size, device=args.device)
+        self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, self.frame_size, device=args.device, propagation_model=args.propagation_model)
+        self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=args.flow_model, device=args.device, iters=50)
+        self.homography_handler = HomographyHandler(out_root, img_dir, path.join(flow_dir, "dynamics_mask"), args.device, self.frame_size)
+        self.depth_handler      = DepthHandler(img_dir, depth_dir, args.device, self.mask_handler, self.frame_size, args.depth_model)
+        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=args.in_channels, num_static_channels=args.num_static_channels, temporal_coarseness=args.noise_temporal_coarseness, frame_size=self.frame_size)        
 
-        if model_type == "omnimatte":
+        if args.model_type == "omnimatte":
             self.flow_handler.max_value = 1.
 
         # Load a custom compositing order if it's given, otherwise initialize a new one
-        self._initialize_composite_order(composite_order_fp)
+        self._initialize_composite_order(args.composite_order)
 
         # placeholder for memory input
-        self.memory_input = None
+        self.memory_input = self.construct_memory_input(args.memory_input_type, args.shared_backbone)
         
     def __getitem__(self, idx):
         """
@@ -132,7 +114,7 @@ class InputProcessor(object):
         # Get spatial noise input if a separate static background is used
         # background_noise:  [1, C-4, T, H, W]
         # background_uv_map: [T, H, W, 2]
-        if self.separate_bg:
+        if self.num_bg_layers == 2:
             background_noise = self.background_volume.spatial_noise_upsampled
             background_noise = background_noise.unsqueeze(0).unsqueeze(2).repeat(1, 1, self.timesteps, 1, 1) 
 
@@ -160,7 +142,7 @@ class InputProcessor(object):
         query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)), dim=1) # [L-b, C, T, H, W]
 
         zeros = torch.zeros((1, 4, self.timesteps, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [1, 4, T, H, W]
-        if self.separate_bg:
+        if self.num_bg_layers == 2:
             static_background_input  = torch.cat((zeros, background_noise), dim=1)                                # [1, C, T, H, W]
             dynamic_background_input = torch.cat((zeros, spatiotemporal_noise_t.unsqueeze(0)), dim=1)             # [1, C, T, H, W]
             background_input = torch.cat((static_background_input, dynamic_background_input))
@@ -168,17 +150,6 @@ class InputProcessor(object):
             background_input = torch.cat((zeros, spatiotemporal_noise_t.unsqueeze(0)), dim=1)                     # [1, C, T, H, W]            
 
         query_input = torch.cat((background_input, query_input)) # [L, C, T, H, W]
-
-        # get memory input for the entire video; store in memory rather than reload every iteration
-        if self.memory_input == None:
-            # -- use ground truth as input
-            if self.gt_in_memory:
-                rgb_memory_input = self.frame_iterator[:len(self.flow_handler)]         # [3, F-1, H, W]
-                flow_memory_input, _, _, _ = self.flow_handler[:len(self.flow_handler)] # [2, F-1, H, W]
-                self.memory_input = torch.cat((rgb_memory_input, flow_memory_input))    # [5, F-1, H, W]
-            # -- use noise as input
-            else:
-                self.memory_input = torch.cat((torch.zeros_like(spatiotemporal_noise[:4]), spatiotemporal_noise)) # [C, F, H, W]
 
         # get parameters for jitter
         params = self.get_jitter_parameters()
@@ -236,6 +207,52 @@ class InputProcessor(object):
 
     def __len__(self):
         return len(self.frame_iterator) - self.timesteps
+
+    def construct_memory_input(self, memory_input_type: str, shared_backbone: bool) -> torch.Tensor:
+        """
+        Construct the memory input of the video
+
+        There are four configurations, sometimes with a special version supporting a shared memory and query encoder backbone:
+            1. Only rgb (shared backbone not possible)
+            2. rgb + depth + flow (shared backbone not possible)
+            3. Only noise
+            4. noise + depth + flow
+
+        Args:
+            memory_input_config (dict): dictionary containing the configuration for the memory input
+
+        Returns:
+            memory_input (torch.Tensor): Tensor used as memory input throughout the full training
+        """
+
+        if memory_input_type == "rgb":
+            memory_input = self.frame_iterator[:len(self.flow_handler)]        # [3, F-1, H, W]
+        
+        elif memory_input_type == "rgb_flow_depth":
+            rgb_input           = self.frame_iterator[:len(self.flow_handler)]         # [3, F-1, H, W]
+            flow_input, _, _, _ = self.flow_handler[:len(self.flow_handler)]           # [2, F-1, H, W]
+            depth_input, _      = self.depth_handler[:len(self.flow_handler)]          # [1, F-1, H, W]
+            memory_input        = torch.cat((rgb_input, flow_input, depth_input))      # [6, F-1, H, W]
+        
+        elif memory_input_type == "noise_flow_depth":
+            noise_input         = self.background_volume.spatiotemporal_noise[:, :-1] # [C-4, F-1, H, W]
+            depth_input, _      = self.depth_handler[:len(self.flow_handler)]         # [  1, F-1, H, W]
+            flow_input, _, _, _ = self.flow_handler[:len(self.flow_handler)]          # [  2, F-1, H, W]
+        
+            if shared_backbone:
+                mask_padding = torch.zeros_like(noise_input[:1])                               # [  1, F-1, H, W]
+                memory_input = torch.cat((mask_padding, depth_input, flow_input, noise_input)) # [C,   F-1, H, W]
+            else:
+                memory_input = torch.cat((depth_input, flow_input, noise_input))               # [C,   F-1, H, W]
+        
+        elif memory_input_type == "noise":
+            memory_input  = self.background_volume.spatiotemporal_noise # [C-4, F-1, H, W]
+        
+            if shared_backbone:
+                padding = torch.zeros_like(memory_input[:4])            # [4, F-1, H, W]
+                memory_input = torch.cat((padding, memory_input))       # [C, F-1, H, W]
+
+        return memory_input
 
     def get_rgb_layers(self, rgb, masks):
         """

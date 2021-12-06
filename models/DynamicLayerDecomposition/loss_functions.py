@@ -14,6 +14,7 @@ class DecompositeLoss(nn.Module):
     def __init__(self,
                  lambda_mask: float = 50.,
                  lambda_recon_flow: float = 1.,
+                 lambda_recon_depth: float = 0.5,
                  lambda_alpha_l0: float = 0.005,
                  lambda_alpha_l1: float = 0.01,
                  lambda_stabilization: float = 0.001,
@@ -28,6 +29,7 @@ class DecompositeLoss(nn.Module):
         self.lambda_alpha_l1          = lambda_alpha_l1
         self.lambda_mask_bootstrap    = lambda_mask
         self.lambda_recon_flow        = lambda_recon_flow
+        self.lambda_recon_depth       = lambda_recon_depth
         self.lambda_stabilization     = lambda_stabilization
         self.lambda_dynamics_reg_corr = lambda_dynamics_reg_corr
         self.lambda_dynamics_reg_diff = lambda_dynamics_reg_diff
@@ -128,14 +130,13 @@ class DecompositeLoss3D(DecompositeLoss):
         
         super().__init__(lambda_mask,
                          lambda_recon_flow,
+                         lambda_recon_depth,
                          lambda_alpha_l0,
                          lambda_alpha_l1,
                          lambda_stabilization,
                          lambda_dynamics_reg_corr,
                          lambda_dynamics_reg_diff)
         
-        self.lambda_recon_depth = lambda_recon_depth
-
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
         Forward pass of the loss module
@@ -230,6 +231,7 @@ class DecompositeLoss2D(DecompositeLoss):
     def __init__(self,
                  lambda_mask: float = 50.,
                  lambda_recon_flow: float = 1.,
+                 lambda_recon_depth: float = .5,
                  lambda_recon_warp: float = 0.,
                  lambda_alpha_warp: float = 0.005,
                  lambda_alpha_l0: float = 0.005,
@@ -239,6 +241,7 @@ class DecompositeLoss2D(DecompositeLoss):
                  lambda_dynamics_reg_diff: float = 0.001) -> None:
         super().__init__(lambda_mask, 
                          lambda_recon_flow, 
+                         lambda_recon_depth,
                          lambda_alpha_l0,
                          lambda_alpha_l1,
                          lambda_stabilization,
@@ -263,6 +266,7 @@ class DecompositeLoss2D(DecompositeLoss):
         # Ground truth values
         flow_gt         = targets["flow"]            # [B, 2, 2, H, W]
         rgb_gt          = targets["rgb"]             # [B, 3, 2, H, W]
+        depth_gt        = targets["depth"]           # [B,    1, T, H, W]
         masks           = targets["masks"]           # [B, L, 1, 2, H, W]
         binary_masks    = targets["binary_masks"]    # [B, L, 1, 2, H, W]
         flow_confidence = targets["flow_confidence"] # [B, 1, 2, H, W]
@@ -270,18 +274,20 @@ class DecompositeLoss2D(DecompositeLoss):
         ### Main loss
 
         # Model predictions
-        rgba_reconstruction = predictions["rgba_reconstruction"]        # [B, 4, 2, H, W]
-        flow_reconstruction = predictions["flow_reconstruction"]        # [B, 2, 2, H, w]
-        rgb_reconstruction  = rgba_reconstruction[:, :3]                # [B, 3, 2, H, W]
-        alpha_composite     = rgba_reconstruction[:, 3:]                # [B, 1, 2, H, W]
-        alpha_layers        = predictions["layers_rgba"][:, :, 3:]      # [B, L, 1, 2, H, W]
+        rgba_reconstruction  = predictions["rgba_reconstruction"]        # [B, 4, 2, H, W]
+        flow_reconstruction  = predictions["flow_reconstruction"]        # [B, 2, 2, H, w]
+        depth_reconstruction = predictions["depth_reconstruction"]       # [B,    1, T, H, W]
+        rgb_reconstruction   = rgba_reconstruction[:, :3]                # [B, 3, 2, H, W]
+        alpha_composite      = rgba_reconstruction[:, 3:]                # [B, 1, 2, H, W]
+        alpha_layers         = predictions["layers_rgba"][:, :, 3:]      # [B, L, 1, 2, H, W]
 
         # Calculate main loss
-        rgb_reconstruction_loss  = self.calculate_loss(rgb_reconstruction, rgb_gt)
-        flow_reconstruction_loss = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
-        mask_bootstrap_loss      = self.calculate_loss(alpha_layers, masks, mask_loss=True)
-        alpha_reg_loss           = self.cal_alpha_reg(alpha_composite * 0.5 + 0.5)
-        dynamics_reg_loss        = self.cal_dynamics_reg(alpha_layers, binary_masks)
+        rgb_reconstruction_loss   = self.calculate_loss(rgb_reconstruction, rgb_gt)
+        flow_reconstruction_loss  = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
+        depth_reconstruction_loss = self.calculate_loss(depth_reconstruction, depth_gt)
+        mask_bootstrap_loss       = self.calculate_loss(alpha_layers, masks, mask_loss=True)
+        alpha_reg_loss            = self.cal_alpha_reg(alpha_composite * 0.5 + 0.5)
+        dynamics_reg_loss         = self.cal_dynamics_reg(alpha_layers, binary_masks)
 
         ### Temporal consistency loss
 
@@ -310,6 +316,7 @@ class DecompositeLoss2D(DecompositeLoss):
                alpha_reg_loss + \
                dynamics_reg_loss + \
                self.lambda_recon_flow     * flow_reconstruction_loss + \
+               self.lambda_recon_depth    * depth_reconstruction_loss + \
                self.lambda_mask_bootstrap * mask_bootstrap_loss + \
                self.lambda_alpha_warp     * alpha_warp_loss + \
                self.lambda_recon_warp     * rgb_reconstruction_warp_loss + \
@@ -322,6 +329,7 @@ class DecompositeLoss2D(DecompositeLoss):
             "alpha_regularization_loss":      alpha_reg_loss.item(),
             "dynamics_regularization_loss":   dynamics_reg_loss.item(),
             "flow_reconstruction_loss":       self.lambda_recon_flow     * flow_reconstruction_loss.item(),
+            "depth_reconstruction_loss":      self.lambda_recon_depth    * depth_reconstruction_loss.item(),
             "mask_bootstrap_loss":            self.lambda_mask_bootstrap * mask_bootstrap_loss.item(),
             "alpha_warp_loss":                self.lambda_alpha_warp     * alpha_warp_loss.item(),
             "rgb_reconstruction_warp_loss":   self.lambda_recon_warp     * rgb_reconstruction_warp_loss.item(),
@@ -329,6 +337,7 @@ class DecompositeLoss2D(DecompositeLoss):
             "brightness_regularization_loss": brightness_regularization_loss.item(),
             "background_offset_loss":         background_offset_loss.item(),
             "lambda_flow_reconstruction":     self.lambda_recon_flow,
+            "lambda_depth_reconstruction":    self.lambda_recon_depth,
             "lambda_mask_bootstrap":          self.lambda_mask_bootstrap,
             "lambda_alpha_warp":              self.lambda_alpha_warp,
             "lambda_stabilization":           self.lambda_stabilization,

@@ -35,10 +35,8 @@ class ConvBlock2D(ConvBlock):
             pady = .5 * (self.s * (desired_height - 1) + (self.k - 1) * (self.d - 1) + self.k - height)
             padx = .5 * (self.s * (desired_width - 1) + (self.k - 1) * (self.d - 1) + self.k - width)
         x = F.pad(x, [int(np.floor(padx)), int(np.ceil(padx)), int(np.floor(pady)), int(np.ceil(pady))])
-        try:
-            x = self.conv(x)
-        except:
-            x = 1
+        x = self.conv(x)
+
         if x.shape[-2] != desired_height or x.shape[-1] != desired_width:
             cropy = x.shape[-2] - desired_height
             cropx = x.shape[-1] - desired_width
@@ -98,7 +96,7 @@ class MemoryEncoder2D(MemoryEncoder):
             spatiotemoral_noise (torch.Tensor): noise tensor of the entire video
             frame_idx (int): index of first frame in the input
         """
-        return spatiotemporal_noise[:, frame_idx].unsqueeze(0)
+        return spatiotemporal_noise[:, :, frame_idx]
 
     def _get_frame_idx_iterator(self, length_video: int):
         """
