@@ -58,8 +58,8 @@ class GlobalContextVolume3D(GlobalContextVolume):
     """
     Global Context Volume usable with 3D convolutions
     """
-    def __init__(self, keydim: int, valdim: int) -> None:
-        super().__init__(keydim, valdim)
+    def __init__(self, keydim: int, valdim: int, topk: int) -> None:
+        super().__init__(keydim, valdim, topk)
 
     def forward(self, query: torch.Tensor) -> torch.Tensor:
         """
@@ -80,6 +80,9 @@ class GlobalContextVolume3D(GlobalContextVolume):
         context_dist = torch.matmul(self.context_volume, query) # -> [B, C_v, THW]
         context_dist = context_dist.view(B, -1, T, H, W)        # -> [B, C_v, T, H, W]
 
+        if self.topk is not None:
+            context_dist = torch.topk(context_dist, self.topk, dim=1)
+
         return context_dist
 
 
@@ -87,11 +90,11 @@ class MemoryEncoder3D(MemoryEncoder):
     """
     Memory Encoder usable with 3D convolutions
     """
-    def __init__(self, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module, gcv: GlobalContextVolume, mem_freq: int = 4, timesteps: int = 16) -> None:
+    def __init__(self, conv_channels: int, keydim: int, valdim: int, topk: int, backbone: nn.Module, gcv: GlobalContextVolume, mem_freq: int = 4, timesteps: int = 16) -> None:
         super().__init__(keydim, valdim)
 
         self.memory_encoder = KeyValueEncoder(nn.Conv3d, conv_channels, keydim, valdim, backbone)
-        self.global_context = gcv(keydim, valdim)
+        self.global_context = gcv(keydim, valdim, topk)
 
         self.timesteps = timesteps
         self.mem_freq  = mem_freq

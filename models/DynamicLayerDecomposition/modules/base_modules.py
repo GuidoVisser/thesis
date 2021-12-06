@@ -91,10 +91,11 @@ class GlobalContextVolume(nn.Module):
     in memory
     """
 
-    def __init__(self, keydim: int, valdim: int) -> None:
+    def __init__(self, keydim: int, valdim: int, topk: int = 0) -> None:
         super().__init__()
 
         self.register_buffer("context_volume", torch.zeros((valdim, keydim)))
+        self.topk = topk if topk > 0 else None
 
     def forward(self, query: torch.Tensor) -> torch.Tensor:
         """

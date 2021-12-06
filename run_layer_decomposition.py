@@ -78,6 +78,7 @@ class ExperimentRunner(object):
             self.args.model_type = "3d_bottleneck"
         elif model_setup == 4:
             self.args.model_type = "3d_bottleneck"
+            self.args.shared_backbone = True
         elif model_setup == 5:
             self.args.model_type = "fully_2d"            
             self.args.use_2d_loss_module = True
@@ -200,6 +201,7 @@ class ExperimentRunner(object):
                 conv_channels=self.args.conv_channels,
                 valdim=self.args.valdim,
                 keydim=self.args.keydim,
+                topk=self.args.topk,
                 do_adjustment=True, 
                 max_frames=len(dataloader.dataset.frame_iterator),
                 coarseness=self.args.coarseness
@@ -212,6 +214,7 @@ class ExperimentRunner(object):
                 conv_channels=self.args.conv_channels,
                 valdim=self.args.valdim,
                 keydim=self.args.keydim,
+                topk=self.args.topk,
                 do_adjustment=True, 
                 max_frames=len(dataloader.dataset.frame_iterator),
                 coarseness=self.args.coarseness,
@@ -233,6 +236,7 @@ class ExperimentRunner(object):
                 conv_channels=self.args.conv_channels,
                 valdim=self.args.valdim,
                 keydim=self.args.keydim,
+                topk=self.args.topk,
                 do_adjustment=True, 
                 max_frames=len(dataloader.dataset.frame_iterator),
                 coarseness=self.args.coarseness
@@ -268,7 +272,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
     parser.add_argument("--model_setup", type=int, default=4, help="id of model setup")
-    parser.add_argument("--memory_setup", type=int, default=1, help="id of memory input setup")
+    parser.add_argument("--memory_setup", type=int, default=3, help="id of memory input setup")
 
     dataset = "DAVIS_minisample"
     video = "scooter-black"
@@ -293,6 +297,7 @@ if __name__ == "__main__":
     model_args.add_argument("--no_static_background", action="store_true", help="Don't use separated static and dynamic background")
     model_args.add_argument("--shared_backbone", action="store_true", help="backbones for query and memory encoder have shared weight")
     model_args.add_argument("--memory_t_strided", action="store_true", help="If 3D convolutions are used in memory encoders, set them to be strided in time dimension")
+    model_args.add_argument("--topk", type=int, default=4, help="k value for topk channel selection in context distribution")
 
     input_args = parser.add_argument_group("model input")
     input_args.add_argument("--num_static_channels", type=int, default=5, help="number of input channels that are static in time")
