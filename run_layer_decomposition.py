@@ -78,7 +78,6 @@ class ExperimentRunner(object):
             self.args.model_type = "3d_bottleneck"
         elif model_setup == 4:
             self.args.model_type = "3d_bottleneck"
-            self.args.shared_backbone = True
         elif model_setup == 5:
             self.args.model_type = "fully_2d"            
             self.args.use_2d_loss_module = True
