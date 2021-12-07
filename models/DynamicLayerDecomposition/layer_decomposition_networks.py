@@ -263,7 +263,7 @@ class LayerDecompositionAttentionMemoryNet3D(LayerDecompositionAttentionMemoryNe
         self.memory_reader = MemoryReader(nn.Conv3d, conv_channels * 4, keydim, valdim, query_backbone)
 
         if shared_encoder:
-            self.memory_encoder = MemoryEncoder3D(conv_channels * 4, keydim, valdim, query_backbone, GlobalContextVolume3D, mem_freq, timesteps)
+            self.memory_encoder = MemoryEncoder3D(conv_channels * 4, keydim, valdim, topk, query_backbone, GlobalContextVolume3D, mem_freq, timesteps)
         else:
             memory_backbone = nn.ModuleList([
                 ConvBlock3D(memory_in_channels,       conv_channels,     ksize=(4, 4, 4), stride=(s, 2, 2)),                                                          # 1/2
@@ -480,7 +480,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             ConvBlock2D(conv_channels * 4,  conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
             ConvBlock2D(conv_channels * 4,  conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
 
-            self.memory_encoder = MemoryEncoder2D(conv_channels * 4, keydim, valdim, memory_backbone, GlobalContextVolume2D)
+            self.memory_encoder = MemoryEncoder2D(conv_channels * 4, keydim, valdim, topk, memory_backbone, GlobalContextVolume2D)
         
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
@@ -604,7 +604,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
                 ConvBlock2D(conv_channels * 4,        conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
                 ConvBlock2D(conv_channels * 4,        conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
 
-            self.memory_encoder = MemoryEncoder2D(conv_channels * 4, keydim, valdim, memory_backbone, GlobalContextVolume2D)
+            self.memory_encoder = MemoryEncoder2D(conv_channels * 4, keydim, valdim, topk, memory_backbone, GlobalContextVolume2D)
 
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
