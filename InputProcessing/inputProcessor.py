@@ -43,6 +43,8 @@ class InputProcessor(object):
         self.N_layers = self.N_objects + self.num_bg_layers
 
         # create input directories
+        self.out_root  = out_root
+
         img_dir        = path.join(out_root, "images")
         mask_dir       = path.join(out_root, "masks")
         flow_dir       = path.join(out_root, "flow")
@@ -130,6 +132,31 @@ class InputProcessor(object):
 
         # NOTE: time dimension is treated as batch dimension in grid_sample because we want to only sample in spatial dimensions
         spatiotemporal_noise_t = F.grid_sample(spatiotemporal_noise[:, idx:idx+self.timesteps].permute(1, 0, 2, 3), background_uv_map).permute(1, 0, 2, 3)
+
+        ### Temp code ###
+
+        # img_t = spatiotemporal_noise_t[:3, 0].permute(1, 2, 0).cpu().numpy() * .25 + 0.75
+        # img = spatiotemporal_noise[:3, idx].permute(1, 2, 0).cpu().numpy() * .25 + 0.75
+
+        # uv = background_uv_map[0].clone().cpu().numpy()
+        # corners = [uv[0, 0], uv[0, -1], uv[-1, -1], uv[-1, 0]]
+
+        # corners = np.array([(c * .5 + .5) * np.array([448, 256]) for c in corners]).reshape((-1, 1, 2)).astype(np.int32)
+
+        # color = (1, 0, 0)
+        # thickness = 3
+
+        # img = cv2.polylines(np.ascontiguousarray(img), [corners], True, color, thickness, cv2.LINE_AA)
+
+        # # color = (255, 0, 0)
+        # # thickness = 3
+
+        # # img = cv2.polylines(np.ascontiguousarray(img), [corners], True, color, thickness)
+
+        # cv2.imwrite(path.join(self.out_root, "st_noise.png"), img * 255)
+        # cv2.imwrite(path.join(self.out_root, "st_sampled_noise.png"), img_t * 255)
+
+        #################
 
         # add uniform sampling in time dimension to background uv map if necessary
         if self.use_3d:

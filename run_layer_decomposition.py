@@ -258,7 +258,7 @@ class ExperimentRunner(object):
             batch_size=self.args.batch_size,
             n_epochs=self.args.n_epochs,
             save_freq=self.args.save_freq,
-            separate_bg=self.args.no_static_background
+            separate_bg=not self.args.no_static_background
         )
 
         return model

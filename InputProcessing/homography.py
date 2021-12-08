@@ -125,7 +125,7 @@ class HomographyHandler(object):
         xt -= self.xmin
         xt /= float(self.xmax - self.xmin)
         yt -= self.ymin
-        yt /= float(self.ymax - self.ymin)
+        yt /= float(self.ymax - self.ymin)       
 
         uv = torch.stack([xt.reshape(h, w), yt.reshape(h, w)]).permute(1, 2, 0) * 2 - 1
 
