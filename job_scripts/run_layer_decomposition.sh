@@ -30,7 +30,7 @@ cp $HOME/thesis/models/third_party/weights/monodepth.pth $TMPDIR/weights/depth_m
 mkdir $TMPDIR/output_dir
 
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
-echo "Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
+echo "$SLURM_JOBID Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
             --model_setup 1 \
             --memory_setup 3 \
@@ -48,7 +48,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 128 \
             --timesteps 4 \
             --description '2d reconstruction model with one 3d convolution layer in the middle that is only used for the dynamic layers'
-echo "End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
+echo "$SLURM_JOBID End: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
 mkdir -p $HOME/thesis/results/layer_decomposition/${VIDEO}_${DT}
