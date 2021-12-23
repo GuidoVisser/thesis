@@ -60,6 +60,8 @@ def default_config():
             "lambda_stabilization":      [0.001],
             "lambda_dynamics_reg_diff":  [0.005],
             "lambda_dynamics_reg_corr":  [0.01],
+            "lambda_dynamics_reg_l0":    [0.005],
+            "lambda_dynamics_reg_l1":    [0.01, 100, 0.],
         },
         "pretrained_models" : {
             "propagation_model": "models/third_party/weights/propagation_model.pth",
