@@ -170,8 +170,8 @@ class ExperimentRunner(object):
                 self.args.lambda_alpha_l0,
                 self.args.lambda_alpha_l1,
                 self.args.lambda_stabilization,
-                self.args.lambda_dynamics_reg_diff,
                 self.args.lambda_dynamics_reg_corr,
+                self.args.lambda_dynamics_reg_diff,
                 self.args.lambda_dynamics_reg_l0,
                 self.args.lambda_dynamics_reg_l1
             )
@@ -183,8 +183,8 @@ class ExperimentRunner(object):
                 self.args.lambda_alpha_l0,
                 self.args.lambda_alpha_l1,
                 self.args.lambda_stabilization,
-                self.args.lambda_dynamics_reg_diff,
                 self.args.lambda_dynamics_reg_corr,
+                self.args.lambda_dynamics_reg_diff,
                 self.args.lambda_dynamics_reg_l0,
                 self.args.lambda_dynamics_reg_l1
             )
