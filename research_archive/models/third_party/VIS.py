@@ -8,15 +8,11 @@ import matplotlib.cm as cm
 
 from PIL import Image
 from os import path, listdir, mkdir
-from mmcv.runner import load_checkpoint, parallel_test, obj_from_dict
-from pycocotools.coco import COCO
+from mmcv.runner import load_checkpoint
 from pycocotools import mask as maskUtils
 
-from models.MaskTrackRCNN.mmdet import datasets
-from models.MaskTrackRCNN.mmdet.apis import inference_detector, show_result
-from models.MaskTrackRCNN.mmdet.models import build_detector, detectors
-
-from models.RAFT.utils.utils import InputPadder
+from models.third_party.MaskTrackRCNN.mmdet.apis import inference_detector, show_result
+from models.third_party.MaskTrackRCNN.mmdet.models import build_detector, detectors
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -93,23 +89,23 @@ class MaskGenerator(object):
         annotations = [annotations[ann] for ann in sorted(annotations.keys())]
         return annotations
 
-    def generate_annotations_for_single_video(self, video_id):
-        """
-        Generate a mask for a specific video
+    # def generate_annotations_for_single_video(self, video_id):
+    #     """
+    #     Generate a mask for a specific video
 
-        Args:
-            video_id (int): coco style id for video
+    #     Args:
+    #         video_id (int): coco style id for video
 
-        returns:
-            annotations (list): coco style annotations for the video
-        """
-        with open(path.join(self.data_dir, "train.json"), "r") as f:
-            data = json.load(f)
-        videos = data["videos"]
-        video = next((vid for vid in videos if vid["id"] == video_id))
-        annotations = self.generate_annotations_for_video(video)
+    #     returns:
+    #         annotations (list): coco style annotations for the video
+    #     """
+    #     with open(path.join(self.data_dir, "train.json"), "r") as f:
+    #         data = json.load(f)
+    #     videos = data["videos"]
+    #     video = next((vid for vid in videos if vid["id"] == video_id))
+    #     annotations = self.generate_annotations_for_video(video)
 
-        return video, annotations
+    #     return video, annotations
 
     def generate_annotations(self, data_path, result_path):
         """

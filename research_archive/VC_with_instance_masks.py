@@ -1,4 +1,4 @@
-from VIS import MaskGenerator
+from research_archive.models.third_party.VIS import MaskGenerator
 from FGVC.tool.video_completion import *
 from FGVC.RAFT.utils.utils import InputPadder
 from os import path, listdir

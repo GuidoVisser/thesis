@@ -8,7 +8,7 @@ from datetime import datetime
 
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from utils.utils import create_dirs
+from utils.utils import create_dir, create_dirs
 from models.third_party.RAFT.utils.flow_viz import flow_to_image
 
 class LayerDecompositer(nn.Module):
@@ -22,7 +22,8 @@ class LayerDecompositer(nn.Module):
                  batch_size: int,
                  n_epochs: int,
                  save_freq: int,
-                 separate_bg: bool):
+                 separate_bg: bool,
+                 use_depth: bool):
         super().__init__()
 
         self.dataloader = dataloader
@@ -38,6 +39,7 @@ class LayerDecompositer(nn.Module):
         self.batch_size = batch_size
         self.writer = summary_writer
         self.separate_bg = separate_bg
+        self.use_depth = use_depth
 
     def run_training(self, start_epoch=0):
         
@@ -109,7 +111,8 @@ class LayerDecompositer(nn.Module):
 
         rgba_layers    = model_output["layers_rgba"]
         flow_layers    = model_output["layers_flow"]
-        depth_layers   = model_output["layers_depth"]
+        if self.use_depth:
+            depth_layers   = model_output["layers_depth"]
         reconstruction = model_output["rgba_reconstruction"]
         
         background_offset = model_output["background_offset"]
@@ -164,22 +167,25 @@ class LayerDecompositer(nn.Module):
                 for l in range(1, n_layers):
                     create_dirs(path.join(self.save_dir, f"{epoch_name}/foreground/{l:02}"),
                                 path.join(self.save_dir, f"{epoch_name}/alpha/{l:02}"),
-                                path.join(self.save_dir, f"{epoch_name}/flow/{l:02}"),
-                                path.join(self.save_dir, f"{epoch_name}/depth/{l:02}"))
+                                path.join(self.save_dir, f"{epoch_name}/flow/{l:02}"))
                     foreground_rgba    = torch.clone(rgba_layers[b, l, :, t]).detach()
                     foreground_flow    = torch.clone(flow_layers[b, l, :, t]).detach() * self.dataloader.dataset.flow_handler.max_value
-                    foreground_depth   = torch.clone(depth_layers[b, l, 0, t]).detach()
                     foreground_alpha   = torch.clone(rgba_layers[b, l, 3, t]).detach()
 
                     foreground_img      = cv2.cvtColor((foreground_rgba.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGBA2BGRA)
                     alpha_img           = (foreground_alpha.cpu().numpy() + 1) / 2. * 255
                     foreground_flow_img = flow_to_image(foreground_flow.permute(1, 2, 0).cpu().numpy(), convert_to_bgr=True)
-                    depth_img           = (1 - ((foreground_depth.cpu().numpy() + 1) / 2.)) * 255
 
                     cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/flow/{l:02}/{img_name}"), foreground_flow_img)
                     cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/foreground/{l:02}/{img_name}"), foreground_img)
                     cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/alpha/{l:02}/{img_name}"), alpha_img)
-                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/depth/{l:02}/{img_name}"), depth_img)
+
+                    if self.use_depth:
+                        create_dir(path.join(self.save_dir, f"{epoch_name}/depth/{l:02}"))
+                        foreground_depth   = torch.clone(depth_layers[b, l, 0, t]).detach()
+                        depth_img           = (1 - ((foreground_depth.cpu().numpy() + 1) / 2.)) * 255
+                        cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/depth/{l:02}/{img_name}"), depth_img)
+
 
     def create_save_dirs(self, epoch):
 
@@ -195,6 +201,8 @@ class LayerDecompositer(nn.Module):
                     path.join(self.save_dir, f"{epoch_name}/brightness_scale"))
         if self.separate_bg:
             create_dirs(path.join(self.save_dir, f"{epoch_name}/background_static"))
+        if self.use_depth:
+            create_dirs(path.join(self.save_dir, f"{epoch_name}/depth"))
 
     def transfer_detail(self, reconstruction, rgba_layers, gt_image):
         residual = gt_image - reconstruction

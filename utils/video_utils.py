@@ -63,7 +63,7 @@ def folder_to_video(dir_path, save_path=None, fps=24):
     return clip
 
 
-def video_to_folder(video, dir_path, image_ext=".png"):
+def video_to_folder(video, dir_path, image_ext=".png", start_frame=0):
     """
     Generate a folder of images in sequence based on the frames of a video and save the fps for reconstruction
 
@@ -71,6 +71,7 @@ def video_to_folder(video, dir_path, image_ext=".png"):
         video (str): path to the video that is to be processed
         dir_path (str): path to the directory where the image sequence will be saved
         image_ext (str): extension of the images
+        start_frame (int): index of first frame to be saved
     """
     # Load video
     vidcap = cv2.VideoCapture(os.path.join(dir_path, video))
@@ -90,13 +91,19 @@ def video_to_folder(video, dir_path, image_ext=".png"):
         json.dump({"fps": fps}, f)
 
     # save frames
-    success, frame = vidcap.read()
+    # success, frame = vidcap.read()
+    success = True
     count = 0
-    assert success, f"Could not read first frame of {video}"
+    # assert success, f"Could not read first frame of {video}"
     while success:
-        frame = cv2.resize(frame, (720, 480), fx=0, fy=0, interpolation=cv2.INTER_CUBIC)
-        cv2.imwrite(os.path.join(save_path, f"{count:05d}{image_ext}"), frame)
         success, frame = vidcap.read()
+        
+        if not success:
+            break
+
+        if count % 2 == (start_frame % 2) and count >= start_frame:
+            frame = cv2.resize(frame, (720, 480), fx=0, fy=0, interpolation=cv2.INTER_CUBIC)
+            cv2.imwrite(os.path.join(save_path, f"{(count - start_frame) // 2:05d}{image_ext}"), frame)
         count += 1
     
     return

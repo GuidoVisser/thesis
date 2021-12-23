@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-from random import choices
 from torch.utils.data import DataLoader
 import torch
 from os import path
@@ -94,6 +93,7 @@ class ExperimentRunner(object):
             self.args.num_static_channels = self.args.in_channels
             self.args.use_2d_loss_module = True
             self.args.lambda_recon_depth = 0.
+            self.args.use_depth = False
 
         if memory_setup == 1:
             self.args.memory_input_type = "noise"
@@ -107,14 +107,12 @@ class ExperimentRunner(object):
             if self.args.shared_backbone:
                 raise ValueError("Cannot use shared encoder with rgb memory input")
         elif memory_setup == 3:
-            self.args.memory_input_type = "noise_flow_depth"
-            if self.args.shared_backbone:
-                self.args.memory_in_channels = 16
-            else:
-                self.args.memory_in_channels = 15
+            self.args.memory_input_type = "noise+"
+            # +1 channel for mask channel if shared backbone is used and +1 channel for depth if it's used
+            self.args.memory_in_channels = 14 + int(self.args.shared_backbone) + int(self.args.use_depth)           
         elif memory_setup == 4:
-            self.args.memory_input_type = "rgb_flow_depth"
-            self.args.memory_in_channels = 6
+            self.args.memory_input_type = "rgb+"
+            self.args.memory_in_channels = 5 + int(self.args.use_depth)
             if self.args.shared_backbone:
                 raise ValueError("Cannot use shared encoder with rgb memory input")
 
@@ -173,7 +171,9 @@ class ExperimentRunner(object):
                 self.args.lambda_alpha_l1,
                 self.args.lambda_stabilization,
                 self.args.lambda_dynamics_reg_diff,
-                self.args.lambda_dynamics_reg_corr
+                self.args.lambda_dynamics_reg_corr,
+                self.args.lambda_dynamics_reg_l0,
+                self.args.lambda_dynamics_reg_l1
             )
         else:
             loss_module = DecompositeLoss3D(
@@ -184,7 +184,9 @@ class ExperimentRunner(object):
                 self.args.lambda_alpha_l1,
                 self.args.lambda_stabilization,
                 self.args.lambda_dynamics_reg_diff,
-                self.args.lambda_dynamics_reg_corr
+                self.args.lambda_dynamics_reg_corr,
+                self.args.lambda_dynamics_reg_l0,
+                self.args.lambda_dynamics_reg_l1
             )
         return loss_module
 
@@ -194,31 +196,59 @@ class ExperimentRunner(object):
         """
 
         if self.args.model_type == "3d_bottleneck":
-            network = LayerDecompositionAttentionMemoryNet3DBottleneck(
-                in_channels=self.args.in_channels,
-                memory_in_channels=self.args.memory_in_channels,
-                shared_backbone=self.args.shared_backbone,
-                conv_channels=self.args.conv_channels,
-                valdim=self.args.valdim,
-                keydim=self.args.keydim,
-                topk=self.args.topk,
-                do_adjustment=True, 
-                max_frames=len(dataloader.dataset.frame_iterator),
-                coarseness=self.args.coarseness
-            )    
+            if not self.args.use_depth:
+                network = LayerDecompositionAttentionMemoryNet3DBottleneck(
+                    in_channels=self.args.in_channels,
+                    memory_in_channels=self.args.memory_in_channels,
+                    shared_backbone=self.args.shared_backbone,
+                    conv_channels=self.args.conv_channels,
+                    valdim=self.args.valdim,
+                    keydim=self.args.keydim,
+                    topk=self.args.topk,
+                    do_adjustment=True, 
+                    max_frames=len(dataloader.dataset.frame_iterator),
+                    coarseness=self.args.coarseness
+                )
+            else:
+                network = LayerDecompositionAttentionMemoryDepthNet3DBottleneck(
+                    in_channels=self.args.in_channels,
+                    memory_in_channels=self.args.memory_in_channels,
+                    shared_backbone=self.args.shared_backbone,
+                    conv_channels=self.args.conv_channels,
+                    valdim=self.args.valdim,
+                    keydim=self.args.keydim,
+                    topk=self.args.topk,
+                    do_adjustment=True, 
+                    max_frames=len(dataloader.dataset.frame_iterator),
+                    coarseness=self.args.coarseness
+                )
         elif self.args.model_type == "3d_memory":
-            network = LayerDecompositionAttentionMemoryNet3DMemoryEncoder(
-                in_channels=self.args.in_channels,
-                memory_in_channels=self.args.memory_in_channels,
-                t_strided=self.args.memory_t_strided,
-                conv_channels=self.args.conv_channels,
-                valdim=self.args.valdim,
-                keydim=self.args.keydim,
-                topk=self.args.topk,
-                do_adjustment=True, 
-                max_frames=len(dataloader.dataset.frame_iterator),
-                coarseness=self.args.coarseness,
-            )     
+            if not self.args.use_depth:
+                network = LayerDecompositionAttentionMemoryNet3DMemoryEncoder(
+                    in_channels=self.args.in_channels,
+                    memory_in_channels=self.args.memory_in_channels,
+                    t_strided=self.args.memory_t_strided,
+                    conv_channels=self.args.conv_channels,
+                    valdim=self.args.valdim,
+                    keydim=self.args.keydim,
+                    topk=self.args.topk,
+                    do_adjustment=True, 
+                    max_frames=len(dataloader.dataset.frame_iterator),
+                    coarseness=self.args.coarseness,
+                )
+            else:
+                network = LayerDecompositionAttentionMemoryDepthNet3DMemoryEncoder(
+                    in_channels=self.args.in_channels,
+                    memory_in_channels=self.args.memory_in_channels,
+                    t_strided=self.args.memory_t_strided,
+                    conv_channels=self.args.conv_channels,
+                    valdim=self.args.valdim,
+                    keydim=self.args.keydim,
+                    topk=self.args.topk,
+                    do_adjustment=True, 
+                    max_frames=len(dataloader.dataset.frame_iterator),
+                    coarseness=self.args.coarseness,
+                )     
         elif self.args.model_type == "omnimatte":
             network = Omnimatte(
                 in_channels=self.args.in_channels,
@@ -228,19 +258,34 @@ class ExperimentRunner(object):
                 do_adjustment=True
             )
         elif self.args.model_type == "fully_2d":
-            network = LayerDecompositionAttentionMemoryNet2D(
-                in_channels=self.args.in_channels,
-                memory_in_channels=self.args.memory_in_channels,
-                shared_backbone=self.args.shared_backbone,
-                flow_max=dataloader.dataset.flow_handler.max_value,
-                conv_channels=self.args.conv_channels,
-                valdim=self.args.valdim,
-                keydim=self.args.keydim,
-                topk=self.args.topk,
-                do_adjustment=True, 
-                max_frames=len(dataloader.dataset.frame_iterator),
-                coarseness=self.args.coarseness
-            )   
+            if not self.args.use_depth:
+                network = LayerDecompositionAttentionMemoryNet2D(
+                    in_channels=self.args.in_channels,
+                    memory_in_channels=self.args.memory_in_channels,
+                    shared_backbone=self.args.shared_backbone,
+                    flow_max=dataloader.dataset.flow_handler.max_value,
+                    conv_channels=self.args.conv_channels,
+                    valdim=self.args.valdim,
+                    keydim=self.args.keydim,
+                    topk=self.args.topk,
+                    do_adjustment=True, 
+                    max_frames=len(dataloader.dataset.frame_iterator),
+                    coarseness=self.args.coarseness
+                )
+            else:
+                network = LayerDecompositionAttentionMemoryDepthNet2D(
+                    in_channels=self.args.in_channels,
+                    memory_in_channels=self.args.memory_in_channels,
+                    shared_backbone=self.args.shared_backbone,
+                    flow_max=dataloader.dataset.flow_handler.max_value,
+                    conv_channels=self.args.conv_channels,
+                    valdim=self.args.valdim,
+                    keydim=self.args.keydim,
+                    topk=self.args.topk,
+                    do_adjustment=True, 
+                    max_frames=len(dataloader.dataset.frame_iterator),
+                    coarseness=self.args.coarseness
+                ) 
 
         if self.args.device != "cpu":
             network = DataParallel(network).to(args.device)
@@ -258,7 +303,8 @@ class ExperimentRunner(object):
             batch_size=self.args.batch_size,
             n_epochs=self.args.n_epochs,
             save_freq=self.args.save_freq,
-            separate_bg=not self.args.no_static_background
+            separate_bg=not self.args.no_static_background,
+            use_depth=self.args.use_depth
         )
 
         return model
@@ -295,6 +341,7 @@ if __name__ == "__main__":
     model_args.add_argument("--no_static_background", action="store_true", help="Don't use separated static and dynamic background")
     model_args.add_argument("--shared_backbone", action="store_true", help="backbones for query and memory encoder have shared weight")
     model_args.add_argument("--memory_t_strided", action="store_true", help="If 3D convolutions are used in memory encoders, set them to be strided in time dimension")
+    model_args.add_argument("--use_depth", action="store_true", help="specify that you want to use depth estimation as an input channel")
     model_args.add_argument("--topk", type=int, default=0, help="k value for topk channel selection in context distribution")
 
     input_args = parser.add_argument_group("model input")
@@ -307,7 +354,7 @@ if __name__ == "__main__":
     input_args.add_argument("--jitter_rate", type=float, default=0.75, help="rate of applying jitter to the input")
     input_args.add_argument("--composite_order", type=str, help="path to a text file containing the compositing order of the foreground objects")
     input_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
-    input_args.add_argument("--memory_input_type", type=str, default="noise_flow_depth", choices=["rgb", "rgb_flow_depth", "noise", "noise_flow_depth"])
+    input_args.add_argument("--memory_input_type", type=str, default="noise+", choices=["rgb", "rgb+", "noise", "noise+"])
 
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
@@ -327,8 +374,11 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_alpha_l0", nargs="+", default=[0.005], help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1", nargs="+", default=[0.01, 100, 0.], help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization", nargs="+", default=[0.001], help="lambda of the camera stabilization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.005], help="lambda of the difference part of the dynamics regularization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.01], help="lambda of the correlation part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.1], help="lambda of the difference part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.1], help="lambda of the correlation part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_l1", nargs="+", default=[0.01, 100, 0.], help="lambda of the difference part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_l0", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
+
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
