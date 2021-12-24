@@ -32,7 +32,7 @@ mkdir $TMPDIR/output_dir
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "$SLURM_JOBID | Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
-            --model_setup 3 \
+            --model_setup 4 \
             --memory_setup 3 \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/$MASK_PATH \
