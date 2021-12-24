@@ -92,15 +92,15 @@ class ExperimentRunner(object):
             self.args.timesteps = 2
             self.args.num_static_channels = self.args.in_channels
             self.args.use_2d_loss_module = True
-            self.args.lambda_recon_depth = 0.
+            self.args.lambda_recon_depth = [0.]
             self.args.use_depth = False
 
         if memory_setup == 1:
             self.args.memory_input_type = "noise"
             if self.args.shared_backbone:
-                self.args.memory_in_channels = 16
+                self.args.memory_in_channels = self.args.in_channels
             else:
-                self.args.memory_in_channels = 12
+                self.args.memory_in_channels = self.args.in_channels - 3 - int(self.args.use_depth)
         elif memory_setup == 2:
             self.args.memory_input_type = "rgb"
             self.args.memory_in_channels = 3
@@ -108,8 +108,10 @@ class ExperimentRunner(object):
                 raise ValueError("Cannot use shared encoder with rgb memory input")
         elif memory_setup == 3:
             self.args.memory_input_type = "noise+"
-            # +1 channel for mask channel if shared backbone is used and +1 channel for depth if it's used
-            self.args.memory_in_channels = 14 + int(self.args.shared_backbone) + int(self.args.use_depth)           
+            if self.args.shared_backbone:
+                self.args.memory_in_channels = self.args.in_channels
+            else:
+                self.args.memory_in_channels = self.args.in_channels - 1
         elif memory_setup == 4:
             self.args.memory_input_type = "rgb+"
             self.args.memory_in_channels = 5 + int(self.args.use_depth)

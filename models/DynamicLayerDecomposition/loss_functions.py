@@ -366,7 +366,7 @@ class DecompositeLoss2D(DecompositeLoss):
             depth_reconstruction = predictions["depth_reconstruction"]                      # [B,    1, T, H, W]
             depth_reconstruction_loss = self.calculate_loss(depth_reconstruction, depth_gt)
         else:
-            depth_reconstruction_loss = torch.zeros((1))
+            depth_reconstruction_loss = torch.zeros((1)).to(rgb_reconstruction_loss.device)
 
         ### Temporal consistency loss
 

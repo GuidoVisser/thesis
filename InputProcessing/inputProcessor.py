@@ -292,7 +292,9 @@ class InputProcessor(object):
             memory_input  = self.background_volume.spatiotemporal_noise                # [C-4, F-1, H, W]
         
             if shared_backbone:
-                padding = torch.zeros_like(memory_input[:4])                           # [4, F-1, H, W]
+                added_channels = 3 + int(self.use_depth)
+
+                padding = torch.zeros_like(memory_input[:added_channels])              # [4, F-1, H, W]
                 memory_input = torch.cat((padding, memory_input))                      # [C, F-1, H, W]
 
         return memory_input

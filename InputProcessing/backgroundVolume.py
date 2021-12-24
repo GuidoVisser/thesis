@@ -33,6 +33,8 @@ class BackgroundVolume(object):
             else:
                 self.spatiotemporal_noise = self.spatial_noise_upsampled.unsqueeze(1).repeat(1, num_frames, 1, 1)
 
-            torch.save(self.spatial_noise,           path.join(save_dir, "spatial_noise.pth"))
-            torch.save(self.spatial_noise_upsampled, path.join(save_dir, "spatial_noise_upsampled.pth"))
-            torch.save(self.spatiotemporal_noise,    path.join(save_dir, "spatiotemporal_noise.pth"))
+
+            x=1
+            # torch.save(self.spatial_noise,           path.join(save_dir, "spatial_noise.pth"))
+            # torch.save(self.spatial_noise_upsampled, path.join(save_dir, "spatial_noise_upsampled.pth"))
+            # torch.save(self.spatiotemporal_noise,    path.join(save_dir, "spatiotemporal_noise.pth"))
