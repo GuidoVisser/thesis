@@ -47,7 +47,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description '2d reconstruction model with one 3d convolution layer in the middle that is only used for the dynamic layers'
+            --description 'test run to check settings'
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
