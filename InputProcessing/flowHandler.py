@@ -56,6 +56,7 @@ class FlowHandler(object):
             with open(f"{self.output_dir}/max_value.txt", "r") as f:
                 self.max_value = float(f.read())
 
+        # If we're not normalizing the scale factor should be set to 1
         if not self.do_normalize:
             self.max_value = 1.
 
