@@ -366,7 +366,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
     lambdas = parser.add_argument_group("lambdas")
-    lambdas.add_argument("--lambda_mask", nargs="+", default=[50., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
+    lambdas.add_argument("--lambda_mask", nargs="+", default=[50., 1, 51., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
     lambdas.add_argument("--lambda_recon_flow", nargs="+", default=[1.], help="lambda of the flow reconstruction loss")
     lambdas.add_argument("--lambda_recon_warp", nargs="+", default=[0.], help="lambda of the warped rgb reconstruction loss")
     lambdas.add_argument("--lambda_recon_depth", nargs="+", default=[0.5], help="lambda of the depth reconstruction loss")

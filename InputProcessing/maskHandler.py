@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from utils.utils import create_dir
 from utils.video_utils import save_frame
-from utils.transforms import get_transforms
+from utils.transforms import get_transforms, ToTensor
 from models.TopkSTM.topkSTM import TopKSTM
 from models.TopkSTM.utils import pad_divide_by
 from datasets import Video
@@ -94,7 +94,7 @@ class MaskHandler(object):
 
         # get mask of initial frame
         mask = np.array(Image.open(initial_mask))
-        mask = get_transforms()([mask])[0]
+        mask = ToTensor()([mask])[0]
         mask = mask.unsqueeze(0)
         
         mask, _ = pad_divide_by(mask, 16)

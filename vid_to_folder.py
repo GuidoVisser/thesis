@@ -38,7 +38,7 @@ def mivos_to_masks(mask_dir, n_objects=1):
 
         if n_objects >= 1:
             img = np.expand_dims(mask[:, :, 2], axis=2)
-            img = np.repeat(img, 3, axis=2)
+            # img = np.repeat(img, 3, axis=2)
 
             cv2.imwrite(path.join(mask_dir, "..", "01", f"{i:05}.png"), img)
         
@@ -58,6 +58,6 @@ if __name__ == "__main__":
     # for i in range(len(vids)):
     #     video_to_folder(vids[i], dir_path, start_frame=start_frames[i])
 
-    mivos_to_masks("datasets/Jaap_Jelle/Annotations/ringdijk/mask", 1)
+    mivos_to_masks("datasets/OVIS/steamboats/mask", 1)
 
-    remove_first_n_frames("", "datasets/Jaap_Jelle/JPEGImages/480p/amsterdamse_brug", 6)
+    # remove_first_n_frames("", "datasets/Jaap_Jelle/JPEGImages/480p/amsterdamse_brug", 6)

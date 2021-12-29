@@ -39,7 +39,7 @@ class LambdaScheduler(object):
         Update the iteration count and set the new lambda value if necessary
         """
         self.iteration += 1
-        if self.iteration in self.schedule.keys():
+        if str(self.iteration) in self.schedule.keys():
             self.value = float(self.schedule[str(self.iteration)])
 
 class DecompositeLoss(nn.Module):
