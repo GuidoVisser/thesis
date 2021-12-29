@@ -126,20 +126,20 @@ class DecompositeLoss(nn.Module):
 
         dynamics_layer.expand(object_layers.shape)
 
-        # alpha_diff = self.lambda_dynamics_reg_diff.value * torch.maximum((object_layers - dynamics_layer), torch.zeros_like(dynamics_layer))
-        # alpha_corr = self.lambda_dynamics_reg_corr.value * (object_layers * dynamics_layer)
+        alpha_diff = self.lambda_dynamics_reg_diff.value * torch.maximum((object_layers - dynamics_layer), torch.zeros_like(dynamics_layer))
+        alpha_corr = self.lambda_dynamics_reg_corr.value * (object_layers * dynamics_layer)
 
-        # loss = torch.mean((1 - binary_masks) * (alpha_corr + alpha_diff))
+        loss = torch.mean((1 - binary_masks) * (alpha_corr + alpha_diff))
 
         # loss = self.lambda_dynamics_reg_diff.value * object_layers - self.lambda_dynamics_reg_corr.value * (object_layers * dynamics_layer)
 
         # loss = self.lambda_dynamics_reg_corr.value * ((1 - object_layers) * dynamics_layer + object_layers)
         # loss -= self.lambda_dynamics_reg_diff.value * (dynamics_layer)
 
-        loss = (1 - self.lambda_dynamics_reg_diff.value) * (1 - object_layers) * dynamics_layer + object_layers + self.lambda_dynamics_reg_corr.value * dynamics_layer
-        loss = (1 - binary_masks) * loss
+        # loss = (1 - self.lambda_dynamics_reg_diff.value) * (1 - object_layers) * dynamics_layer + object_layers + self.lambda_dynamics_reg_corr.value * dynamics_layer
+        # loss = (1 - binary_masks) * loss
 
-        loss = self.lambda_dynamics_reg_l1.value * torch.mean(loss) + self.lambda_dynamics_reg_l0.value * torch.mean((torch.sigmoid(loss * 5.0) - 0.5) * 2.0)
+        # loss = self.lambda_dynamics_reg_l1.value * torch.mean(loss) + self.lambda_dynamics_reg_l0.value * torch.mean((torch.sigmoid(loss * 5.0) - 0.5) * 2.0)
 
         return loss
 
