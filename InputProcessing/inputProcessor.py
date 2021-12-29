@@ -66,8 +66,6 @@ class InputProcessor(object):
         self.depth_handler      = DepthHandler(img_dir, depth_dir, args.device, self.mask_handler, self.frame_size, args.depth_model)
         self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=args.in_channels, num_static_channels=args.num_static_channels, temporal_coarseness=args.noise_temporal_coarseness, frame_size=self.frame_size, use_depth=args.use_depth)
 
-        if args.model_type == "omnimatte":
-            self.flow_handler.max_value = 1.
 
         # Load a custom compositing order if it's given, otherwise initialize a new one
         self._initialize_composite_order(args.composite_order)

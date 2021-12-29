@@ -345,7 +345,7 @@ class LayerDecompositionAttentionMemoryNet3DMemoryEncoder(LayerDecompositionAtte
             ConvBlock2D(conv_channels * 2,              conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
 
     def render(self, x: torch.Tensor, global_context: GlobalContextVolume2D):
         """
@@ -476,7 +476,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
 
     def render(self, x: torch.Tensor, global_context: GlobalContextVolume2D):
         """
@@ -555,10 +555,8 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
     """
     Layer Decomposition Attention Memory Net with 2D convolutions
     """
-    def __init__(self, in_channels, memory_in_channels, shared_backbone, flow_max, conv_channels=64, valdim=128, keydim=64, topk=0, max_frames=200, coarseness=10, do_adjustment=True):
+    def __init__(self, in_channels, memory_in_channels, shared_backbone, conv_channels=64, valdim=128, keydim=64, topk=0, max_frames=200, coarseness=10, do_adjustment=True):
         super().__init__(max_frames, coarseness, do_adjustment)
-
-        self.flow_max = flow_max
 
         # initialize foreground encoder and decoder
         query_backbone = nn.ModuleList([
@@ -595,7 +593,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
         
     def render(self, x: torch.Tensor, global_context: GlobalContextVolume, is_bg=False):
         """
@@ -692,7 +690,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
 
                 # Temporal consistency
                 rgba_t1          = rgba[B:]
-                rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:B] * self.flow_max)
+                rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:B])
                 alpha_warped     = self.get_alpha_from_rgba(rgba_warped)
                 composite_warped = self.composite_rgb(composite_warped, rgba_warped[:, :3], alpha_warped)
 
@@ -987,7 +985,7 @@ class LayerDecompositionAttentionMemoryDepthNet3DMemoryEncoder(LayerDecompositio
             ConvBlock2D(conv_channels * 2,              conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
         self.final_depth = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
 
     def render(self, x: torch.Tensor, global_context: GlobalContextVolume2D):
@@ -1208,10 +1206,8 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
     """
     Layer Decomposition Attention Memory Net with 2D convolutions
     """
-    def __init__(self, in_channels, memory_in_channels, shared_backbone, flow_max, conv_channels=64, valdim=128, keydim=64, topk=0, max_frames=200, coarseness=10, do_adjustment=True):
+    def __init__(self, in_channels, memory_in_channels, shared_backbone, conv_channels=64, valdim=128, keydim=64, topk=0, max_frames=200, coarseness=10, do_adjustment=True):
         super().__init__(max_frames, coarseness, do_adjustment)
-
-        self.flow_max = flow_max
 
         # initialize foreground encoder and decoder
         query_backbone = nn.ModuleList([
@@ -1248,7 +1244,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
         self.final_depth = ConvBlock2D(conv_channels, 1, ksize=4, stride=1, activation='tanh')
         
     def render(self, x: torch.Tensor, global_context: GlobalContextVolume, is_bg=False):
@@ -1352,7 +1348,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
 
                 # Temporal consistency
                 rgba_t1          = rgba[B:]
-                rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:B] * self.flow_max)
+                rgba_warped      = FlowHandler.apply_flow(rgba_t1, flow[:B])
                 alpha_warped     = self.get_alpha_from_rgba(rgba_warped)
                 composite_warped = self.composite_rgb(composite_warped, rgba_warped[:, :3], alpha_warped)
 
@@ -1463,7 +1459,7 @@ class Omnimatte(nn.Module):
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)])
         
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
 
         self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))

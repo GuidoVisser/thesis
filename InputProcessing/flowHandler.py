@@ -22,7 +22,6 @@ class FlowHandler(object):
                  output_dir: str,
                  raft_weights: str,
                  iters: int = 12,
-                 normalize: bool = False,
                  forward_backward_threshold: float = 20.,
                  photometric_threshold: float = 20.,
                  device = "cuda") -> None:
@@ -33,7 +32,6 @@ class FlowHandler(object):
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
         self.raft = self.initialize_raft(raft_weights)
-        self.do_normalize = normalize
 
         self.output_dir= output_dir
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
@@ -48,17 +46,7 @@ class FlowHandler(object):
         self.padder             = InputPadder(self.frame_iterator.frame_size)
 
         if not path.exists(path.join(self.output_dir, f"forward/flow/00000.flo")):
-            self.max_value = 0.
             self.calculate_full_video_flow()
-            with open(f"{self.output_dir}/max_value.txt", "w") as f:
-                f.write(str(self.max_value))
-        else:
-            with open(f"{self.output_dir}/max_value.txt", "r") as f:
-                self.max_value = float(f.read())
-
-        # If we're not normalizing the scale factor should be set to 1
-        if not self.do_normalize:
-            self.max_value = 1.
 
     @torch.no_grad()
     def __getitem__(self, frame_idx: Union[int, slice]):
@@ -87,10 +75,6 @@ class FlowHandler(object):
             flow = torch.from_numpy(readFlow(frame_path)).permute(2, 0, 1)
             conf = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
             dynamics_mask = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"dynamics_mask/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
-
-        # normalize 
-        if self.do_normalize:
-            flow /= self.max_value
 
         # background_mask = 1 - torch.minimum(torch.sum(object_masks, dim=0), torch.ones(object_masks.shape[1:]))
         # dynamics_mask = background_mask * dynamics_mask
@@ -153,8 +137,6 @@ class FlowHandler(object):
 
             #     forward_flow = forward_flow[:, t[1]:h+t[1], t[0]:w+t[0]]
             #     conf         = conf[t[1]:h+t[1], t[0]:w+t[0]]
-
-            self.max_value = max(self.max_value, torch.max(torch.abs(forward_flow)).item())
 
             forward_flow = forward_flow.permute(1, 2, 0).cpu().numpy()
             conf         = conf.cpu().numpy()
