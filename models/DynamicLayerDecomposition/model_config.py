@@ -50,7 +50,7 @@ def default_config():
             'alpha_loss_l1_rolloff':     100, 
         },
         "lambdas": {
-            "lambda_mask":               [50., 100, 0.],
+            "lambda_mask":               [50., 50, 0.],
             "lambda_recon_flow":         [1.],
             "lambda_recon_warp":         [0.],
             "lambda_recon_depth":        [0.5],
@@ -58,10 +58,8 @@ def default_config():
             "lambda_alpha_l0":           [0.005],
             "lambda_alpha_l1":           [0.01, 100, 0.],
             "lambda_stabilization":      [0.001],
-            "lambda_dynamics_reg_diff":  [0.1],
-            "lambda_dynamics_reg_corr":  [0.1],
-            "lambda_dynamics_reg_l0":    [0.005],
-            "lambda_dynamics_reg_l1":    [0.01, 100, 0.],
+            "lambda_dynamics_reg_diff":  [0.01],
+            "lambda_dynamics_reg_corr":  [0.005],
         },
         "pretrained_models" : {
             "propagation_model": "models/third_party/weights/propagation_model.pth",

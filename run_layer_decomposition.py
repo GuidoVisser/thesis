@@ -318,7 +318,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
     parser.add_argument("--model_setup", type=int, default=4, help="id of model setup")
-    parser.add_argument("--memory_setup", type=int, default=3, help="id of memory input setup")
+    parser.add_argument("--memory_setup", type=int, default=1, help="id of memory input setup")
 
     dataset = "DAVIS_minisample"
     video = "scooter-black"
@@ -376,8 +376,8 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_alpha_l0", nargs="+", default=[0.005], help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1", nargs="+", default=[0.01, 100, 0.], help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization", nargs="+", default=[0.001], help="lambda of the camera stabilization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.1], help="lambda of the difference part of the dynamics regularization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.1], help="lambda of the correlation part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_l1", nargs="+", default=[0.01, 100, 0.], help="lambda of the difference part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_l0", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
 
