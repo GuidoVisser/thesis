@@ -33,7 +33,7 @@ mkdir $TMPDIR/output_dir
 echo "$SLURM_JOBID | Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
             --model_setup 4 \
-            --memory_setup 3 \
+            --memory_setup 1 \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/$MASK_PATH \
             --out_dir $TMPDIR/output_dir \
