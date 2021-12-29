@@ -1124,7 +1124,7 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
             ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
-        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
         self.final_depth = ConvBlock2D(conv_channels, 1, ksize=4, stride=1, activation='tanh')
 
     def render(self, x: torch.Tensor, global_context: GlobalContextVolume2D):

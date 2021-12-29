@@ -22,7 +22,7 @@ class FlowHandler(object):
                  output_dir: str,
                  raft_weights: str,
                  iters: int = 12,
-                 aligned: bool = False,
+                 normalize: bool = False,
                  forward_backward_threshold: float = 20.,
                  photometric_threshold: float = 20.,
                  device = "cuda") -> None:
@@ -33,7 +33,7 @@ class FlowHandler(object):
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
         self.raft = self.initialize_raft(raft_weights)
-        # self.aligned = aligned
+        self.do_normalize = normalize
 
         self.output_dir= output_dir
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
@@ -55,6 +55,9 @@ class FlowHandler(object):
         else:
             with open(f"{self.output_dir}/max_value.txt", "r") as f:
                 self.max_value = float(f.read())
+
+        if not self.do_normalize:
+            self.max_value = 1.
 
     @torch.no_grad()
     def __getitem__(self, frame_idx: Union[int, slice]):
@@ -85,7 +88,8 @@ class FlowHandler(object):
             dynamics_mask = torch.from_numpy(cv2.imread(path.join(self.output_dir, f"dynamics_mask/{frame_idx:05}.png"), cv2.IMREAD_GRAYSCALE)) / 255.
 
         # normalize 
-        flow /= self.max_value
+        if self.do_normalize:
+            flow /= self.max_value
 
         # background_mask = 1 - torch.minimum(torch.sum(object_masks, dim=0), torch.ones(object_masks.shape[1:]))
         # dynamics_mask = background_mask * dynamics_mask
