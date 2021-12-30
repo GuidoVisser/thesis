@@ -64,7 +64,7 @@ class InputProcessor(object):
         self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=args.flow_model, device=args.device, iters=50)
         self.homography_handler = HomographyHandler(out_root, img_dir, path.join(flow_dir, "dynamics_mask"), args.device, self.frame_size)
         self.depth_handler      = DepthHandler(img_dir, depth_dir, args.device, self.mask_handler, self.frame_size, args.depth_model)
-        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=args.in_channels, num_static_channels=args.num_static_channels, temporal_coarseness=args.noise_temporal_coarseness, frame_size=self.frame_size, use_depth=args.use_depth)
+        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=args.in_channels, num_static_channels=args.num_static_channels, temporal_coarseness=args.noise_temporal_coarseness, upsample_size=args.noise_upsample_size, frame_size=self.frame_size, use_depth=args.use_depth)
 
 
         # Load a custom compositing order if it's given, otherwise initialize a new one

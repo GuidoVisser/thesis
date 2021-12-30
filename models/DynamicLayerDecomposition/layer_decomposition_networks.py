@@ -441,6 +441,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
                  keydim=64, 
                  topk=0,
                  max_frames=200, 
+                 transposed_bottleneck=True,
                  coarseness=10, 
                  do_adjustment=True):
 
@@ -472,7 +473,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
-        self.dynamics_layer = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=True)
+        self.dynamics_layer = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
             ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
@@ -543,6 +544,200 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         _, _, T, _, _ = x.shape
 
         _, x, skips = self.memory_reader(x[:, :, 0], global_context)
+        
+        # decoding
+        for layer in self.decoder:          
+            x = torch.cat((x, skips.pop()), 1)
+            x = layer(x)
+
+        # finalizing render
+        rgba  = self.final_rgba(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
+        flow  = self.final_flow(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
+
+        return rgba, flow
+
+
+class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
+    """
+    Layer Decomposition Attention Memory Net with 2D convolutions and one 3D convolution in the middle to function as a temporal bottleneck
+    """
+    def __init__(self, 
+                 in_channels, 
+                 conv_channels=64, 
+                 max_frames=200, 
+                 transposed_bottleneck=True,
+                 coarseness=10, 
+                 do_adjustment=True):
+
+        super().__init__(max_frames, coarseness, do_adjustment)
+
+        # initialize foreground encoder and decoder
+        self.encoder = nn.ModuleList([
+            ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
+            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
+            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+
+        self.dynamics_layer = ConvBlock3D(conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
+
+        self.decoder = nn.ModuleList([
+            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
+            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/4
+            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/2
+            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
+
+        self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
+        self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
+
+
+    def forward(self, input: dict) -> dict:
+        """
+        Apply forward pass of network
+
+        Args:
+            input (dict): collection of inputs to the network
+        """
+        query_input       = input["query_input"]
+        background_flow   = input["background_flow"]
+        background_uv_map = input["background_uv_map"]
+        jitter_grid       = input["jitter_grid"]
+        index             = input["index"]
+
+        B, L, C, T, H, W = query_input.shape
+
+        composite_rgba = None
+        composite_flow = background_flow
+
+        layers_rgba = []
+        layers_flow = []
+
+        # camera stabilization correction
+        index = index.transpose(0, 1).reshape(-1)
+        background_offset = self.get_background_offset(jitter_grid, index)
+        brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
+
+        full_static_bg = None
+
+        for i in range(L):
+            layer_input = query_input[:, i]
+
+            # Background layer
+            if i == 0:
+
+                rgba, flow = self.render_background(layer_input)
+                if full_static_bg is None:
+                    full_static_bg = torch.clone(rgba[:, :3, 0]).detach().cpu()
+                rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
+                if self.do_adjustment:
+                    rgba = self._apply_background_offset(rgba, background_offset)
+
+                composite_rgba = rgba
+                flow = composite_flow
+
+            # Object layers
+            else:
+                rgba, flow = self.render(layer_input)
+                alpha = self.get_alpha_from_rgba(rgba)
+
+                composite_rgba = self.composite_rgba(composite_rgba, rgba)
+                composite_flow = flow * alpha + composite_flow * (1. - alpha)
+
+            layers_rgba.append(rgba)
+            layers_flow.append(flow)
+
+        if self.do_adjustment:
+            # map output to [0, 1]
+            composite_rgba = composite_rgba * 0.5 + 0.5
+
+            # adjust for brightness
+            composite_rgba = torch.clamp(brightness_scale * composite_rgba, 0, 1)
+
+            # map back to [-1, 1]
+            composite_rgba = composite_rgba * 2 - 1
+
+        # stack in layer dimension
+        layers_rgba  = torch.stack(layers_rgba, 1)
+        layers_flow  = torch.stack(layers_flow, 1)
+
+        out = {
+            "rgba_reconstruction": composite_rgba,          # [B,    4, T, H, W]
+            "flow_reconstruction": composite_flow,          # [B,    2, T, H, w]
+            "layers_rgba": layers_rgba,                     # [B, L, 4, T, H, W]
+            "layers_flow": layers_flow,                     # [B, L, 2, T, H, W]
+            "brightness_scale": brightness_scale,           # [B,    1, T, H, W]
+            "background_offset": background_offset,         # [B,    2, T, H, W]
+            "full_static_bg": full_static_bg                # [B,    3, T, H, W]
+        }
+        return out
+
+    def render(self, x: torch.Tensor):
+        """
+        Pass inputs of a single layer through the network
+
+        Parameters:
+            x (torch.Tensor):       sampled texture concatenated with person IDs
+
+        Returns RGBa for the input layer and the final feature maps.
+        """
+        T = x.shape[-3]
+
+        outputs = []
+        skips = []
+        for t in range(T):
+            skips_t = []
+            x_t = x[..., t, :, :]
+            for i, layer in enumerate(self.encoder):
+                x_t = layer(x_t)
+                if i < 4:
+                    skips_t.append(x_t)
+                
+            outputs.append(x_t)
+            skips.append(skips_t)
+
+        x = torch.stack(outputs, dim=-3)
+
+        x = self.dynamics_layer(x)
+
+        rgba  = []
+        flow  = []
+        for t in range(T):
+            # decoding
+            x_t = x[..., t, :, :]
+            skips_t = skips[t]
+
+            for layer in self.decoder:
+                x_t = torch.cat((x_t, skips_t.pop()), 1)
+                x_t = layer(x_t)
+        
+            # finalizing render
+            rgba.append(self.final_rgba(x_t))
+            flow.append(self.final_flow(x_t))
+
+        rgba  = torch.stack(rgba, dim=-3)
+        flow  = torch.stack(flow, dim=-3)
+
+        return rgba, flow
+
+    def render_background(self, x: torch.Tensor):
+        """
+        Pass inputs of a single layer through the network
+
+        Parameters:
+            x (torch.Tensor):       sampled texture concatenated with person IDs
+
+        Returns RGBa for the input layer and the final feature maps.
+        """
+
+        _, _, T, _, _ = x.shape
+
+        x = x[:, :, 0]
+        skips = []
+        for i, layer in enumerate(self.encoder):
+            x = layer(x)
+            if i < 4:
+                skips.append(x)
         
         # decoding
         for layer in self.decoder:          
@@ -1086,7 +1281,8 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
                  valdim=128, 
                  keydim=64, 
                  topk=0,
-                 max_frames=200, 
+                 max_frames=200,
+                 transposed_bottleneck=True, 
                  coarseness=10, 
                  do_adjustment=True):
 
@@ -1118,7 +1314,7 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
         
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
-        self.dynamics_layer = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=True)
+        self.dynamics_layer = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
             ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
@@ -1445,7 +1641,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
 
 
 class Omnimatte(nn.Module):
-    def __init__(self, conv_channels=64, in_channels=16, max_frames=200, coarseness=10, do_adjustment=True):
+    def __init__(self, conv_channels=64, in_channels=16, max_frames=200, coarseness=10, do_adjustment=True, force_dynamics_layer=False):
         super().__init__()
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),
@@ -1471,6 +1667,7 @@ class Omnimatte(nn.Module):
 
         self.max_frames = max_frames
         self.do_adjustment = do_adjustment
+        self.force_dynamics_layer = force_dynamics_layer # Necessary for some experiments, but Omnimatte, doesn't have a dynamics layer
         
     def render(self, x):
         """Pass inputs for a single layer through UNet.
@@ -1524,7 +1721,6 @@ class Omnimatte(nn.Module):
 
         layers_rgba  = []
         layers_flow  = []
-        layers_depth = []
 
         # For temporal consistency
         layers_alpha_warped = []
@@ -1557,7 +1753,7 @@ class Omnimatte(nn.Module):
                 rgba_warped      = rgba[:B]
                 composite_warped = rgba_warped[:, :3]
             # Omnimatte doesn't have a dynamic background layer
-            if i == 1:
+            if i == 1 and not self.force_dynamics_layer:
                 rgba        = -1 * torch.ones_like(rgba)
                 flow        = -1 * torch.ones_like(flow)
                 rgba_warped = -1 * torch.ones_like(rgba[:B])

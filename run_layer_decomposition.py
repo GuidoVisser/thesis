@@ -94,6 +94,13 @@ class ExperimentRunner(object):
             self.args.use_2d_loss_module = True
             self.args.lambda_recon_depth = [0.]
             self.args.use_depth = False
+        elif model_setup == 8:
+            self.args.model_type = "bottleneck_no_attention"
+        elif model_setup == 9:
+            self.args.model_type = "no_addons"
+            self.args.timesteps = 2
+            self.args.use_2d_loss_module = True
+            self.args.lambda_alpha_warp = [0.]
 
         if memory_setup == 1:
             self.args.memory_input_type = "noise"
@@ -175,7 +182,9 @@ class ExperimentRunner(object):
                 self.args.lambda_dynamics_reg_corr,
                 self.args.lambda_dynamics_reg_diff,
                 self.args.lambda_dynamics_reg_l0,
-                self.args.lambda_dynamics_reg_l1
+                self.args.lambda_dynamics_reg_l1,
+                self.args.corr_diff,
+                self.args.alpha_reg_layers
             )
         else:
             loss_module = DecompositeLoss3D(
@@ -188,7 +197,9 @@ class ExperimentRunner(object):
                 self.args.lambda_dynamics_reg_corr,
                 self.args.lambda_dynamics_reg_diff,
                 self.args.lambda_dynamics_reg_l0,
-                self.args.lambda_dynamics_reg_l1
+                self.args.lambda_dynamics_reg_l1,
+                self.args.corr_diff,
+                self.args.alpha_reg_layers
             )
         return loss_module
 
@@ -209,6 +220,7 @@ class ExperimentRunner(object):
                     topk=self.args.topk,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
+                    transposed_bottleneck=not self.args.bottleneck_normal,
                     coarseness=self.args.coarseness
                 )
             else:
@@ -222,6 +234,7 @@ class ExperimentRunner(object):
                     topk=self.args.topk,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
+                    transposed_bottleneck=not self.args.bottleneck_normal,
                     coarseness=self.args.coarseness
                 )
         elif self.args.model_type == "3d_memory":
@@ -285,7 +298,24 @@ class ExperimentRunner(object):
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
                     coarseness=self.args.coarseness
-                ) 
+                )
+        elif self.args.model_type == "bottleneck_no_attention":
+            network = LayerDecompositionNet3DBottleneck(
+                    in_channels=self.args.in_channels,
+                    conv_channels=self.args.conv_channels,
+                    do_adjustment=True, 
+                    max_frames=len(dataloader.dataset.frame_iterator),
+                    coarseness=self.args.coarseness
+            )
+        elif self.args.model_type == "no_addons":
+            network = Omnimatte(
+                    in_channels=self.args.in_channels,
+                    conv_channels=self.args.conv_channels,
+                    do_adjustment=True, 
+                    max_frames=len(dataloader.dataset.frame_iterator),
+                    coarseness=self.args.coarseness,
+                    force_dynamics_layer=True
+            )                  
 
         if self.args.device != "cpu":
             network = DataParallel(network).to(args.device)
@@ -315,17 +345,17 @@ if __name__ == "__main__":
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
-    parser.add_argument("--model_setup", type=int, default=4, help="id of model setup")
+    parser.add_argument("--model_setup", type=int, default=9, help="id of model setup")
     parser.add_argument("--memory_setup", type=int, default=1, help="id of memory input setup")
 
-    dataset = "DAVIS_minisample"
+    dataset = "Videos"
     video = "scooter-black"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/480p/{video}/00000.png"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00000.png"], 
         help="paths to the initial object masks or the directories containing the object masks")
-    directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/JPEGImages/480p/{video}", 
+    directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/Images/{video}", 
         help="path to the directory in which the video frames are stored")
     directory_args.add_argument("--continue_from", type=str, default="", help="root directory of training run from which you wish to continue")
 
@@ -343,6 +373,10 @@ if __name__ == "__main__":
     model_args.add_argument("--memory_t_strided", action="store_true", help="If 3D convolutions are used in memory encoders, set them to be strided in time dimension")
     model_args.add_argument("--use_depth", action="store_true", help="specify that you want to use depth estimation as an input channel")
     model_args.add_argument("--topk", type=int, default=0, help="k value for topk channel selection in context distribution")
+    model_args.add_argument("--corr_diff", action="store_true", help="use corr_diff dynamics regularization in stead of alpha composite")
+    model_args.add_argument("--alpha_reg_layers", action="store_true", help="alpha regularization loss is l1 and l0 on alpha layers in stead of composite")
+    model_args.add_argument("--bottleneck_normal", action="store_true", help="have a normal 3d conv as bottleneck in stead of a transposed conv")
+
 
     input_args = parser.add_argument_group("model input")
     input_args.add_argument("--num_static_channels", type=int, default=5, help="number of input channels that are static in time")
@@ -354,14 +388,15 @@ if __name__ == "__main__":
     input_args.add_argument("--jitter_rate", type=float, default=0.75, help="rate of applying jitter to the input")
     input_args.add_argument("--composite_order", type=str, help="path to a text file containing the compositing order of the foreground objects")
     input_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
+    input_args.add_argument("--noise_upsample_size", type=int, default=16, help="determines the spatial coarseness of both the spatial the and dynamic noise input")
     input_args.add_argument("--memory_input_type", type=str, default="noise+", choices=["rgb", "rgb+", "noise", "noise+"])
 
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=252, help="Number of epochs used for training")
-    training_param_args.add_argument("--save_freq", type=int, default=70, help="Frequency at which the intermediate results are saved")
+    training_param_args.add_argument("--n_epochs", type=int, default=10, help="Number of epochs used for training")
+    training_param_args.add_argument("--save_freq", type=int, default=5, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
@@ -369,14 +404,14 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_mask", nargs="+", default=[50., 1, 51., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
     lambdas.add_argument("--lambda_recon_flow", nargs="+", default=[1.], help="lambda of the flow reconstruction loss")
     lambdas.add_argument("--lambda_recon_warp", nargs="+", default=[0.], help="lambda of the warped rgb reconstruction loss")
-    lambdas.add_argument("--lambda_recon_depth", nargs="+", default=[0.5], help="lambda of the depth reconstruction loss")
+    lambdas.add_argument("--lambda_recon_depth", nargs="+", default=[1.], help="lambda of the depth reconstruction loss")
     lambdas.add_argument("--lambda_alpha_warp", nargs="+", default=[0.005], help="lambda of the warped alpha estimation loss")
     lambdas.add_argument("--lambda_alpha_l0", nargs="+", default=[0.005], help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1", nargs="+", default=[0.01, 100, 0.], help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization", nargs="+", default=[0.001], help="lambda of the camera stabilization loss")
     lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
-    lambdas.add_argument("--lambda_dynamics_reg_l1", nargs="+", default=[0.01, 100, 0.], help="lambda of the difference part of the dynamics regularization loss")
+    lambdas.add_argument("--lambda_dynamics_reg_l1", nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_l0", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
 
 

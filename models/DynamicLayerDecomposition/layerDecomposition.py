@@ -1,6 +1,7 @@
 import cv2
 import torch.nn as nn
 import torch
+from torch.utils import data
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from os import path
@@ -42,7 +43,8 @@ class LayerDecompositer(nn.Module):
         self.use_depth = use_depth
 
     def run_training(self, start_epoch=0):
-        
+
+        t_avg = []
         for epoch in range(start_epoch, self.n_epochs):
 
             t0 = datetime.now()
@@ -74,9 +76,15 @@ class LayerDecompositer(nn.Module):
 
             self.loss_module.update_lambdas()
 
+            t_avg.append((datetime.now() - t0).total_seconds())
+
             if torch.cuda.device_count() <= 1:
                 t1 = datetime.now()
-                print(f"Epoch: {epoch} / {self.n_epochs - 1} done in {(t1 - t0).total_seconds()} seconds")
+                print(f"Epoch: {epoch} / {self.n_epochs - 1} done in {(t1 - t0).total_seconds()} seconds")           
+
+
+        with open(path.join(self.results_root, "time.txt"), "w") as f:
+            f.write(str(sum(t_avg) / len(t_avg)))
 
         torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))           
 
