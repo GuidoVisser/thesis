@@ -104,7 +104,7 @@ class LayerDecompositer(nn.Module):
             frame_indices = input["index"][:, 0].tolist()
             self.visualize_and_save_output(output, targets, frame_indices, "final")
 
-    def visualize_and_save_output(self, model_output, targets, frame_indices, epoch):
+    def visualize_and_save_output(self, model_output, targets, frame_indices, epoch_name):
         """
         Save the output of the model 
         """
@@ -117,6 +117,12 @@ class LayerDecompositer(nn.Module):
         
         background_offset = model_output["background_offset"]
         brightness_scale  = model_output["brightness_scale"]
+
+        if "full_static_bg" in model_output:
+            full_static_bg = model_output["full_static_bg"]
+            bg_plate = full_static_bg[0, :]
+            background_plate_img  = cv2.cvtColor((bg_plate.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(path.join(self.save_dir, epoch_name, "bg_plate.png"), background_plate_img)
 
         gt_rgb = targets["rgb"]
 
@@ -154,7 +160,6 @@ class LayerDecompositer(nn.Module):
                 brightness_scale_img  = (torch.clone(brightness_scale[b, :, t]).detach().permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255
 
                 img_name = f"{(frame_indices[b] + t):05}.png"
-                epoch_name = f"{epoch:03}" if isinstance(epoch, int) else epoch
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background/{img_name}"), background_img)
                 if self.separate_bg:
                     cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_static/{img_name}"), background_img_static)

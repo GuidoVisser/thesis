@@ -84,6 +84,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         background_offset = self.get_background_offset(jitter_grid, index)
         brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
 
+        full_static_bg = None
+
         for i in range(L):
             layer_input = query_input[:, i]
 
@@ -91,6 +93,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             if i == 0:
 
                 rgba, flow = self.render_background(layer_input, global_context)
+                if full_static_bg is None:
+                    full_static_bg = torch.clone(rgba[:, :3, 0]).detach().cpu()
                 rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 if self.do_adjustment:
                     rgba = self._apply_background_offset(rgba, background_offset)
@@ -130,6 +134,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             "layers_flow": layers_flow,                     # [B, L, 2, T, H, W]
             "brightness_scale": brightness_scale,           # [B,    1, T, H, W]
             "background_offset": background_offset,         # [B,    2, T, H, W]
+            "full_static_bg": full_static_bg                # [B,    3, T, H, W]
         }
         return out
     
