@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 #SBATCH -n 1
-#SBATCH -t 4:00:00
+#SBATCH -t 1:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -16,12 +16,10 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='amsterdamse_brug'
+VIDEO='scooter-black'
 cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/video
 mkdir $TMPDIR/00
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00/ $TMPDIR/00/
-mkdir $TMPDIR/01
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01/ $TMPDIR/01/
+cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00/00000.png $TMPDIR/00/00000.png
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -36,7 +34,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --model_setup 4 \
             --memory_setup 1 \
             --img_dir $TMPDIR/video \
-            --initial_mask $TMPDIR/00/ $TMPDIR/01/ \
+            --initial_mask $TMPDIR/00/00000.png \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
@@ -48,12 +46,11 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'noise and optical flow as input to the memory encoder, no shared backbone' \ 
-            --input_setup 4 \ 
-            --model_setup 3
+            --description 'noise and optical flow as input to the memory encoder' \ 
+            --input_setup 3
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__attention_study__rgb+
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__attention_study__rgb+
+mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__attention_study__noise_plus
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__attention_study__noise_plus

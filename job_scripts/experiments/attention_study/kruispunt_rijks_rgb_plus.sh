@@ -48,11 +48,12 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'A fully 2D convolutional encoder decoder network' \ 
-            --model_setup 6
+            --description 'noise and optical flow as input to the memory encoder, no shared backbone' \ 
+            --input_setup 4 \ 
+            --model_setup 3
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__fully 2d
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__fully 2d
+mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__attention_study__rgb_plus
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__attention_study__rgb_plus
