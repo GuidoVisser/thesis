@@ -90,7 +90,7 @@ class FlowHandler(object):
     def calculate_full_video_flow(self):
 
         for frame_idx in range(len(self.frame_iterator) - 1):
-            print(f"Calculating Optical Flow: {frame_idx} / {len(self.frame_iterator) - 1}")
+            # print(f"Calculating Optical Flow: {frame_idx} / {len(self.frame_iterator) - 1}")
 
             # Define images
             image0 = self.get_image(frame_idx)

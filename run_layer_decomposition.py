@@ -425,6 +425,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    for arg in vars(args):
+        print(arg, getattr(args, arg))
+
     experiment_runner = ExperimentRunner(args)
     experiment_runner.start()
 

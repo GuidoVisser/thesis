@@ -110,7 +110,7 @@ def extract_and_match_features(frames: list,
 
             timer.update('visualize')
 
-        timer.print(f"Finished pair {i:5} of {len(frames)-2:5}") # -2:= -1 for zero index, -1 because we look at pairs i.s.o. frames
+        # timer.print(f"Finished pair {i:5} of {len(frames)-2:5}") # -2:= -1 for zero index, -1 because we look at pairs i.s.o. frames
 
     return output
 

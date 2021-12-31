@@ -104,10 +104,10 @@ class MaskHandler(object):
 
         # loop through video and propagate mask, skipping first frame
         for i, frame in enumerate(frame_iterator):
-            if forward:
-                print(f"Propagating Mask: {i + initial_index} / {length_video - 1}")
-            else:
-                print(f"Propagating Mask: {initial_index - i} / {length_video - 1}")
+            # if forward:
+            #     print(f"Propagating Mask: {i + initial_index} / {length_video - 1}")
+            # else:
+            #     print(f"Propagating Mask: {initial_index - i} / {length_video - 1}")
 
             if i == 0:
                 continue
