@@ -1,3 +1,5 @@
+#!/bin/bash 
+
 job_scripts/experiments/3d_conv_study/master.sh
 job_scripts/experiments/alpha_study/master.sh
 job_scripts/experiments/attention_study/master.sh
