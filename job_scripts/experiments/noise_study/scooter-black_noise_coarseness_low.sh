@@ -46,8 +46,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'No upsampling is done' \ 
-            --noise_upsample_size 64 \ 
+            --description 'No upsampling is done' \
+            --noise_upsample_size 64 \
             --noise_temporal_coarseness 8
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

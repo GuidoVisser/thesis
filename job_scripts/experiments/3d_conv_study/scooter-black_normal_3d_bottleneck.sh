@@ -46,7 +46,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'A 3D bottleneck network where the 3D convolution is a normal 3D convolution, not transposed' \ 
+            --description 'A 3D bottleneck network where the 3D convolution is a normal 3D convolution, not transposed' \
             --model_setup 3
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

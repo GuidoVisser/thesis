@@ -18,7 +18,7 @@ def generate_script(config, video, identifier):
     
     arguments = ""
     for arg, value in config.arguments.items():
-        arguments += " \\ \n" + " "*12 + "--" + arg + " " + str(value)
+        arguments += " \\\n" + " "*12 + "--" + arg + " " + str(value)
 
     return header + body + arguments + footer
 

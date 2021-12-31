@@ -48,7 +48,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'A fully 2D convolutional encoder decoder network' \ 
+            --description 'A fully 2D convolutional encoder decoder network' \
             --model_setup 6
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

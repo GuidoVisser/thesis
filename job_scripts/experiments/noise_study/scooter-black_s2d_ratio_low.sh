@@ -46,7 +46,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'Only dynamic noise is added to the input' \ 
+            --description 'Only dynamic noise is added to the input' \
             --num_static_channels 0
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

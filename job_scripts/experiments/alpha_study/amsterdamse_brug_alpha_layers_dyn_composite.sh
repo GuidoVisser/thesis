@@ -48,9 +48,9 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'l1 and l0 on alpha layers with alpha composite dynamics regularization' \ 
-            --alpha_reg_layers  \ 
-            --lambda_dynamics_reg_corr 0.1 \ 
+            --description 'l1 and l0 on alpha layers with alpha composite dynamics regularization' \
+            --alpha_reg_layers  \
+            --lambda_dynamics_reg_corr 0.1 \
             --lambda_dynamics_reg_diff 0.1
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

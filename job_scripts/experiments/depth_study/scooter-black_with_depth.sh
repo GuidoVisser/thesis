@@ -46,7 +46,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'Depth estimation is added to the models input' \ 
+            --description 'Depth estimation is added to the models input' \
             --use_depth 
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

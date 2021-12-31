@@ -46,7 +46,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'The input noise is mostly static' \ 
+            --description 'The input noise is mostly static' \
             --num_static_channels 8
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

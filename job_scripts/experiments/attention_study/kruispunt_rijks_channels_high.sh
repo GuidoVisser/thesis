@@ -48,8 +48,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'high number of attention channels' \ 
-            --keydim 128 \ 
+            --description 'high number of attention channels' \
+            --keydim 128 \
             --valdim 512
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
