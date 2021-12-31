@@ -19,7 +19,7 @@ class BackgroundVolume(object):
 
         self.save_dir  = save_dir
 
-        if path.exists(path.join(save_dir, "spatiotemporal_noise.pth")) and 1 == 0:
+        if path.exists(path.join(save_dir, "spatiotemporal_noise.pth")):
             self.spatial_noise           = torch.load(path.join(save_dir, "spatial_noise.pth"))
             self.spatial_noise_upsampled = torch.load(path.join(save_dir, "spatial_noise_upsampled.pth"))
             self.spatiotemporal_noise    = torch.load(path.join(save_dir, "spatiotemporal_noise.pth"))
