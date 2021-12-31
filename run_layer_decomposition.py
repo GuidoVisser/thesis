@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from datetime import datetime
 from torch.utils.data import DataLoader
 import torch
 from os import path
@@ -395,7 +396,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
     training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
-    training_param_args.add_argument("--n_epochs", type=int, default=10, help="Number of epochs used for training")
+    training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=5, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
@@ -425,10 +426,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    print("\n"+"#"*30+"\n")
     for arg in vars(args):
-        print(arg, getattr(args, arg))
-
+        print(arg, " "*(25 - len(arg)), getattr(args, arg))
+    print("\n"+"#"*30+"\n")
+    
     experiment_runner = ExperimentRunner(args)
+    t0 = datetime.now()
     experiment_runner.start()
+    print((datetime.now() - t0).total_seconds())
 
     print("done")
