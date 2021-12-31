@@ -10,19 +10,6 @@
 8619417 kruispunt_rijks 3d_conv_study__fully_2d 46.073961600000004
 8619431 scooter-black attention_study__no_shared_backbone 12.7872736
 8619411 kruispunt_rijks 3d_conv_study__normal_3d_bottleneck 57.41365599999999
-gvisser@login4:~/thesis$ cat times.txt 
-8619414 kruispunt_rijks 3d_conv_study__3d_encoder
-8619416 scooter-black 3d_conv_study__fully_2d 10.725114999999999
-8619415 amsterdamse_brug 3d_conv_study__3d_encoder
-8619410 scooter-black 3d_conv_study__normal_3d_bottleneck 12.861318399999998
-8619419 scooter-black alpha_study__alpha_layers_corr_diff 13.121119400000001
-8619422 scooter-black alpha_study__alpha_layers_dyn_composite 13.0145406
-8619413 scooter-black 3d_conv_study__3d_encoder 24.2182348
-8619428 scooter-black alpha_study__alpha_composite_corr_diff 12.9005776
-8619425 scooter-black alpha_study__alpha_composite_dyn_composite 12.795864599999998
-8619417 kruispunt_rijks 3d_conv_study__fully_2d 46.073961600000004
-8619431 scooter-black attention_study__no_shared_backbone 12.7872736
-8619411 kruispunt_rijks 3d_conv_study__normal_3d_bottleneck 57.41365599999999
 8619420 kruispunt_rijks alpha_study__alpha_layers_corr_diff 59.407863199999994
 8619434 scooter-black attention_study__no_addons 8.353566599999999
 8619423 kruispunt_rijks alpha_study__alpha_layers_dyn_composite 61.58621300000001
