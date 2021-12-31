@@ -47,10 +47,14 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 128 \
             --timesteps 4 \
             --description 'A 3D convolutional encoder with a 2D convolutional decoder' \
-            --model_setup 1
+            --model_setup 1 \
+            --batch_size 2
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
 mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__3d_encoder
 cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__3d_encoder
+
+read -r t<$TMPDIR/output_dir/time.txt
+echo $VIDEO 3d_conv_study__3d_encoder $t >> $HOME/thesis/times.txt
