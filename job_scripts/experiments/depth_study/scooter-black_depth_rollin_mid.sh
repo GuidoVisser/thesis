@@ -48,7 +48,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --timesteps 4 \
             --description 'Depth estimation is added to the models input, however the depth reconstruction loss is added to the total loss after a rollin period' \
             --use_depth  \
-            --lambda_recon_depth 0.0, 500 1.0
+            --lambda_recon_depth 0.0 500 1.0
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 

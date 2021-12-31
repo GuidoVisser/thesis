@@ -47,7 +47,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 128 \
             --timesteps 4 \
             --description 'noise and optical flow as input to the memory encoder, no shared backbone' \
-            --input_setup 4 \
+            --memory_setup 4 \
             --model_setup 3
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

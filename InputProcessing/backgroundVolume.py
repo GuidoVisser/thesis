@@ -27,7 +27,7 @@ class BackgroundVolume(object):
             self.spatial_noise = torch.randn(in_channels - 3 - int(use_depth), frame_size[1] // upsample_size, frame_size[0] // upsample_size)
             self.spatial_noise_upsampled = F.interpolate(self.spatial_noise.unsqueeze(0), (frame_size[1], frame_size[0]), mode='bilinear')[0]
 
-            if num_static_channels < in_channels: # always true except with Omnimatte
+            if num_static_channels < in_channels - 3 - int(use_depth): # always true except with Omnimatte
                 spatiotemporal_noise = torch.randn(in_channels - num_static_channels - 3 - int(use_depth), ceil(num_frames/temporal_coarseness), frame_size[1] // upsample_size, frame_size[0] // upsample_size)
                 spatiotemporal_noise_upsampled = F.interpolate(spatiotemporal_noise.unsqueeze(0), (num_frames, frame_size[1], frame_size[0]), mode='trilinear')[0]
                 self.spatiotemporal_noise = torch.cat((self.spatial_noise_upsampled[:num_static_channels].unsqueeze(1).repeat(1, num_frames, 1, 1), spatiotemporal_noise_upsampled))

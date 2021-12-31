@@ -147,7 +147,7 @@ class DecompositeLoss(nn.Module):
 
             loss = self.lambda_dynamics_reg_l1.value * torch.mean(loss) #+ self.lambda_dynamics_reg_l0.value * torch.mean((torch.sigmoid(loss * 5.0) - 0.5) * 2.0)
 
-            return loss
+        return loss
 
     def cal_alpha_reg(self, prediction: torch.Tensor) -> torch.Tensor:
         """
