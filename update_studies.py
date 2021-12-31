@@ -1,8 +1,5 @@
 import json
-import pprint as prettyprint
-
-pp = prettyprint.PrettyPrinter(indent=2)
-pprint = pp.pprint
+from math import ceil
 
 dicts = {}
 
@@ -22,16 +19,13 @@ for line in data:
 
         study, setting = identifier.split("__")
     
-        if not "times" in dicts[study]["configs"][setting].keys():
-            dicts[study]["configs"][setting]["times"] = {video: t}
+        if not "sec_per_epoch" in dicts[study]["configs"][setting].keys():
+            dicts[study]["configs"][setting]["sec_per_epoch"] = {video: ceil(float(t))}
         else:
-            dicts[study]["configs"][setting]["times"][video] = t
-        
-        if not "times" in dicts[study]["videos"][video].keys():
-            dicts[study]["videos"][video]["times"] = {setting: t}
-        else:
-            dicts[study]["videos"][video]["times"][setting] = t
+            dicts[study]["configs"][setting]["sec_per_epoch"][video] = ceil(float(t))
+    else:
+        print(line)
 
 for study in studies:
-    with open(f"job_scripts/experiments/{study}_updated.json", "w") as f:
-        json.dump(dicts[study], f)
+    with open(f"job_scripts/experiments/{study}.json", "w") as f:
+        json.dump(dicts[study], f, indent=4) 
