@@ -94,7 +94,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
                 rgba, flow = self.render_background(layer_input, global_context)
                 if full_static_bg is None:
-                    full_static_bg = torch.clone(rgba[:, :3, 0]).detach().cpu()
+                    full_static_bg = torch.clone(rgba[:, :3, 0]).detach()
                 rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 if self.do_adjustment:
                     rgba = self._apply_background_offset(rgba, background_offset)
@@ -628,7 +628,7 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
 
                 rgba, flow = self.render_background(layer_input)
                 if full_static_bg is None:
-                    full_static_bg = torch.clone(rgba[:, :3, 0]).detach().cpu()
+                    full_static_bg = torch.clone(rgba[:, :3, 0]).detach()
                 rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 if self.do_adjustment:
                     rgba = self._apply_background_offset(rgba, background_offset)
