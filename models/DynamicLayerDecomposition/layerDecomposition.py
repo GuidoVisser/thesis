@@ -82,7 +82,7 @@ class LayerDecompositer(nn.Module):
                 t1 = datetime.now()
                 print(f"Epoch: {epoch} / {self.n_epochs - 1} done in {(t1 - t0).total_seconds()} seconds")           
 
-
+        print(sum(t_avg) / len(t_avg))
         with open(path.join(self.results_root, "time.txt"), "w") as f:
             f.write(str(sum(t_avg) / len(t_avg)))
 
