@@ -47,7 +47,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 128 \
             --timesteps 4 \
             --description 'The optical flow is not used in the input of the network' \
-            --no_flow 
+            --lambda_recon_flow 0.0
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
