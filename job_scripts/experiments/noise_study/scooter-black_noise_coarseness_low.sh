@@ -46,14 +46,15 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'A fully 2D convolutional encoder decoder network' \
-            --model_setup 6
+            --description 'No upsampling is done' \
+            --noise_upsample_size 64 \
+            --noise_temporal_coarseness 8
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__fully_2d
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__fully_2d
+mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__noise_study__noise_coarseness_low
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__noise_study__noise_coarseness_low
 
 read -r t<$TMPDIR/output_dir/time.txt
-echo $SLURM_JOBID $VIDEO 3d_conv_study__fully_2d $t >> $HOME/thesis/times.txt
+echo $SLURM_JOBID $VIDEO noise_study__noise_coarseness_low $t >> $HOME/thesis/times.txt

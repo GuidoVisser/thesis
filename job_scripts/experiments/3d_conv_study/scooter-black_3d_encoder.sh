@@ -57,4 +57,4 @@ mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_
 cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__3d_encoder
 
 read -r t<$TMPDIR/output_dir/time.txt
-echo $VIDEO 3d_conv_study__3d_encoder $t >> $HOME/thesis/times.txt
+echo $SLURM_JOBID $VIDEO 3d_conv_study__3d_encoder $t >> $HOME/thesis/times.txt

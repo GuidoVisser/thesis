@@ -46,14 +46,14 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 128 \
             --timesteps 4 \
-            --description 'A fully 2D convolutional encoder decoder network' \
-            --model_setup 6
+            --description 'The optical flow is not used in the input of the network' \
+            --lambda_recon_flow 1.0 500 0.0
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__fully_2d
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__3d_conv_study__fully_2d
+mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__optical_flow_study__flow_rolloff
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__optical_flow_study__flow_rolloff
 
 read -r t<$TMPDIR/output_dir/time.txt
-echo $SLURM_JOBID $VIDEO 3d_conv_study__fully_2d $t >> $HOME/thesis/times.txt
+echo $SLURM_JOBID $VIDEO optical_flow_study__flow_rolloff $t >> $HOME/thesis/times.txt
