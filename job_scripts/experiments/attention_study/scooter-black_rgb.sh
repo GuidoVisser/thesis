@@ -53,8 +53,8 @@ python $HOME/thesis/run_layer_decomposition.py \
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__attention_study__rgb
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__attention_study__rgb
+mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO_$SLURM_JOBID_attention_study__rgb
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO_$SLURM_JOBID_attention_study__rgb
 
 read -r t<$TMPDIR/output_dir/time.txt
 echo $SLURM_JOBID $VIDEO attention_study__rgb $t >> $HOME/thesis/times.txt

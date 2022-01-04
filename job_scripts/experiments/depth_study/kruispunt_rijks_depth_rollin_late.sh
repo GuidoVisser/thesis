@@ -55,8 +55,8 @@ python $HOME/thesis/run_layer_decomposition.py \
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__depth_study__depth_rollin_late
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO__$SLURM_JOBID__depth_study__depth_rollin_late
+mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO_$SLURM_JOBID_depth_study__depth_rollin_late
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO_$SLURM_JOBID_depth_study__depth_rollin_late
 
 read -r t<$TMPDIR/output_dir/time.txt
 echo $SLURM_JOBID $VIDEO depth_study__depth_rollin_late $t >> $HOME/thesis/times.txt
