@@ -53,8 +53,8 @@ python $HOME/thesis/run_layer_decomposition.py \
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO_$SLURM_JOBID_3d_conv_study__3d_encoder
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO_$SLURM_JOBID_3d_conv_study__3d_encoder
+mkdir -p $HOME/thesis/results/layer_decomposition/${VIDEO}_${SLURM_JOBID}_3d_conv_study__3d_encoder
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/${VIDEO}_${SLURM_JOBID}_3d_conv_study__3d_encoder
 
 read -r t<$TMPDIR/output_dir/time.txt
 echo $SLURM_JOBID $VIDEO 3d_conv_study__3d_encoder $t >> $HOME/thesis/times.txt

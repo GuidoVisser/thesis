@@ -14,7 +14,7 @@ def generate_script(config, video, identifier):
     print(time_estimate)
 
     header = f"""#!/bin/bash \n\n#SBATCH -n 1\n#SBATCH -t {time_estimate}\n#SBATCH -p gpu\n#SBATCH --gpus-per-node=gtx1080ti:4\n\n# get start time of script\nDT=`date +"%m_%d_%H_%M_%S"`\n\n# load modules\nmodule load 2020\nmodule load Python/3.8.2-GCCcore-9.3.0\n\n# install dependencies\npip install --user --upgrade torch && pip install --user --upgrade torchvision\n\n"""
-    footer = f"""\n\necho "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log\n\n#Copy output directory from scratch to home\nmkdir -p $HOME/thesis/results/layer_decomposition/$VIDEO_$SLURM_JOBID_{identifier}\ncp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/$VIDEO_$SLURM_JOBID_{identifier}\n\nread -r t<$TMPDIR/output_dir/time.txt\necho $SLURM_JOBID $VIDEO {identifier} $t >> $HOME/thesis/times.txt"""
+    footer = f"""\n\necho "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log\n\n#Copy output directory from scratch to home\nmkdir -p $HOME/thesis/results/layer_decomposition/${{VIDEO}}_${{SLURM_JOBID}}_{identifier}\ncp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/${{VIDEO}}_${{SLURM_JOBID}}_{identifier}\n\nread -r t<$TMPDIR/output_dir/time.txt\necho $SLURM_JOBID $VIDEO {identifier} $t >> $HOME/thesis/times.txt"""
 
     mask_copying="\n".join([f"mkdir $TMPDIR/{i:02}\ncp -RT $HOME/thesis/datasets/{video.dataset}/Annotations/$VIDEO/{i:02}/{mask_path} $TMPDIR/{i:02}/{mask_path}" for i, mask_path in enumerate(video.mask_paths)])
     mask_argument=" ".join([f"$TMPDIR/{i:02}/{mask_path}" for i, mask_path in enumerate(video.mask_paths)])
@@ -37,33 +37,34 @@ def generate_master_script(outdir, config):
     return header + forloop
 
 def main(args):
-    outdir = path.join(args.root, args.experiments.split(".")[0])
-    makedirs(outdir, exist_ok=True)
+    for experiment_path in args.experiments:
+        outdir = path.join(args.root, experiment_path.split(".")[0])
+        makedirs(outdir, exist_ok=True)
 
-    with open(f"{args.root}/{args.experiments}", "r") as f:
-        data = EasyDict(json.load(f))
+        with open(f"{args.root}/{experiment_path}", "r") as f:
+            data = EasyDict(json.load(f))
 
-    videos = data.videos
-    setups = data.configs
+        videos = data.videos
+        setups = data.configs
 
-    for video, vid_data in videos.items():
-        for name, exp in setups.items():
-            experiment = EasyDict(exp)
-            vid_data = EasyDict(vid_data)
-            vid_data.name = video
+        for video, vid_data in videos.items():
+            for name, exp in setups.items():
+                experiment = EasyDict(exp)
+                vid_data = EasyDict(vid_data)
+                vid_data.name = video
 
-            with open(f"{outdir}/{video}_{name}.sh", "w") as f:
-                identifier = args.experiments.split(".")[0] + "__" + name
-                f.write(generate_script(experiment, vid_data, identifier))
+                with open(f"{outdir}/{video}_{name}.sh", "w") as f:
+                    identifier = experiment_path.split(".")[0] + "__" + name
+                    f.write(generate_script(experiment, vid_data, identifier))
 
-    with open(f"{outdir}/master.sh", "w") as f:
-        f.write(generate_master_script(outdir, data))
+        with open(f"{outdir}/master.sh", "w") as f:
+            f.write(generate_master_script(outdir, data))
 
 if __name__ == "__main__":
     parser = ArgumentParser()
 
     parser.add_argument("--root", type=str, default="job_scripts/experiments", help="root directory of the experiment scripts")
-    parser.add_argument("--experiments", type=str, default="alpha_study.json", help="path to json file containing experiment configurations")
+    parser.add_argument("--experiments", nargs="+", default=["alpha_study.json", "3d_conv_study.json", "attention_study.json", "optical_flow_study.json", "depth_study.json", "noise_study.json"], help="paths to json files containing experiment configurations")
 
     args = parser.parse_args()
 
