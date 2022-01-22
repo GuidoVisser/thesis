@@ -34,7 +34,10 @@ class DepthHandler(object):
         self.device = device
 
         self.model = Resnet18_md(num_in_layers=3).to(self.device).eval()
-        self.model.load_state_dict(torch.load(model_path))
+        if torch.cuda.device_count == 0:
+            self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
+        else:
+            self.model.load_state_dict(torch.load(model_path))
 
         # Load data
         self.frame_size = frame_size

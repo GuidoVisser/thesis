@@ -89,7 +89,10 @@ class TopKSTM(nn.Module):
         self.val_memory.reset()
 
     def load_pretrained(self, model_path: str) -> None:
-        self.prop_net.load_state_dict(torch.load(model_path))
+        if torch.cuda.device_count == 0:
+            self.prop_net.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+        else:
+            self.prop_net.load_state_dict(torch.load(model_path))
 
 
 class Memory(object):

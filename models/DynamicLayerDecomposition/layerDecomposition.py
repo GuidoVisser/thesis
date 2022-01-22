@@ -100,7 +100,8 @@ class LayerDecompositer(nn.Module):
 
             # set targets to the same device as the output
             device = next(iter(output.values())).get_device()
-            targets = {k:v.to(device) for (k, v) in targets.items()}
+            if not device == -1:
+                targets = {k:v.to(device) for (k, v) in targets.items()}
 
             # Do detail transfer
             reconstruction = output["rgba_reconstruction"]

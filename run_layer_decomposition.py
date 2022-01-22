@@ -346,7 +346,7 @@ if __name__ == "__main__":
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
-    parser.add_argument("--model_setup", type=int, default=9, help="id of model setup")
+    parser.add_argument("--model_setup", type=int, default=4, help="id of model setup")
     parser.add_argument("--memory_setup", type=int, default=1, help="id of memory input setup")
 
     dataset = "Videos"
@@ -417,11 +417,11 @@ if __name__ == "__main__":
 
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
-    pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/propagation_model.pth", 
+    pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/topkstm.pth", 
         help="path to the weights of the mask propagation model")
-    pretrained_model_args.add_argument("--flow_model", type=str, default="models/third_party/weights/raft-things.pth",
+    pretrained_model_args.add_argument("--flow_model", type=str, default="models/third_party/weights/raft.pth",
         help="path to the weights of the optical flow estimation model")
-    pretrained_model_args.add_argument("--depth_model", type=str, default="models/third_party/weights/monodepth_resnet18_001.pth",
+    pretrained_model_args.add_argument("--depth_model", type=str, default="models/third_party/weights/monodepth.pth",
         help="path to the weights of the depth estimation model")
 
     args = parser.parse_args()
