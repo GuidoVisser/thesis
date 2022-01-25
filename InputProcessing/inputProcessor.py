@@ -73,12 +73,8 @@ class InputProcessor(object):
         self.depth_handler      = depth_handler
         self.background_volume  = background_volume
 
-
         # Load a custom compositing order if it's given, otherwise initialize a new one
         self._initialize_composite_order(args.composite_order)
-
-        # placeholder for memory input
-        # self.memory_input = self.construct_memory_input(args.memory_input_type, args.shared_backbone)
         
     def __getitem__(self, idx):
         """
@@ -127,18 +123,17 @@ class InputProcessor(object):
             background_noise = self.background_volume.spatial_noise_upsampled
             background_noise = background_noise.unsqueeze(0).unsqueeze(2).repeat(1, 1, self.timesteps, 1, 1) 
 
-        background_uv_maps = []
-        for frame_idx in range(idx, idx+self.timesteps):
-            background_uv_maps.append(self.homography_handler.get_frame_uv(frame_idx))
-        background_uv_map  = torch.stack(background_uv_maps)
+        # UV maps for sampling the static background
+        background_uv_map = self.homography_handler.uv_maps[idx:idx+self.timesteps]
+        
+        # add uniform sampling in time dimension to background uv map if necessary
+        if self.use_3d:
+            t = torch.linspace(-1, 1, self.timesteps).unsqueeze(1).unsqueeze(1).unsqueeze(1).repeat(1, self.frame_size[1], self.frame_size[0], 1)
+            background_uv_map = torch.cat((background_uv_map, t), dim=-1)
 
         # Get spatiotemporal noise input
-        # spatiotemporal_noise:   [C-4, F, H, W]
-        # spatiotemporal_noise_t: [C-4, T, H, W]
-        spatiotemporal_noise = self.background_volume.spatiotemporal_noise 
-
-        # NOTE: time dimension is treated as batch dimension in grid_sample because we want to only sample in spatial dimensions
-        spatiotemporal_noise_t = F.grid_sample(spatiotemporal_noise[:, idx:idx+self.timesteps].permute(1, 0, 2, 3), background_uv_map).permute(1, 0, 2, 3)
+        # spatiotemporal_noise:   [C-4, T, H, W]
+        spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, idx:idx+self.timesteps].unsqueeze(0)
 
         ### Temp code ###
 
@@ -165,65 +160,63 @@ class InputProcessor(object):
 
         #################
 
-        # add uniform sampling in time dimension to background uv map if necessary
-        if self.use_3d:
-            t = torch.linspace(-1, 1, self.timesteps).unsqueeze(1).unsqueeze(1).unsqueeze(1).repeat(1, self.frame_size[1], self.frame_size[0], 1)
-
-            background_uv_map = torch.cat((background_uv_map, t), dim=-1)
-
         # Construct query input        
-        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)                         # [L-b, 1, T, H, W] 
+        # [L-b, 1, T, H, W]
+        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)
         if self.use_depth:
-            query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)), dim=1) # [L-b, C, T, H, W]
+            # [L-b, C, T, H, W]
+            query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise.expand(self.N_layers - self.num_bg_layers, -1, -1, -1, -1)), dim=1)
         else:
-            query_input = torch.cat((pids, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)), dim=1) # [L-b, C, T, H, W]
+            # [L-b, C, T, H, W]
+            query_input = torch.cat((pids, object_flow, spatiotemporal_noise.expand(self.N_layers - self.num_bg_layers, -1, -1, -1, -1)), dim=1)
 
         zeros_channels = 4 if self.use_depth else 3
         zeros = torch.zeros((1, zeros_channels, self.timesteps, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [1, 4, T, H, W]
         if self.num_bg_layers == 2:
-            static_background_input  = torch.cat((zeros, background_noise), dim=1)                                # [1, C, T, H, W]
-            dynamic_background_input = torch.cat((zeros, spatiotemporal_noise_t.unsqueeze(0)), dim=1)             # [1, C, T, H, W]
-            background_input = torch.cat((static_background_input, dynamic_background_input))
+            static_background_input  = torch.cat((zeros, background_noise), dim=1)            # [1, C, T, H, W]
+            dynamic_background_input = torch.cat((zeros, spatiotemporal_noise), dim=1)        # [1, C, T, H, W]
+            background_input = torch.cat((static_background_input, dynamic_background_input)) # [2, C, T, H, W]
         else:
-            background_input = torch.cat((zeros, spatiotemporal_noise_t.unsqueeze(0)), dim=1)                     # [1, C, T, H, W]            
+            # [1, C, T, H, W]
+            background_input = torch.cat((zeros, spatiotemporal_noise), dim=1)
 
         query_input = torch.cat((background_input, query_input)) # [L, C, T, H, W]
 
-        # get parameters for jitter
-        params = self.get_jitter_parameters()
-            
-        # transform targets
-        rgb       = self.apply_jitter_transform(rgb,       params)
-        flow      = self.apply_jitter_transform(flow,      params)
-        masks     = self.apply_jitter_transform(masks,     params)
-        flow_conf = self.apply_jitter_transform(flow_conf, params)
-        if self.use_depth:
-            depth = self.apply_jitter_transform(depth,     params)
-
-
-        # transform inputs
-        query_input       = self.apply_jitter_transform(query_input,     params)
-        background_flow   = self.apply_jitter_transform(background_flow, params)
-        background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params)
-        background_uv_map = background_uv_map.permute(0, 2, 3, 1)
-
-        # rescale flow values to conform to new image size
-        scale_w = params['jitter size'][1] / self.frame_size[0]
-        scale_h = params['jitter size'][0] / self.frame_size[1]
-
-        flow[0] *= scale_w
-        flow[1] *= scale_h
-        background_flow[0] *= scale_w
-        background_flow[1] *= scale_h
-        query_input[:, 1] *= scale_w
-        query_input[:, 2] *= scale_h
-
-        # create jitter grid for background offset and brightness scaling
+        # create base grid for background offset and brightness scaling
         if self.use_3d:
-            jitter_grid = self.initialize_3d_jitter_grid()
+            adjustment_grid = self.initialize_3d_adjustment_grid()
         else:
-            jitter_grid = self.initialize_2d_jitter_grid()
-        jitter_grid = self.apply_jitter_transform(jitter_grid, params)
+            adjustment_grid = self.initialize_2d_adjustment_grid()
+
+        # get parameters for jitter
+        params, apply_jitter = self.get_jitter_parameters()
+    
+        if apply_jitter:
+            # transform targets
+            rgb       = self.apply_jitter_transform(rgb,       params)
+            flow      = self.apply_jitter_transform(flow,      params)
+            masks     = self.apply_jitter_transform(masks,     params)
+            flow_conf = self.apply_jitter_transform(flow_conf, params)
+            if self.use_depth:
+                depth = self.apply_jitter_transform(depth,     params)
+
+            # transform inputs
+            query_input       = self.apply_jitter_transform(query_input,     params)
+            background_flow   = self.apply_jitter_transform(background_flow, params)
+            adjustment_grid   = self.apply_jitter_transform(adjustment_grid, params)
+            background_uv_map = self.apply_jitter_transform(background_uv_map.permute(0, 3, 1, 2), params)
+            background_uv_map = background_uv_map.permute(0, 2, 3, 1)
+            
+            # rescale flow values to conform to new image size
+            scale_w = params['jitter size'][1] / self.frame_size[0]
+            scale_h = params['jitter size'][0] / self.frame_size[1]
+
+            flow[0] *= scale_w
+            flow[1] *= scale_h
+            background_flow[0] *= scale_w
+            background_flow[1] *= scale_h
+            query_input[:, 1] *= scale_w
+            query_input[:, 2] *= scale_h
 
         targets = {
             "rgb": rgb,
@@ -235,12 +228,11 @@ class InputProcessor(object):
         if self.use_depth:
             targets["depth"] = depth
 
-        # TODO: remove memory input
         model_input = {
             "query_input": query_input,
             "background_flow": background_flow,
             "background_uv_map": background_uv_map,
-            "jitter_grid": jitter_grid,
+            "adjustment_grid": adjustment_grid,
             "index": torch.arange(idx, idx + self.timesteps).long(),
         }
 
@@ -248,61 +240,6 @@ class InputProcessor(object):
 
     def __len__(self):
         return len(self.frame_iterator) - self.timesteps
-
-    # def construct_memory_input(self, memory_input_type: str, shared_backbone: bool) -> torch.Tensor:
-    #     """
-    #     Construct the memory input of the video
-
-    #     There are four configurations, sometimes with a special version supporting a shared memory and query encoder backbone:
-    #         1. Only rgb (shared backbone not possible)
-    #         2. rgb + depth + flow (shared backbone not possible)
-    #         3. Only noise
-    #         4. noise + depth + flow
-
-    #     Args:
-    #         memory_input_config (dict): dictionary containing the configuration for the memory input
-
-    #     Returns:
-    #         memory_input (torch.Tensor): Tensor used as memory input throughout the full training
-    #     """
-
-    #     if memory_input_type == "rgb":
-    #         memory_input = self.frame_iterator[:len(self.flow_handler)]                # [3, F-1, H, W]
-        
-    #     elif memory_input_type == "rgb+":
-    #         rgb_input           = self.frame_iterator[:len(self.flow_handler)]         # [3, F-1, H, W]
-    #         flow_input, _, _, _ = self.flow_handler[:len(self.flow_handler)]           # [2, F-1, H, W]
-
-    #         if self.use_depth:
-    #             depth_input, _      = self.depth_handler[:len(self.flow_handler)]      # [1, F-1, H, W]
-    #             memory_input        = torch.cat((rgb_input, flow_input, depth_input))  # [6, F-1, H, W]
-    #         else:
-    #             memory_input        = torch.cat((rgb_input, flow_input))               # [5, F-1, H, W]
-        
-    #     elif memory_input_type == "noise+":
-    #         noise_input         = self.background_volume.spatiotemporal_noise[:, :-1]  # [C-4, F-1, H, W]
-    #         flow_input, _, _, _ = self.flow_handler[:len(self.flow_handler)]           # [  2, F-1, H, W]
-            
-    #         if self.use_depth:
-    #             depth_input, _  = self.depth_handler[:len(self.flow_handler)]          # [  1, F-1, H, W]
-    #             memory_input    = torch.cat((depth_input, flow_input, noise_input))    # [C,   F-1, H, W]
-    #         else:
-    #             memory_input    = torch.cat((flow_input, noise_input))                 # [C,   F-1, H, W]
-                  
-    #         if shared_backbone:
-    #             mask_padding = torch.zeros_like(noise_input[:1])                       # [  1, F-1, H, W]
-    #             memory_input = torch.cat((mask_padding, memory_input))                 # [C,   F-1, H, W]
-
-    #     elif memory_input_type == "noise":
-    #         memory_input  = self.background_volume.spatiotemporal_noise                # [C-4, F-1, H, W]
-        
-    #         if shared_backbone:
-    #             added_channels = 3 + int(self.use_depth)
-
-    #             padding = torch.zeros_like(memory_input[:added_channels])              # [4, F-1, H, W]
-    #             memory_input = torch.cat((padding, memory_input))                      # [C, F-1, H, W]
-
-    #     return memory_input
 
     def get_rgb_layers(self, rgb, masks):
         """
@@ -337,12 +274,12 @@ class InputProcessor(object):
 
         return flow * masks        
 
-    def initialize_2d_jitter_grid(self):
+    def initialize_2d_adjustment_grid(self):
         u = torch.linspace(-1, 1, steps=self.frame_size[0]).unsqueeze(0).repeat(self.frame_size[1], 1)
         v = torch.linspace(-1, 1, steps=self.frame_size[1]).unsqueeze(-1).repeat(1, self.frame_size[0])
         return torch.stack([u, v], 0).unsqueeze(0).repeat(2, 1, 1, 1)
 
-    def initialize_3d_jitter_grid(self):
+    def initialize_3d_adjustment_grid(self):
         t = torch.linspace(-1, 1, steps=self.timesteps).unsqueeze(1).unsqueeze(1).repeat(1, self.frame_size[1], self.frame_size[0])
         u = torch.linspace(-1, 1, steps=self.frame_size[0]).unsqueeze(0).unsqueeze(0).repeat(self.timesteps, self.frame_size[1], 1)
         v = torch.linspace(-1, 1, steps=self.frame_size[1]).unsqueeze(0).unsqueeze(-1).repeat(self.timesteps, 1, self.frame_size[0])
@@ -387,19 +324,15 @@ class InputProcessor(object):
 
         width, height = self.frame_size
 
-        if self.do_jitter:
+        if self.do_jitter and np.random.uniform() < self.jitter_rate:
 
-            # get scale
-            if np.random.uniform() > self.jitter_rate:
-                scale = 1.
-            else:
-                scale = np.random.uniform(1, 1.25)
-            
-            # construct jitter
+            apply_jitter = True
+            scale = np.random.uniform(1, 1.25)
             jitter_size = (scale * np.array([height, width])).astype(np.int)
             start_h = np.random.randint(jitter_size[0] - height + 1)
             start_w = np.random.randint(jitter_size[1] - width  + 1)
         else:
+            apply_jitter = False
             jitter_size = np.array([height, width])
             start_h = 0
             start_w = 0
@@ -413,7 +346,7 @@ class InputProcessor(object):
             "crop size": crop_size
         }
 
-        return params
+        return params, apply_jitter
 
     def _prepare_image_dir(self, video_dir, out_dir):
         """
@@ -503,39 +436,24 @@ class ContextDataset(object):
             b: The number of background layers (1 if only static, 2 if also dynamic)
 
         """
-        # Get mask input
-        # binary_masks: [L-b, C, H, W]
-        _, binary_masks = self.mask_handler[idx] 
-
-        # Get optical flow input and confidence
-        # object_flow:     [L-b, C, H, W]
-        _, _, object_flow, _ = self.flow_handler[idx] 
-
-        # Get depth input
-        # object_depth: [L-b, C, H, W]
+        # Get inputs
+        _, binary_masks = self.mask_handler[idx]      # [L-b, C, H, W]
+        _, _, object_flow, _ = self.flow_handler[idx] # [L-b, C, H, W]
         if self.use_depth:
-            _, object_depth = self.depth_handler[idx]
-
-        # Get spatial noise input if a separate static background is used
-        # background_noise:  [1, C-4, H, W]
-        # background_uv_map: [1, H, W, 2]
-        background_uv_map  = self.homography_handler.get_frame_uv(idx).unsqueeze(0)
-
-        # Get spatiotemporal noise input
-        # spatiotemporal_noise_t: [C-4, H, W]
-        spatiotemporal_noise_t = F.grid_sample(self.background_volume.spatiotemporal_noise[:, idx].unsqueeze(0), background_uv_map).squeeze(0)
+            _, object_depth = self.depth_handler[idx] # [L-b, C, H, W]
+        spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, idx].unsqueeze(0) # [C-4, H, W]
 
         # Construct query input        
-        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - 1, 1, 1, 1)                         # [L-b, 1, H, W] 
+        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - 1, 1, 1, 1) # [L-b, 1, H, W] 
         if self.use_depth:
-            query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - 1, 1, 1, 1)), dim=1) # [L-b, C, H, W]
+            query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise.expand(self.N_layers - 1, -1, -1, -1)), dim=1) # [L-b, C, H, W]
         else:
-            query_input = torch.cat((pids, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - 1, 1, 1, 1)), dim=1) # [L-b, C, H, W]
+            query_input = torch.cat((pids, object_flow, spatiotemporal_noise.expand(self.N_layers - 1, -1, -1, -1)), dim=1) # [L-b, C, H, W]
 
         zeros_channels = 4 if self.use_depth else 3
         zeros = torch.zeros((1, zeros_channels, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [1, 4, H, W]
 
-        dynamic_background_input = torch.cat((zeros, spatiotemporal_noise_t.unsqueeze(0)), dim=1) # [1, C, H, W]
+        dynamic_background_input = torch.cat((zeros, spatiotemporal_noise), dim=1) # [1, C, H, W]
 
         query_input = torch.cat((dynamic_background_input, query_input)) # [L, C, H, W]
 

@@ -171,7 +171,7 @@ class ExperimentRunner(object):
         flow_handler       = FlowHandler(frame_iterator, mask_handler, flow_dir, raft_weights=self.args.flow_model, device=self.args.device, iters=50)
         homography_handler = HomographyHandler(self.args.out_dir, img_dir, path.join(flow_dir, "dynamics_mask"), self.args.device, (self.args.frame_width, self.args.frame_height))
         depth_handler      = DepthHandler(img_dir, depth_dir, self.args, mask_handler)
-        background_volume  = BackgroundVolume(background_dir, len(frame_iterator), self.args)
+        background_volume  = BackgroundVolume(background_dir, homography_handler, self.args)
 
 
         input_processor = InputProcessor(
@@ -411,7 +411,7 @@ if __name__ == "__main__":
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
-    parser.add_argument("--model_setup", type=int, default=8, help="id of model setup")
+    parser.add_argument("--model_setup", type=int, default=4, help="id of model setup")
     parser.add_argument("--memory_setup", type=int, default=1, help="id of memory input setup")
 
     dataset = "Videos"

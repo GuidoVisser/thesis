@@ -67,7 +67,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         query_input       = input["query_input"]
         background_flow   = input["background_flow"]
         background_uv_map = input["background_uv_map"]
-        jitter_grid       = input["jitter_grid"]
+        adjustment_grid       = input["adjustment_grid"]
         index             = input["index"]
 
         B, L, C, T, H, W = query_input.shape
@@ -80,8 +80,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        background_offset = self.get_background_offset(jitter_grid, index)
-        brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
+        background_offset = self.get_background_offset(adjustment_grid, index)
+        brightness_scale  = self.get_brightness_scale(adjustment_grid, index) 
 
         full_static_bg = None
 
@@ -137,35 +137,35 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         }
         return out
     
-    def get_background_offset(self, jitter_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+    def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
         Get the background offset of the current set of frames
 
         Args:
-            jitter_grid (torch.Tensor): sampling grid to apply jitter to the offset
+            adjustment_grid (torch.Tensor): sampling grid to apply jitter to the offset
             index (torch.Tensor):       tensor containing relevant frame indices
         """
         background_offset = F.interpolate(self.bg_offset, (self.max_frames, 4, 7), mode="trilinear")
-        background_offset = background_offset[:, :, index].repeat(jitter_grid.shape[0], 1, 1, 1, 1)
-        background_offset = F.grid_sample(background_offset, jitter_grid.permute(0, 2, 3, 4, 1), align_corners=True)
+        background_offset = background_offset[:, :, index].repeat(adjustment_grid.shape[0], 1, 1, 1, 1)
+        background_offset = F.grid_sample(background_offset, adjustment_grid.permute(0, 2, 3, 4, 1), align_corners=True)
         
         # There is no offset in temporal dimension, so add zeros tensor
         background_offset = torch.cat((torch.zeros_like(background_offset[:, 0:1]), background_offset), dim=1)
 
         return background_offset
 
-    def get_brightness_scale(self, jitter_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+    def get_brightness_scale(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
         Get the brightness scaling tensor of the current set of frames
 
         Args:
-            jitter_grid (torch.Tensor): sampling grid to apply jitter to the offset
+            adjustment_grid (torch.Tensor): sampling grid to apply jitter to the offset
             index (torch.Tensor):       tensor containing relevant frame indices
         """
 
         brightness_scale = F.interpolate(self.brightness_scale, (self.max_frames, 4, 7), mode='trilinear', align_corners=True)
-        brightness_scale = brightness_scale[:, :, index].repeat(jitter_grid.shape[0], 1, 1, 1, 1)
-        brightness_scale = F.grid_sample(brightness_scale, jitter_grid.permute(0, 2, 3, 4, 1), align_corners=True)
+        brightness_scale = brightness_scale[:, :, index].repeat(adjustment_grid.shape[0], 1, 1, 1, 1)
+        brightness_scale = F.grid_sample(brightness_scale, adjustment_grid.permute(0, 2, 3, 4, 1), align_corners=True)
 
         return brightness_scale
 
@@ -604,7 +604,7 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
         query_input       = input["query_input"]
         background_flow   = input["background_flow"]
         background_uv_map = input["background_uv_map"]
-        jitter_grid       = input["jitter_grid"]
+        adjustment_grid       = input["adjustment_grid"]
         index             = input["index"]
 
         B, L, C, T, H, W = query_input.shape
@@ -617,8 +617,8 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        background_offset = self.get_background_offset(jitter_grid, index)
-        brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
+        background_offset = self.get_background_offset(adjustment_grid, index)
+        brightness_scale  = self.get_brightness_scale(adjustment_grid, index) 
 
         full_static_bg = None
 
@@ -833,7 +833,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
         query_input       = input["query_input"]
         background_flow   = input["background_flow"]
         background_uv_map = input["background_uv_map"]
-        jitter_grid       = input["jitter_grid"]
+        adjustment_grid       = input["adjustment_grid"]
         index             = input["index"]
 
         B, L, C, T, H, W = query_input.shape
@@ -853,10 +853,10 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        jitter_grid = self.reorder_time2batch(jitter_grid)
+        adjustment_grid = self.reorder_time2batch(adjustment_grid)
 
-        background_offset = self.get_background_offset(jitter_grid, index)
-        brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
+        background_offset = self.get_background_offset(adjustment_grid, index)
+        brightness_scale  = self.get_brightness_scale(adjustment_grid, index) 
 
         for i in range(L):
             layer_input = query_input[:, i]
@@ -926,31 +926,31 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
         }
         return out
 
-    def get_background_offset(self, jitter_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+    def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
         Get the background offset of the current set of frames
 
         Args:
-            jitter_grid (torch.Tensor): sampling grid to apply jitter to the offset
+            adjustment_grid (torch.Tensor): sampling grid to apply jitter to the offset
             index (torch.Tensor):       tensor containing relevant frame indices
         """
         background_offset = F.interpolate(self.bg_offset, (self.max_frames, 4, 7), mode="trilinear")
         background_offset = background_offset[0, :, index].transpose(0, 1)
-        background_offset = F.grid_sample(background_offset, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+        background_offset = F.grid_sample(background_offset, adjustment_grid.permute(0, 2, 3, 1), align_corners=True)
 
         return background_offset
 
-    def get_brightness_scale(self, jitter_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+    def get_brightness_scale(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
         Get the brightness scaling tensor of the current set of frames
 
         Args:
-            jitter_grid (torch.Tensor): sampling grid to apply jitter to the offset
+            adjustment_grid (torch.Tensor): sampling grid to apply jitter to the offset
             index (torch.Tensor):       tensor containing relevant frame indices
         """
         brightness_scale = F.interpolate(self.brightness_scale, (self.max_frames, 4, 7), mode='trilinear', align_corners=True)
         brightness_scale = brightness_scale[0, 0, index].unsqueeze(1)
-        brightness_scale = F.grid_sample(brightness_scale, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+        brightness_scale = F.grid_sample(brightness_scale, adjustment_grid.permute(0, 2, 3, 1), align_corners=True)
 
         return brightness_scale
 
@@ -988,7 +988,7 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
         query_input       = input["query_input"]
         background_flow   = input["background_flow"]
         background_uv_map = input["background_uv_map"]
-        jitter_grid       = input["jitter_grid"]
+        adjustment_grid       = input["adjustment_grid"]
         index             = input["index"]
 
         B, L, C, T, H, W = query_input.shape
@@ -1002,8 +1002,8 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        background_offset = self.get_background_offset(jitter_grid, index)
-        brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
+        background_offset = self.get_background_offset(adjustment_grid, index)
+        brightness_scale  = self.get_brightness_scale(adjustment_grid, index) 
 
         for i in range(L):
             layer_input = query_input[:, i]
@@ -1396,82 +1396,6 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
 
         return rgba, flow, depth
 
-    # def render(self, x: torch.Tensor):
-    #     """
-    #     Pass inputs of a single layer through the network
-
-    #     Parameters:
-    #         x (torch.Tensor):       sampled texture concatenated with person IDs
-    #         context (torch.Tensor): a context tensor read from the attention memory of the corresponding object layer
-
-    #     Returns RGBa for the input layer and the final feature maps.
-    #     """
-    #     T = x.shape[-3]
-
-    #     outputs = []
-    #     skips = []
-    #     for t in range(T):
-    #         global_features, x_t, skips_t = self.memory_reader(x[..., t, :, :], global_context)
-
-    #         x_t = torch.cat((global_features, x_t), dim=1)
-            
-    #         outputs.append(x_t)
-    #         skips.append(skips_t)
-
-    #     x = torch.stack(outputs, dim=-3)
-
-    #     x = self.dynamics_layer(x)
-
-    #     rgba  = []
-    #     flow  = []
-    #     depth = []
-    #     for t in range(T):
-    #         # decoding
-    #         x_t = x[..., t, :, :]
-    #         skips_t = skips[t]
-
-    #         for layer in self.decoder:
-    #             x_t = torch.cat((x_t, skips_t.pop()), 1)
-    #             x_t = layer(x_t)
-        
-    #         # finalizing render
-    #         rgba.append(self.final_rgba(x_t))
-    #         flow.append(self.final_flow(x_t))
-    #         depth.append(self.final_depth(x_t))
-
-    #     rgba  = torch.stack(rgba, dim=-3)
-    #     flow  = torch.stack(flow, dim=-3)
-    #     depth = torch.stack(depth, dim=-3)
-
-    #     return rgba, flow, depth
-
-    # def render_background(self, x: torch.Tensor):
-    #     """
-    #     Pass inputs of a single layer through the network
-
-    #     Parameters:
-    #         x (torch.Tensor):       sampled texture concatenated with person IDs
-    #         context (torch.Tensor): a context tensor read from the attention memory of the corresponding object layer
-
-    #     Returns RGBa for the input layer and the final feature maps.
-    #     """
-
-    #     _, _, T, _, _ = x.shape
-
-    #     _, x, skips = self.memory_reader(x[:, :, 0], global_context)
-        
-    #     # decoding
-    #     for layer in self.decoder:          
-    #         x = torch.cat((x, skips.pop()), 1)
-    #         x = layer(x)
-
-    #     # finalizing render
-    #     rgba  = self.final_rgba(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
-    #     flow  = self.final_flow(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
-    #     depth = self.final_depth(x).unsqueeze(2).repeat(1, 1, T, 1, 1)
-
-    #     return rgba, flow, depth
-
 
 class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMemoryDepthNet):
     """
@@ -1541,36 +1465,6 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
 
         return rgba, flow, depth
 
-    # def render(self, x: torch.Tensor is_bg=False):
-    #     """
-    #     Pass inputs of a single layer through the network
-
-    #     Parameters:
-    #         x (torch.Tensor):       sampled texture concatenated with person IDs
-    #         context (torch.Tensor): a context tensor read from the attention memory of the corresponding object layer
-
-    #     Returns RGBa for the input layer and the final feature maps.
-    #     """
-    #     global_features, x, skips = self.memory_reader(x, global_context)
-
-    #     if is_bg:
-    #         x = torch.cat((torch.zeros_like(global_features), x), dim=1)
-    #     else:
-    #         x = torch.cat((global_features, x), dim=1)
-
-    #     # decoding
-    #     for layer in self.decoder:          
-    #         x = torch.cat((x, skips.pop()), 1)
-    #         x = layer(x)
-
-        # # finalizing render
-        # rgba = self.final_rgba(x)
-        # flow = self.final_flow(x)
-        # depth = self.final_depth(x)
-
-        # return rgba, flow, depth
-
-
     def forward(self, input: dict) -> dict:
         """
         Apply forward pass of network
@@ -1582,7 +1476,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
         query_input       = input["query_input"]
         background_flow   = input["background_flow"]
         background_uv_map = input["background_uv_map"]
-        jitter_grid       = input["jitter_grid"]
+        adjustment_grid       = input["adjustment_grid"]
         index             = input["index"]
 
         B, L, C, T, H, W = query_input.shape
@@ -1603,10 +1497,10 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        jitter_grid = self.reorder_time2batch(jitter_grid)
+        adjustment_grid = self.reorder_time2batch(adjustment_grid)
 
-        background_offset = self.get_background_offset(jitter_grid, index)
-        brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
+        background_offset = self.get_background_offset(adjustment_grid, index)
+        brightness_scale  = self.get_brightness_scale(adjustment_grid, index) 
 
         for i in range(L):
             layer_input = query_input[:, i]
@@ -1685,31 +1579,31 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
         }
         return out
 
-    def get_background_offset(self, jitter_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+    def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
         Get the background offset of the current set of frames
 
         Args:
-            jitter_grid (torch.Tensor): sampling grid to apply jitter to the offset
+            adjustment_grid (torch.Tensor): sampling grid to apply jitter to the offset
             index (torch.Tensor):       tensor containing relevant frame indices
         """
         background_offset = F.interpolate(self.bg_offset, (self.max_frames, 4, 7), mode="trilinear")
         background_offset = background_offset[0, :, index].transpose(0, 1)
-        background_offset = F.grid_sample(background_offset, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+        background_offset = F.grid_sample(background_offset, adjustment_grid.permute(0, 2, 3, 1), align_corners=True)
 
         return background_offset
 
-    def get_brightness_scale(self, jitter_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+    def get_brightness_scale(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
         Get the brightness scaling tensor of the current set of frames
 
         Args:
-            jitter_grid (torch.Tensor): sampling grid to apply jitter to the offset
+            adjustment_grid (torch.Tensor): sampling grid to apply jitter to the offset
             index (torch.Tensor):       tensor containing relevant frame indices
         """
         brightness_scale = F.interpolate(self.brightness_scale, (self.max_frames, 4, 7), mode='trilinear', align_corners=True)
         brightness_scale = brightness_scale[0, 0, index].unsqueeze(1)
-        brightness_scale = F.grid_sample(brightness_scale, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+        brightness_scale = F.grid_sample(brightness_scale, adjustment_grid.permute(0, 2, 3, 1), align_corners=True)
 
         return brightness_scale
 
@@ -1798,7 +1692,7 @@ class Omnimatte(nn.Module):
         input_tensor      = input["query_input"]
         background_flow   = input["background_flow"]
         background_uv_map = input["background_uv_map"]
-        jitter_grid       = input["jitter_grid"]
+        adjustment_grid       = input["adjustment_grid"]
         index             = input["index"]
 
         B, L, C, T, H, W = input_tensor.shape
@@ -1818,10 +1712,10 @@ class Omnimatte(nn.Module):
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
-        jitter_grid = self.reorder_time2batch(jitter_grid)
+        adjustment_grid = self.reorder_time2batch(adjustment_grid)
 
-        background_offset = self.get_background_offset(jitter_grid, index)
-        brightness_scale  = self.get_brightness_scale(jitter_grid, index) 
+        background_offset = self.get_background_offset(adjustment_grid, index)
+        brightness_scale  = self.get_brightness_scale(adjustment_grid, index) 
 
         for i in range(L):
 
@@ -1903,17 +1797,17 @@ class Omnimatte(nn.Module):
         """
         return rgba[:, 3:4] * .5 + .5
 
-    def get_background_offset(self, jitter_grid, index):
+    def get_background_offset(self, adjustment_grid, index):
         background_offset = F.interpolate(self.bg_offset, (self.max_frames, 4, 7), mode="trilinear")
         background_offset = background_offset[0, :, index].transpose(0, 1)
-        background_offset = F.grid_sample(background_offset, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+        background_offset = F.grid_sample(background_offset, adjustment_grid.permute(0, 2, 3, 1), align_corners=True)
 
         return background_offset
 
-    def get_brightness_scale(self, jitter_grid, index):
+    def get_brightness_scale(self, adjustment_grid, index):
         brightness_scale = F.interpolate(self.brightness_scale, (self.max_frames, 4, 7), mode='trilinear', align_corners=True)
         brightness_scale = brightness_scale[0, 0, index].unsqueeze(1)
-        brightness_scale = F.grid_sample(brightness_scale, jitter_grid.permute(0, 2, 3, 1), align_corners=True)
+        brightness_scale = F.grid_sample(brightness_scale, adjustment_grid.permute(0, 2, 3, 1), align_corners=True)
 
         return brightness_scale
 

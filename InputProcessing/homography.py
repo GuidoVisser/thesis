@@ -42,7 +42,18 @@ class HomographyHandler(object):
             self.xmin, self.ymin, self.xmax, self.ymax = self.get_outer_borders()
             self.save_homography(homography_path)
 
+        self.uv_maps = []
+        for i in range(len(self.homographies)):
+            self.uv_maps.append(self.get_frame_uv(i))
+        self.uv_maps = torch.stack(self.uv_maps)
+
         self.homography_demo(savepath)
+
+    def __getitem__(self, idx):
+        return self.homographies[idx]
+
+    def __len__(self):
+        return len(self.homographies)
 
     def load_homography(self, filepath):
         with open(filepath, "r") as f:
