@@ -16,23 +16,19 @@ from datasets import Video
 
 class MaskHandler(object):
     def __init__(self,
-                 img_dir: str,
                  mask_dir: str,
-                 initial_masks: list,
-                 frame_size: list,
-                 device: str = "cuda",
-                 propagation_model:str = "models/third_party/weights/propagation_model.pth",
+                 args,
                  binary_threshold: float = 0.5) -> None:
         super().__init__()
 
         # set hyperparameters
-        self.frame_size       = frame_size
+        self.frame_size       = (args.frame_width, args.frame_height)
         self.binary_threshold = binary_threshold
         
-        self.N_objects = len(initial_masks)
-        self.img_dir   = img_dir
+        self.N_objects = len(args.initial_mask)
+        self.img_dir   = args.img_dir
         self.mask_dir  = mask_dir
-        self.device    = device
+        self.device    = args.device
 
         # propagate each object mask through video
         for i in range(self.N_objects):
@@ -41,19 +37,19 @@ class MaskHandler(object):
                 create_dir(save_dir)
 
                 # if the path points to a single mask, propagate it through the video
-                if path.isfile(initial_masks[i]):
-                    self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir)
-                    self.propagate(initial_masks[i], 50, 10, self.device, self.device, propagation_model, save_dir, forward=False)
+                if path.isfile(args.initial_mask[i]):
+                    self.propagate(args.initial_mask[i], 50, 10, self.device, self.device, args.propagation_model, save_dir)
+                    self.propagate(args.initial_mask[i], 50, 10, self.device, self.device, args.propagation_model, save_dir, forward=False)
                 
                 # if the path points to a directory with masks, resize them and use them
-                elif path.isdir(initial_masks[i]):
-                    for frame in sorted(listdir(initial_masks[i])):
-                        fn = path.join(initial_masks[i], frame)
+                elif path.isdir(args.initial_mask[i]):
+                    for frame in sorted(listdir(args.initial_mask[i])):
+                        fn = path.join(args.initial_mask[i], frame)
                         img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
-                        img = cv2.resize(img, frame_size)
+                        img = cv2.resize(img, self.frame_size)
                         cv2.imwrite(path.join(save_dir, frame), img)
                 else:
-                    raise ValueError(f"{initial_masks[i]} is neither a valid directory or file")
+                    raise ValueError(f"{args.initial_mask[i]} is neither a valid directory or file")
          
     @torch.no_grad()
     def propagate(self, initial_mask, top_k, mem_freq, model_device, memory_device, model_weights, save_dir, forward=True):

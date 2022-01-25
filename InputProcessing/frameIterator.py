@@ -1,4 +1,5 @@
 from os import path, listdir
+from argparse import Namespace
 from typing import Union
 import cv2
 import torch
@@ -8,16 +9,15 @@ class FrameIterator(object):
 
     def __init__(self, 
                  img_dir:str, 
-                 frame_size: list=[864, 480],
-                 device: str = "cuda"
+                 args: Namespace,
                 ) -> None:
         super().__init__()
 
         self.img_dir = img_dir
         self.images = [path.join(img_dir, frame) for frame in sorted(listdir(img_dir))]
 
-        self.frame_size = frame_size
-        self.device = device
+        self.frame_size = (args.frame_width, args.frame_height)
+        self.device = args.device
 
     def __getitem__(self, idx: Union[int, slice]) -> torch.Tensor:
         

@@ -15,8 +15,10 @@ from models.third_party.RAFT.utils.flow_viz import flow_to_image
 class LayerDecompositer(nn.Module):
     def __init__(self,
                  dataloader: DataLoader,
+                 context_loader: DataLoader,
                  loss_module: nn.Module,
                  network: nn.Module,
+                 context_network: nn.Module,
                  summary_writer: SummaryWriter,
                  learning_rate: float,
                  results_root: str,
@@ -28,10 +30,14 @@ class LayerDecompositer(nn.Module):
         super().__init__()
 
         self.dataloader = dataloader
+        self.context_loader = context_loader
         self.loss_module = loss_module
         self.net = network
+        self.context_network = context_network
         self.learning_rate = learning_rate
         self.optimizer = Adam(self.net.parameters(), self.learning_rate)
+        if self.context_network is not None:
+            self.context_optimizer = Adam(self.context_network.parameters(), self.learning_rate)
 
         self.results_root = results_root
         self.save_dir = f"{results_root}/decomposition"
@@ -51,7 +57,20 @@ class LayerDecompositer(nn.Module):
             
             if epoch % self.save_freq == 0:
                 self.create_save_dirs(f"intermediate/{epoch}")
-            
+
+            # TODO Go through data loader for memory encoding.
+            if self.context_network is not None:
+                self.net.global_context.reset_steps()
+                for iteration, input in enumerate(self.context_loader):
+                    for l in range(input.shape[1]):
+
+                        x = input[:, l]    
+                        with torch.no_grad():
+                            for layer in self.net.encoder:
+                                x = layer(x)
+
+                        self.context_network(x)
+ 
             for iteration, (input, targets) in enumerate(self.dataloader):
 
                 self.optimizer.zero_grad()
@@ -67,13 +86,15 @@ class LayerDecompositer(nn.Module):
                 global_step = iteration + epoch*len(self.dataloader)
                 self.writer.add_scalars("losses", loss_values, global_step=global_step)
 
-                loss.backward()
+                loss.backward(retain_graph=True)
                 self.optimizer.step()
 
                 if epoch % self.save_freq == 0:
                     frame_indices = input["index"][:, 0].tolist()
                     self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
 
+            if self.context_network is not None:
+                self.context_optimizer.step()
             self.loss_module.update_lambdas()
 
             t_avg.append((datetime.now() - t0).total_seconds())
@@ -82,11 +103,13 @@ class LayerDecompositer(nn.Module):
                 t1 = datetime.now()
                 print(f"Epoch: {epoch} / {self.n_epochs - 1} done in {(t1 - t0).total_seconds()} seconds")           
 
-        print(sum(t_avg) / len(t_avg))
+        print(f"Average time per epoch: {sum(t_avg) / len(t_avg)} seconds")
         with open(path.join(self.results_root, "time.txt"), "w") as f:
             f.write(str(sum(t_avg) / len(t_avg)))
 
-        torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))           
+        torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth")) 
+        if self.context_network is not None:
+            torch.save(self.context_network.state_dict(), path.join(self.results_root, "context_weights.pth"))           
 
     @torch.no_grad()
     def decomposite(self):

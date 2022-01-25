@@ -85,30 +85,11 @@ class MemoryEncoder2D(MemoryEncoder):
     """
     Memory Encoder usable with 2D convolutions
     """
-    def __init__(self, conv_channels: int, keydim: int, valdim: int, topk: int, backbone: nn.Module, gcv: GlobalContextVolume) -> None:
+    def __init__(self, conv_channels: int, keydim: int, valdim: int, gcv: GlobalContextVolume) -> None:
         super().__init__(keydim, valdim)
 
-        self.memory_encoder = KeyValueEncoder(nn.Conv2d, conv_channels, keydim, valdim, backbone)
-        self.global_context = gcv(keydim, valdim, topk)
-
-    def _get_input(self, spatiotemporal_noise: torch.Tensor, frame_idx: int) -> torch.Tensor:
-        """
-        Get the input for a single timestep to add to the global context
-
-        Args:
-            spatiotemoral_noise (torch.Tensor): noise tensor of the entire video
-            frame_idx (int): index of first frame in the input
-        """
-        return spatiotemporal_noise[:, :, frame_idx]
-
-    def _get_frame_idx_iterator(self, length_video: int):
-        """
-        Get a range object that specifies which frame indices should be considered in the memory
-
-        Args:
-            length_video (int): number of frames in the video
-        """
-        return range(length_video)
+        self.key_value_encoder = KeyValueEncoder(nn.Conv2d, conv_channels, keydim, valdim)
+        self.global_context    = gcv
 
     def _get_context_from_key_value_pair(self, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
         """

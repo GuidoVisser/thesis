@@ -17,7 +17,15 @@ from .homography import HomographyHandler
 
 
 class InputProcessor(object):
-    def __init__(self, args, do_jitter: bool = True,
+    def __init__(self, 
+                 args,
+                 frame_iterator,
+                 mask_handler,
+                 flow_handler,
+                 homography_handler,
+                 depth_handler,
+                 background_volume, 
+                 do_jitter: bool = True,
                 ) -> None:
         super().__init__()
 
@@ -32,46 +40,45 @@ class InputProcessor(object):
         self.use_depth                 = args.use_depth
 
         # directories
-        video = args.img_dir
-        out_root = args.out_dir
-        initial_mask = args.initial_mask
+        # video = args.img_dir
+        # out_root = args.out_dir
+        # initial_mask = args.initial_mask
 
-        if isinstance(initial_mask, str):
+        if isinstance(args.initial_mask, str):
             self.N_objects = 1
         else:
-            self.N_objects = len(initial_mask)
+            self.N_objects = len(args.initial_mask)
 
         self.N_layers = self.N_objects + self.num_bg_layers
 
         # create input directories
-        self.out_root  = out_root
+        self.out_root  = args.out_dir
 
-        img_dir        = path.join(out_root, "images")
-        mask_dir       = path.join(out_root, "masks")
-        flow_dir       = path.join(out_root, "flow")
-        depth_dir      = path.join(out_root, "depth")
-        background_dir = path.join(out_root, "background")
-        create_dirs(img_dir, mask_dir, flow_dir, depth_dir, background_dir)
+        # img_dir        = path.join(out_root, "images")
+        # mask_dir       = path.join(out_root, "masks")
+        # flow_dir       = path.join(out_root, "flow")
+        # depth_dir      = path.join(out_root, "depth")
+        # background_dir = path.join(out_root, "background")
 
         # save resized ground truth frames in the input directory
-        self._prepare_image_dir(video, img_dir)
+        # self._prepare_image_dir(video, img_dir)
 
         # create helper classes 
         #   These helpers prepare the mask propagation, homography estimation and optical flow calculation 
         #   at initialization and save the results for fast retrieval
-        self.frame_iterator     = FrameIterator(img_dir, self.frame_size, device=args.device)
-        self.mask_handler       = MaskHandler(video, mask_dir, initial_mask, self.frame_size, device=args.device, propagation_model=args.propagation_model)
-        self.flow_handler       = FlowHandler(self.frame_iterator, self.mask_handler, flow_dir, raft_weights=args.flow_model, device=args.device, iters=50)
-        self.homography_handler = HomographyHandler(out_root, img_dir, path.join(flow_dir, "dynamics_mask"), args.device, self.frame_size)
-        self.depth_handler      = DepthHandler(img_dir, depth_dir, args.device, self.mask_handler, self.frame_size, args.depth_model)
-        self.background_volume  = BackgroundVolume(background_dir, num_frames=len(self.frame_iterator), in_channels=args.in_channels, num_static_channels=args.num_static_channels, temporal_coarseness=args.noise_temporal_coarseness, upsample_size=args.noise_upsample_size, frame_size=self.frame_size, use_depth=args.use_depth)
+        self.frame_iterator     = frame_iterator
+        self.mask_handler       = mask_handler
+        self.flow_handler       = flow_handler
+        self.homography_handler = homography_handler
+        self.depth_handler      = depth_handler
+        self.background_volume  = background_volume
 
 
         # Load a custom compositing order if it's given, otherwise initialize a new one
         self._initialize_composite_order(args.composite_order)
 
         # placeholder for memory input
-        self.memory_input = self.construct_memory_input(args.memory_input_type, args.shared_backbone)
+        # self.memory_input = self.construct_memory_input(args.memory_input_type, args.shared_backbone)
         
     def __getitem__(self, idx):
         """
@@ -228,9 +235,9 @@ class InputProcessor(object):
         if self.use_depth:
             targets["depth"] = depth
 
+        # TODO: remove memory input
         model_input = {
             "query_input": query_input,
-            "memory_input": self.memory_input,
             "background_flow": background_flow,
             "background_uv_map": background_uv_map,
             "jitter_grid": jitter_grid,
@@ -242,60 +249,60 @@ class InputProcessor(object):
     def __len__(self):
         return len(self.frame_iterator) - self.timesteps
 
-    def construct_memory_input(self, memory_input_type: str, shared_backbone: bool) -> torch.Tensor:
-        """
-        Construct the memory input of the video
+    # def construct_memory_input(self, memory_input_type: str, shared_backbone: bool) -> torch.Tensor:
+    #     """
+    #     Construct the memory input of the video
 
-        There are four configurations, sometimes with a special version supporting a shared memory and query encoder backbone:
-            1. Only rgb (shared backbone not possible)
-            2. rgb + depth + flow (shared backbone not possible)
-            3. Only noise
-            4. noise + depth + flow
+    #     There are four configurations, sometimes with a special version supporting a shared memory and query encoder backbone:
+    #         1. Only rgb (shared backbone not possible)
+    #         2. rgb + depth + flow (shared backbone not possible)
+    #         3. Only noise
+    #         4. noise + depth + flow
 
-        Args:
-            memory_input_config (dict): dictionary containing the configuration for the memory input
+    #     Args:
+    #         memory_input_config (dict): dictionary containing the configuration for the memory input
 
-        Returns:
-            memory_input (torch.Tensor): Tensor used as memory input throughout the full training
-        """
+    #     Returns:
+    #         memory_input (torch.Tensor): Tensor used as memory input throughout the full training
+    #     """
 
-        if memory_input_type == "rgb":
-            memory_input = self.frame_iterator[:len(self.flow_handler)]                # [3, F-1, H, W]
+    #     if memory_input_type == "rgb":
+    #         memory_input = self.frame_iterator[:len(self.flow_handler)]                # [3, F-1, H, W]
         
-        elif memory_input_type == "rgb+":
-            rgb_input           = self.frame_iterator[:len(self.flow_handler)]         # [3, F-1, H, W]
-            flow_input, _, _, _ = self.flow_handler[:len(self.flow_handler)]           # [2, F-1, H, W]
+    #     elif memory_input_type == "rgb+":
+    #         rgb_input           = self.frame_iterator[:len(self.flow_handler)]         # [3, F-1, H, W]
+    #         flow_input, _, _, _ = self.flow_handler[:len(self.flow_handler)]           # [2, F-1, H, W]
 
-            if self.use_depth:
-                depth_input, _      = self.depth_handler[:len(self.flow_handler)]      # [1, F-1, H, W]
-                memory_input        = torch.cat((rgb_input, flow_input, depth_input))  # [6, F-1, H, W]
-            else:
-                memory_input        = torch.cat((rgb_input, flow_input))               # [5, F-1, H, W]
+    #         if self.use_depth:
+    #             depth_input, _      = self.depth_handler[:len(self.flow_handler)]      # [1, F-1, H, W]
+    #             memory_input        = torch.cat((rgb_input, flow_input, depth_input))  # [6, F-1, H, W]
+    #         else:
+    #             memory_input        = torch.cat((rgb_input, flow_input))               # [5, F-1, H, W]
         
-        elif memory_input_type == "noise+":
-            noise_input         = self.background_volume.spatiotemporal_noise[:, :-1]  # [C-4, F-1, H, W]
-            flow_input, _, _, _ = self.flow_handler[:len(self.flow_handler)]           # [  2, F-1, H, W]
+    #     elif memory_input_type == "noise+":
+    #         noise_input         = self.background_volume.spatiotemporal_noise[:, :-1]  # [C-4, F-1, H, W]
+    #         flow_input, _, _, _ = self.flow_handler[:len(self.flow_handler)]           # [  2, F-1, H, W]
             
-            if self.use_depth:
-                depth_input, _  = self.depth_handler[:len(self.flow_handler)]          # [  1, F-1, H, W]
-                memory_input    = torch.cat((depth_input, flow_input, noise_input))    # [C,   F-1, H, W]
-            else:
-                memory_input    = torch.cat((flow_input, noise_input))                 # [C,   F-1, H, W]
+    #         if self.use_depth:
+    #             depth_input, _  = self.depth_handler[:len(self.flow_handler)]          # [  1, F-1, H, W]
+    #             memory_input    = torch.cat((depth_input, flow_input, noise_input))    # [C,   F-1, H, W]
+    #         else:
+    #             memory_input    = torch.cat((flow_input, noise_input))                 # [C,   F-1, H, W]
                   
-            if shared_backbone:
-                mask_padding = torch.zeros_like(noise_input[:1])                       # [  1, F-1, H, W]
-                memory_input = torch.cat((mask_padding, memory_input))                 # [C,   F-1, H, W]
+    #         if shared_backbone:
+    #             mask_padding = torch.zeros_like(noise_input[:1])                       # [  1, F-1, H, W]
+    #             memory_input = torch.cat((mask_padding, memory_input))                 # [C,   F-1, H, W]
 
-        elif memory_input_type == "noise":
-            memory_input  = self.background_volume.spatiotemporal_noise                # [C-4, F-1, H, W]
+    #     elif memory_input_type == "noise":
+    #         memory_input  = self.background_volume.spatiotemporal_noise                # [C-4, F-1, H, W]
         
-            if shared_backbone:
-                added_channels = 3 + int(self.use_depth)
+    #         if shared_backbone:
+    #             added_channels = 3 + int(self.use_depth)
 
-                padding = torch.zeros_like(memory_input[:added_channels])              # [4, F-1, H, W]
-                memory_input = torch.cat((padding, memory_input))                      # [C, F-1, H, W]
+    #             padding = torch.zeros_like(memory_input[:added_channels])              # [4, F-1, H, W]
+    #             memory_input = torch.cat((padding, memory_input))                      # [C, F-1, H, W]
 
-        return memory_input
+    #     return memory_input
 
     def get_rgb_layers(self, rgb, masks):
         """
@@ -417,6 +424,158 @@ class InputProcessor(object):
         for i, frame_path in enumerate(frame_paths):
             img = cv2.resize(cv2.imread(path.join(video_dir, frame_path)), self.frame_size, interpolation=cv2.INTER_LINEAR)
             cv2.imwrite(path.join(out_dir, f"{i:05}.jpg"), img)
+
+    def _initialize_composite_order(self, fp: str) -> None:
+        """
+        Initialize a compositing order for each frame in the video
+
+        If a filepath is given, a custom compositing order is loaded, otherwise the order of each frame
+        is initialized in the same order
+        """
+        self.composite_order = []
+        
+        if fp == None:
+            create_new = True
+        else:
+            if path.exists(fp):
+                with open(fp, "r") as f:
+                    for line in f.readlines():
+                        self.composite_order.append(tuple([int(frame_idx) for frame_idx in line.split(" ")]))
+            else:
+                create_new = True
+
+        if create_new:
+            for _ in range(len(self) + 1):
+                self.composite_order.append(tuple([int(i+1) for i in range(self.mask_handler.N_objects)]))
+
+
+class ContextDataset(object):
+
+    def __init__(self, 
+                 args,
+                 frame_iterator,
+                 mask_handler,
+                 flow_handler,
+                 homography_handler,
+                 depth_handler,
+                 background_volume, 
+                ) -> None:
+        super().__init__()
+
+        # initialize attributes
+        self.frame_size = (args.frame_width, args.frame_height)
+        self.use_depth  = args.use_depth
+
+        if isinstance(args.initial_mask, str):
+            self.N_objects = 1
+        else:
+            self.N_objects = len(args.initial_mask)
+
+        self.N_layers = self.N_objects + 1
+
+        # create input directories
+        self.out_root  = args.out_dir
+
+        # create helper classes 
+        #   These helpers prepare the mask propagation, homography estimation and optical flow calculation 
+        #   at initialization and save the results for fast retrieval
+        self.frame_iterator     = frame_iterator
+        self.mask_handler       = mask_handler
+        self.flow_handler       = flow_handler
+        self.homography_handler = homography_handler
+        self.depth_handler      = depth_handler
+        self.background_volume  = background_volume
+        
+        # Load a custom compositing order if it's given, otherwise initialize a new one
+        self._initialize_composite_order(args.composite_order)
+
+    def __getitem__(self, idx):
+        """
+        Get the optical flow input for the layer decompostion model
+
+        Dimensions:
+            T: time
+            L: number of layers, always equal to N_objects + 2 (background)
+            C: channel dimension, amount of channels in the input
+            H: height of the image
+            W: width of the image
+            F: The number of frames in the video
+            b: The number of background layers (1 if only static, 2 if also dynamic)
+
+        """
+        # Get mask input
+        # binary_masks: [L-b, C, H, W]
+        _, binary_masks = self.mask_handler[idx] 
+
+        # Get optical flow input and confidence
+        # object_flow:     [L-b, C, H, W]
+        _, _, object_flow, _ = self.flow_handler[idx] 
+
+        # Get depth input
+        # object_depth: [L-b, C, H, W]
+        if self.use_depth:
+            _, object_depth = self.depth_handler[idx]
+
+        # Get spatial noise input if a separate static background is used
+        # background_noise:  [1, C-4, H, W]
+        # background_uv_map: [1, H, W, 2]
+        background_uv_map  = self.homography_handler.get_frame_uv(idx).unsqueeze(0)
+
+        # Get spatiotemporal noise input
+        # spatiotemporal_noise_t: [C-4, H, W]
+        spatiotemporal_noise_t = F.grid_sample(self.background_volume.spatiotemporal_noise[:, idx].unsqueeze(0), background_uv_map).squeeze(0)
+
+        # Construct query input        
+        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - 1, 1, 1, 1)                         # [L-b, 1, H, W] 
+        if self.use_depth:
+            query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - 1, 1, 1, 1)), dim=1) # [L-b, C, H, W]
+        else:
+            query_input = torch.cat((pids, object_flow, spatiotemporal_noise_t.repeat(self.N_layers - 1, 1, 1, 1)), dim=1) # [L-b, C, H, W]
+
+        zeros_channels = 4 if self.use_depth else 3
+        zeros = torch.zeros((1, zeros_channels, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [1, 4, H, W]
+
+        dynamic_background_input = torch.cat((zeros, spatiotemporal_noise_t.unsqueeze(0)), dim=1) # [1, C, H, W]
+
+        query_input = torch.cat((dynamic_background_input, query_input)) # [L, C, H, W]
+
+        return query_input
+
+    def __len__(self):
+        return len(self.flow_handler)
+
+    def get_rgb_layers(self, rgb, masks):
+        """
+        Get an rgba matte for every object
+        
+        Args:
+            rgb (torch.Tensor[2, 3, H, W])
+            a_mask (torch.Tensor[2, L, H, W])
+
+        Returns:
+            rgb_matte (torch.Tensor[2, L, 3, H, W])
+        """
+        masks = torch.stack([masks]*3, 2)
+        rgb = torch.stack([rgb]*self.N_objects, 1)
+
+        return rgb * masks  
+
+
+    def get_flow_layers(self, flow: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
+        """
+        Get a matte for the optical flow of every object
+
+        Args:
+            flow (torch.Tensor[2, 2, H, W])
+            a_mask (torch.Tensor[2, L, H, W])
+
+        Returns:
+            flow_matte (torch.Tensor[2, L, 2, H, W])
+        """
+        masks = torch.stack([masks]*2, 2)
+        flow = torch.stack([flow]*self.N_objects, 1)
+
+        return flow * masks   
 
     def _initialize_composite_order(self, fp: str) -> None:
         """

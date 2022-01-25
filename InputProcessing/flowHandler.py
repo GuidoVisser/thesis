@@ -21,7 +21,7 @@ class FlowHandler(object):
                  mask_iterator: MaskHandler,
                  output_dir: str,
                  raft_weights: str,
-                 iters: int = 12,
+                 iters: int = 50,
                  forward_backward_threshold: float = 20.,
                  photometric_threshold: float = 20.,
                  device = "cuda") -> None:

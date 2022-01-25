@@ -2,17 +2,25 @@ from argparse import ArgumentParser
 from datetime import datetime
 from torch.utils.data import DataLoader
 import torch
-from os import path
+import torch.nn as nn
+from os import path, listdir
 from torch.nn.parallel import DataParallel
 from torch.utils.tensorboard import SummaryWriter
 
-from InputProcessing.inputProcessor import InputProcessor
+from InputProcessing.inputProcessor import ContextDataset, InputProcessor
 from models.DynamicLayerDecomposition.layerDecomposition import LayerDecompositer
 from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss2D, DecompositeLoss3D
 from models.DynamicLayerDecomposition.layer_decomposition_networks import *
 
+from InputProcessing.backgroundVolume import BackgroundVolume
+from InputProcessing.maskHandler import MaskHandler
+from InputProcessing.flowHandler import FlowHandler
+from InputProcessing.frameIterator import FrameIterator
+from InputProcessing.homography import HomographyHandler
+from InputProcessing.depthHandler import DepthHandler
+
 from utils.demo import create_decomposite_demo
-from utils.utils import create_dir, seed_all
+from utils.utils import create_dir, seed_all, create_dirs
 from models.DynamicLayerDecomposition.model_config import default_config, read_config, load_config, save_config, update_config
 
 
@@ -105,26 +113,16 @@ class ExperimentRunner(object):
 
         if memory_setup == 1:
             self.args.memory_input_type = "noise"
-            if self.args.shared_backbone:
-                self.args.memory_in_channels = self.args.in_channels
-            else:
-                self.args.memory_in_channels = self.args.in_channels - 3 - int(self.args.use_depth)
+            self.args.memory_in_channels = self.args.in_channels
         elif memory_setup == 2:
             self.args.memory_input_type = "rgb"
             self.args.memory_in_channels = 3
-            if self.args.shared_backbone:
-                raise ValueError("Cannot use shared encoder with rgb memory input")
         elif memory_setup == 3:
             self.args.memory_input_type = "noise+"
-            if self.args.shared_backbone:
-                self.args.memory_in_channels = self.args.in_channels
-            else:
-                self.args.memory_in_channels = self.args.in_channels - 1
+            self.args.memory_in_channels = self.args.in_channels
         elif memory_setup == 4:
             self.args.memory_input_type = "rgb+"
             self.args.memory_in_channels = 5 + int(self.args.use_depth)
-            if self.args.shared_backbone:
-                raise ValueError("Cannot use shared encoder with rgb memory input")
 
     def start(self):
         # set seeds
@@ -132,9 +130,9 @@ class ExperimentRunner(object):
 
         # initialize components
         writer = SummaryWriter(self.args.out_dir)
-        dataloader = self.init_dataloader()
+        dataloader, context_loader = self.init_dataloader()
         loss_module = self.init_loss_module()
-        model = self.init_model(dataloader, loss_module, writer)
+        model = self.init_model(dataloader, context_loader, loss_module, writer)
 
         # run training
         model.run_training(self.start_epoch)
@@ -152,8 +150,38 @@ class ExperimentRunner(object):
         Initialize the input processor
         """
 
+        img_dir        = path.join(self.args.out_dir, "images")
+        mask_dir       = path.join(self.args.out_dir, "masks")
+        flow_dir       = path.join(self.args.out_dir, "flow")
+        depth_dir      = path.join(self.args.out_dir, "depth")
+        background_dir = path.join(self.args.out_dir, "background")
+        create_dirs(img_dir, mask_dir, flow_dir, depth_dir, background_dir)
+
+        # prepare image directory
+        frame_paths = [frame for frame in sorted(listdir(self.args.img_dir))]
+        for i, frame_path in enumerate(frame_paths):
+            img = cv2.resize(cv2.imread(path.join(self.args.img_dir, frame_path)), (self.args.frame_width, self.args.frame_height), interpolation=cv2.INTER_LINEAR)
+            cv2.imwrite(path.join(img_dir, f"{i:05}.jpg"), img)
+
+        # create helper classes 
+        #   These helpers prepare the mask propagation, homography estimation and optical flow calculation 
+        #   at initialization and save the results for fast retrieval
+        frame_iterator     = FrameIterator(img_dir, self.args)
+        mask_handler       = MaskHandler(mask_dir, self.args)
+        flow_handler       = FlowHandler(frame_iterator, mask_handler, flow_dir, raft_weights=self.args.flow_model, device=self.args.device, iters=50)
+        homography_handler = HomographyHandler(self.args.out_dir, img_dir, path.join(flow_dir, "dynamics_mask"), self.args.device, (self.args.frame_width, self.args.frame_height))
+        depth_handler      = DepthHandler(img_dir, depth_dir, self.args, mask_handler)
+        background_volume  = BackgroundVolume(background_dir, len(frame_iterator), self.args)
+
+
         input_processor = InputProcessor(
             self.args,
+            frame_iterator,
+            mask_handler,
+            flow_handler,
+            homography_handler,
+            depth_handler,
+            background_volume,
             do_jitter=True
         )
 
@@ -163,7 +191,22 @@ class ExperimentRunner(object):
             shuffle=True
         )
 
-        return dataloader
+        context_dataset = ContextDataset(
+            self.args,
+            frame_iterator,
+            mask_handler,
+            flow_handler,
+            homography_handler,
+            depth_handler,
+            background_volume
+        )
+
+        context_loader = DataLoader(
+            context_dataset,
+            batch_size=args.batch_size
+        )
+
+        return dataloader, context_loader
 
     def init_loss_module(self):
         """
@@ -204,7 +247,7 @@ class ExperimentRunner(object):
             )
         return loss_module
 
-    def init_model(self, dataloader, loss_module, writer):
+    def init_model(self, dataloader, context_loader, loss_module, writer):
         """
         Initialize the decomposition model
         """
@@ -213,8 +256,6 @@ class ExperimentRunner(object):
             if not self.args.use_depth:
                 network = LayerDecompositionAttentionMemoryNet3DBottleneck(
                     in_channels=self.args.in_channels,
-                    memory_in_channels=self.args.memory_in_channels,
-                    shared_backbone=self.args.shared_backbone,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
                     keydim=self.args.keydim,
@@ -227,8 +268,6 @@ class ExperimentRunner(object):
             else:
                 network = LayerDecompositionAttentionMemoryDepthNet3DBottleneck(
                     in_channels=self.args.in_channels,
-                    memory_in_channels=self.args.memory_in_channels,
-                    shared_backbone=self.args.shared_backbone,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
                     keydim=self.args.keydim,
@@ -238,33 +277,33 @@ class ExperimentRunner(object):
                     transposed_bottleneck=not self.args.bottleneck_normal,
                     coarseness=self.args.coarseness
                 )
-        elif self.args.model_type == "3d_memory":
-            if not self.args.use_depth:
-                network = LayerDecompositionAttentionMemoryNet3DMemoryEncoder(
-                    in_channels=self.args.in_channels,
-                    memory_in_channels=self.args.memory_in_channels,
-                    t_strided=self.args.memory_t_strided,
-                    conv_channels=self.args.conv_channels,
-                    valdim=self.args.valdim,
-                    keydim=self.args.keydim,
-                    topk=self.args.topk,
-                    do_adjustment=True, 
-                    max_frames=len(dataloader.dataset.frame_iterator),
-                    coarseness=self.args.coarseness,
-                )
-            else:
-                network = LayerDecompositionAttentionMemoryDepthNet3DMemoryEncoder(
-                    in_channels=self.args.in_channels,
-                    memory_in_channels=self.args.memory_in_channels,
-                    t_strided=self.args.memory_t_strided,
-                    conv_channels=self.args.conv_channels,
-                    valdim=self.args.valdim,
-                    keydim=self.args.keydim,
-                    topk=self.args.topk,
-                    do_adjustment=True, 
-                    max_frames=len(dataloader.dataset.frame_iterator),
-                    coarseness=self.args.coarseness,
-                )     
+        # elif self.args.model_type == "3d_memory":
+        #     if not self.args.use_depth:
+        #         network = LayerDecompositionAttentionMemoryNet3DMemoryEncoder(
+        #             in_channels=self.args.in_channels,
+        #             memory_in_channels=self.args.memory_in_channels,
+        #             t_strided=self.args.memory_t_strided,
+        #             conv_channels=self.args.conv_channels,
+        #             valdim=self.args.valdim,
+        #             keydim=self.args.keydim,
+        #             topk=self.args.topk,
+        #             do_adjustment=True, 
+        #             max_frames=len(dataloader.dataset.frame_iterator),
+        #             coarseness=self.args.coarseness,
+        #         )
+        #     else:
+        #         network = LayerDecompositionAttentionMemoryDepthNet3DMemoryEncoder(
+        #             in_channels=self.args.in_channels,
+        #             memory_in_channels=self.args.memory_in_channels,
+        #             t_strided=self.args.memory_t_strided,
+        #             conv_channels=self.args.conv_channels,
+        #             valdim=self.args.valdim,
+        #             keydim=self.args.keydim,
+        #             topk=self.args.topk,
+        #             do_adjustment=True, 
+        #             max_frames=len(dataloader.dataset.frame_iterator),
+        #             coarseness=self.args.coarseness,
+        #         )     
         elif self.args.model_type == "omnimatte":
             network = Omnimatte(
                 in_channels=self.args.in_channels,
@@ -277,8 +316,6 @@ class ExperimentRunner(object):
             if not self.args.use_depth:
                 network = LayerDecompositionAttentionMemoryNet2D(
                     in_channels=self.args.in_channels,
-                    memory_in_channels=self.args.memory_in_channels,
-                    shared_backbone=self.args.shared_backbone,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
                     keydim=self.args.keydim,
@@ -290,8 +327,6 @@ class ExperimentRunner(object):
             else:
                 network = LayerDecompositionAttentionMemoryDepthNet2D(
                     in_channels=self.args.in_channels,
-                    memory_in_channels=self.args.memory_in_channels,
-                    shared_backbone=self.args.shared_backbone,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
                     keydim=self.args.keydim,
@@ -301,6 +336,8 @@ class ExperimentRunner(object):
                     coarseness=self.args.coarseness
                 )
         elif self.args.model_type == "bottleneck_no_attention":
+            if self.args.use_depth:
+                raise NotImplementedError("Bottleneck model without context module is not supported with depth estimation")
             network = LayerDecompositionNet3DBottleneck(
                     in_channels=self.args.in_channels,
                     conv_channels=self.args.conv_channels,
@@ -309,6 +346,8 @@ class ExperimentRunner(object):
                     coarseness=self.args.coarseness
             )
         elif self.args.model_type == "no_addons":
+            if self.args.use_depth:
+                raise NotImplementedError("Model without temporal add ons is not supported with depth estimation")
             network = Omnimatte(
                     in_channels=self.args.in_channels,
                     conv_channels=self.args.conv_channels,
@@ -318,25 +357,51 @@ class ExperimentRunner(object):
                     force_dynamics_layer=True
             )                  
 
+        if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
+            context_network = MemoryEncoder2D(args.conv_channels * 4, args.keydim, args.valdim, network.global_context)            
+
         if self.args.device != "cpu":
             network = DataParallel(network).to(args.device)
+            if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
+                context_network = DataParallel(context_network).to(args.device)
 
         if self.args.continue_from != "":
             network.load_state_dict(torch.load(f"{args.continue_from}/reconstruction_weights.pth"))
+            if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
+                context_network.load_state_dict(torch.load(f"{args.continue_from}/context_weights.pth"))
 
-        model = LayerDecompositer(
-            dataloader, 
-            loss_module, 
-            network, 
-            writer,
-            self.args.learning_rate, 
-            results_root=self.args.out_dir, 
-            batch_size=self.args.batch_size,
-            n_epochs=self.args.n_epochs,
-            save_freq=self.args.save_freq,
-            separate_bg=not self.args.no_static_background,
-            use_depth=self.args.use_depth
-        )
+        if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
+            model = LayerDecompositer(
+                dataloader, 
+                context_loader,
+                loss_module, 
+                network, 
+                context_network,
+                writer,
+                self.args.learning_rate, 
+                results_root=self.args.out_dir, 
+                batch_size=self.args.batch_size,
+                n_epochs=self.args.n_epochs,
+                save_freq=self.args.save_freq,
+                separate_bg=not self.args.no_static_background,
+                use_depth=self.args.use_depth
+            )
+        else:
+            model = LayerDecompositer(
+                dataloader, 
+                context_loader,
+                loss_module, 
+                network, 
+                None,
+                writer,
+                self.args.learning_rate, 
+                results_root=self.args.out_dir, 
+                batch_size=self.args.batch_size,
+                n_epochs=self.args.n_epochs,
+                save_freq=self.args.save_freq,
+                separate_bg=not self.args.no_static_background,
+                use_depth=self.args.use_depth
+            )
 
         return model
 
@@ -346,7 +411,7 @@ if __name__ == "__main__":
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
-    parser.add_argument("--model_setup", type=int, default=4, help="id of model setup")
+    parser.add_argument("--model_setup", type=int, default=8, help="id of model setup")
     parser.add_argument("--memory_setup", type=int, default=1, help="id of memory input setup")
 
     dataset = "Videos"
@@ -370,9 +435,8 @@ if __name__ == "__main__":
     model_args.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
     model_args.add_argument("--use_2d_loss_module", action="store_true", help="Use 2d loss module in stead of 3d loss module")
     model_args.add_argument("--no_static_background", action="store_true", help="Don't use separated static and dynamic background")
-    model_args.add_argument("--shared_backbone", action="store_true", help="backbones for query and memory encoder have shared weight")
     model_args.add_argument("--memory_t_strided", action="store_true", help="If 3D convolutions are used in memory encoders, set them to be strided in time dimension")
-    model_args.add_argument("--use_depth", action="store_true", help="specify that you want to use depth estimation as an input channel")
+    model_args.add_argument("--use_depth", action="store_false", help="specify that you want to use depth estimation as an input channel")
     model_args.add_argument("--topk", type=int, default=0, help="k value for topk channel selection in context distribution")
     model_args.add_argument("--corr_diff", action="store_true", help="use corr_diff dynamics regularization in stead of alpha composite")
     model_args.add_argument("--alpha_reg_layers", action="store_true", help="alpha regularization loss is l1 and l0 on alpha layers in stead of composite")
@@ -395,7 +459,7 @@ if __name__ == "__main__":
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")
-    training_param_args.add_argument("--device", type=str, default="cuda", help="CUDA device")
+    training_param_args.add_argument("--device", type=str, default="cpu", help="CUDA device")
     training_param_args.add_argument("--n_epochs", type=int, default=1, help="Number of epochs used for training")
     training_param_args.add_argument("--save_freq", type=int, default=5, help="Frequency at which the intermediate results are saved")
     training_param_args.add_argument("--n_gpus", type=int, default=torch.cuda.device_count(), help="Number of GPUs to use for training")

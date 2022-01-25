@@ -18,10 +18,8 @@ class DepthHandler(object):
     def __init__(self, 
                  img_dir: str, 
                  out_dir: str, 
-                 device: str, 
-                 mask_handler: MaskHandler,
-                 frame_size: tuple = (448, 256), 
-                 model_path: str = "models/third_party/weights/monodepth_resnet18_001.pth") -> None:
+                 args,
+                 mask_handler: MaskHandler) -> None:
         super().__init__()
 
         self.img_dir = img_dir
@@ -31,18 +29,18 @@ class DepthHandler(object):
         create_dir(out_dir)
 
         # Set up model for depth estimation
-        self.device = device
+        self.device = args.device
 
         self.model = Resnet18_md(num_in_layers=3).to(self.device).eval()
-        if torch.cuda.device_count == 0:
-            self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
+        if torch.cuda.device_count() == 0:
+            self.model.load_state_dict(torch.load(args.depth_model, map_location='cpu'))
         else:
-            self.model.load_state_dict(torch.load(model_path))
+            self.model.load_state_dict(torch.load(args.depth_model))
 
         # Load data
-        self.frame_size = frame_size
+        self.frame_size = (args.frame_width, args.frame_height)
 
-        self.n_img, self.loader = prepare_dataloader(img_dir, (frame_size[1], frame_size[0]))
+        self.n_img, self.loader = prepare_dataloader(img_dir, (args.frame_height, args.frame_width))
         self.estimate_depth()
 
         self.frame_paths = [path.join(out_dir, fn) for fn in sorted(listdir(self.out_dir))]

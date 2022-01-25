@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class ConvBlock(nn.Module):
@@ -51,13 +52,11 @@ class KeyValueEncoder(nn.Module):
     
     Usable with both 2D and 3D convolutions
     """
-    def __init__(self, conv_module: nn.Module, conv_channels: int, keydim: int, valdim: int, encoder: nn.Module) -> None:
+    def __init__(self, conv_module: nn.Module, conv_channels: int, keydim: int, valdim: int) -> None:
         super().__init__()
 
-        self.encoder = encoder
-
-        self.key_layer = conv_module(conv_channels, keydim, kernel_size=3, padding=1)
-        self.val_layer = conv_module(conv_channels, valdim, kernel_size=3, padding=1)
+        self.key_layer = conv_module(conv_channels, keydim, kernel_size=4, padding='same')
+        self.val_layer = conv_module(conv_channels, valdim, kernel_size=4, padding='same')
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -71,16 +70,11 @@ class KeyValueEncoder(nn.Module):
             val (torch.Tensor): value tensor
             skips (list[torch.Tensor]): list of skip connections
         """
-        skips = []
-        for i, layer in enumerate(self.encoder):
-            x = layer(x)
-            if i < 4:
-                skips.append(x)
-
-        key = self.key_layer(x)
-        val = self.val_layer(x)
         
-        return key, val, skips
+        key = F.softmax(self.key_layer(x), dim=1)
+        val = F.leaky_relu(self.val_layer(x), negative_slope=0.2)
+        
+        return key, val
 
 
 class GlobalContextVolume(nn.Module):
@@ -97,6 +91,9 @@ class GlobalContextVolume(nn.Module):
         self.register_buffer("context_volume", torch.zeros((valdim, keydim)))
         self.topk = topk if topk > 0 else None
 
+        # for running average
+        self.step = 1
+
     def forward(self, query: torch.Tensor) -> torch.Tensor:
         """
         Returns a context distribution defined by the global context and the local query
@@ -112,7 +109,7 @@ class GlobalContextVolume(nn.Module):
         """
         return NotImplemented
 
-    def update(self, local_contexts: list) -> None:
+    def update(self, context: torch.Tensor) -> None:
         """
         Update the global context volume using the local context matrices at different timesteps
         v1:
@@ -121,8 +118,17 @@ class GlobalContextVolume(nn.Module):
         Args:
             local_contexts (list[ torch.Tensor[C_v x C_k] ] -- length=T)
         """
-        self.context_volume = torch.mean(torch.stack(local_contexts, dim=0), dim=0, keepdim=False)
+        if self.step == 1:
+            self.context_volume = context
+        else:
+            self.context_volume = (self.step - 1) / self.step * self.context_volume + 1 / self.step * context
+        self.step += 1
 
+    def reset_steps(self):
+        """
+        Reset the self.step variable to start a new running average
+        """
+        self.step = 1
 
 class MemoryEncoder(nn.Module):
     """
@@ -134,60 +140,26 @@ class MemoryEncoder(nn.Module):
     def __init__(self, keydim: int, valdim: int) -> None:
         super().__init__()
 
-        self.memory_encoder = NotImplemented
-        self.global_context = NotImplemented
+        self.key_value_encoder      = NotImplemented
+        self.global_context         = NotImplemented
 
         self.valdim    = valdim
         self.keydim    = keydim
 
-    def forward(self, spatiotemporal_noise: torch.Tensor) -> GlobalContextVolume:
+    def forward(self, input: torch.Tensor) -> GlobalContextVolume:
         """
-        Set the global context volume for this epoch
+        Update the global context distribution
         """
-    
-        local_contexts = []
+        
+        key, value = self.key_value_encoder(input)
 
-        # construct an iterator
-        frame_iterator = self._get_frame_idx_iterator(spatiotemporal_noise.shape[-3])
-
-        for frame_idx in frame_iterator:
-
-            # get current input
-            input = self._get_input(spatiotemporal_noise, frame_idx)
-
-            # encode frame and get context matrix
-            key, value, _ = self.memory_encoder(input)
-            context = self._get_context_from_key_value_pair(key, value)
-
-            # remove batch dimension
-            context = context.squeeze(0)
-
-            # append to collection of local contexts of current layer
-            local_contexts.append(context)
+        context = self._get_context_from_key_value_pair(key, value)
 
         # update the memory of the current layer
-        self.global_context.update(local_contexts)
+        for b in range(context.shape[0]):
+            self.global_context.update(context[b])
 
         return self.global_context
-
-    def _get_input(self, spatiotemporal_noise: torch.Tensor, frame_idx: int) -> torch.Tensor:
-        """
-        Get the input for a single timestep to add to the global context
-
-        Args:
-            spatiotemoral_noise (torch.Tensor): noise tensor of the entire video
-            frame_idx (int): index of first frame in the input
-        """
-        return NotImplemented
-
-    def _get_frame_idx_iterator(self, length_video: int):
-        """
-        Get a range object that specifies which frame indices should be considered in the memory
-
-        Args:
-            length_video (int): number of frames in the video        
-        """
-        return NotImplemented
 
 
     def _get_context_from_key_value_pair(self, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
@@ -207,35 +179,35 @@ class MemoryEncoder(nn.Module):
         return NotImplemented
 
 
-class MemoryReader(nn.Module):
-    """
-    Memory Reader base class
+# class MemoryReader(nn.Module):
+#     """
+#     Memory Reader base class
 
-    Encodes the input into a key value pair. the key is used as query to retrieve a feature map from the 
-    global context distribution. The value tensor, feature map and skip connections are passed on.
+#     Encodes the input into a key value pair. the key is used as query to retrieve a feature map from the 
+#     global context distribution. The value tensor, feature map and skip connections are passed on.
 
-    Usable with both 2D and 3D convolutions
-    """
-    def __init__(self, conv_module: nn.Module, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module) -> None:
-        super().__init__()
+#     Usable with both 2D and 3D convolutions
+#     """
+#     def __init__(self, conv_module: nn.Module, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module) -> None:
+#         super().__init__()
 
-        self.query_encoder = KeyValueEncoder(conv_module, conv_channels, keydim, valdim, backbone)
+#         self.query_encoder = KeyValueEncoder(conv_module, conv_channels, keydim, valdim, backbone)
 
-        self.keydim = keydim
-        self.valdim = valdim
+#         self.keydim = keydim
+#         self.valdim = valdim
 
-    def forward(self, input: torch.Tensor, global_context: GlobalContextVolume) -> torch.Tensor:
-        """
-        Args:
-            input (torch.Tensor)
+#     def forward(self, input: torch.Tensor, global_context: GlobalContextVolume) -> torch.Tensor:
+#         """
+#         Args:
+#             input (torch.Tensor)
 
-        Returns:
-            context_distribution (torch.Tensor)
-            value (torch.Tensor)
-            skips (list[torch.Tensor])
-        """
-        query, value, skips = self.query_encoder(input)
+#         Returns:
+#             context_distribution (torch.Tensor)
+#             value (torch.Tensor)
+#             skips (list[torch.Tensor])
+#         """
+#         query, value, skips = self.query_encoder(input)
 
-        context_distribution = global_context(query)
+#         context_distribution = global_context(query)
 
-        return context_distribution, value, skips
+#         return context_distribution, value, skips
