@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 from os import path
 from datetime import datetime
+from torch.nn.parallel import DataParallel
 
 from torch.utils.tensorboard.writer import SummaryWriter
 
@@ -62,7 +63,10 @@ class LayerDecompositer(nn.Module):
 
                 self.context_optimizer.zero_grad()
 
-                self.context_network.global_context.reset_steps()
+                if isinstance(self.context_network, DataParallel):
+                    self.context_network.module.global_context.reset_steps()
+                else:
+                    self.context_network.global_context.reset_steps()
                 for iteration, input in enumerate(self.context_loader):
                     for l in range(input.shape[1]):
 
