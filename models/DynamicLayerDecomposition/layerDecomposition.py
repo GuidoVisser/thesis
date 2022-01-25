@@ -58,9 +58,11 @@ class LayerDecompositer(nn.Module):
             if epoch % self.save_freq == 0:
                 self.create_save_dirs(f"intermediate/{epoch}")
 
-            # TODO Go through data loader for memory encoding.
             if self.context_network is not None:
-                self.net.global_context.reset_steps()
+
+                self.context_optimizer.zero_grad()
+
+                self.context_network.global_context.reset_steps()
                 for iteration, input in enumerate(self.context_loader):
                     for l in range(input.shape[1]):
 
@@ -70,7 +72,7 @@ class LayerDecompositer(nn.Module):
                                 x = layer(x)
 
                         self.context_network(x)
- 
+
             for iteration, (input, targets) in enumerate(self.dataloader):
 
                 self.optimizer.zero_grad()
