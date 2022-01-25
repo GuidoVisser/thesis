@@ -70,11 +70,12 @@ class LayerDecompositer(nn.Module):
                 for iteration, input in enumerate(self.context_loader):
                     for l in range(input.shape[1]):
 
-                        x = input[:, l]    
+                        x = input[:, l]
                         with torch.no_grad():
 
                             if isinstance(self.net, DataParallel):
                                 encoder = self.net.module.encoder
+                                x.to(encoder.device)
                             else:
                                 encoder = self.net.encoder
 

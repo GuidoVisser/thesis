@@ -67,7 +67,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         query_input       = input["query_input"]
         background_flow   = input["background_flow"]
         background_uv_map = input["background_uv_map"]
-        adjustment_grid       = input["adjustment_grid"]
+        adjustment_grid   = input["adjustment_grid"]
         index             = input["index"]
 
         B, L, C, T, H, W = query_input.shape
