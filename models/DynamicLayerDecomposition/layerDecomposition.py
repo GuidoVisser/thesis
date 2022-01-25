@@ -72,7 +72,13 @@ class LayerDecompositer(nn.Module):
 
                         x = input[:, l]    
                         with torch.no_grad():
-                            for layer in self.net.encoder:
+
+                            if isinstance(self.net, DataParallel):
+                                encoder = self.net.module.encoder
+                            else:
+                                encoder = self.net.encoder
+
+                            for layer in encoder:
                                 x = layer(x)
 
                         self.context_network(x)
