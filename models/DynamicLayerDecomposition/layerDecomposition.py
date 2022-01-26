@@ -76,10 +76,12 @@ class LayerDecompositer(nn.Module):
                             if isinstance(self.net, DataParallel):
                                 encoder = self.net.module.encoder
                                 x.to(next(self.net.module.parameters()).device)
+                                print(next(self.net.module.parameters()).device)
                             else:
                                 encoder = self.net.encoder
 
                             for layer in encoder:
+                                print(x.device)
                                 x = layer(x)
 
                         self.context_network(x)
