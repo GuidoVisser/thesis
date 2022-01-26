@@ -53,10 +53,10 @@ class GlobalContextVolume2D(GlobalContextVolume):
     """
     Global Context Volume usable with 2D convolutions
     """
-    def __init__(self, keydim: int, valdim: int, topk: int) -> None:
-        super().__init__(keydim, valdim, topk)
+    def __init__(self, keydim: int, valdim: int, n_layers: int, topk: int) -> None:
+        super().__init__(keydim, valdim, n_layers, topk)
 
-    def forward(self, query: torch.Tensor) -> torch.Tensor:
+    def forward(self, query: torch.Tensor, layer_idx: int) -> torch.Tensor:
         """
         Returns a context distribution defined by the global context and the local query
 
@@ -64,6 +64,7 @@ class GlobalContextVolume2D(GlobalContextVolume):
 
         Args:
             query (torch.Tensor[B x C_k x H, W])
+            layer_idx (int)
 
         Returns:
             context_dist (torch.Tensor[B x C_v x H x W])
@@ -71,9 +72,9 @@ class GlobalContextVolume2D(GlobalContextVolume):
         """
         B, _, H, W = query.shape
 
-        query = query.view(B, -1, H*W)                          # -> [B x C_k x HW]
-        context_dist = torch.matmul(self.context_volume, query) # -> [B x C_v x HW]
-        context_dist = context_dist.view(B, -1, H, W)           # -> [B x C_v x H x W]
+        query = query.view(B, -1, H*W)                                     # -> [B x C_k x HW]
+        context_dist = torch.matmul(self.context_volume[layer_idx], query) # -> [B x C_v x HW]
+        context_dist = context_dist.view(B, -1, H, W)                      # -> [B x C_v x H x W]
 
         if self.topk is not None:
             context_dist = torch.topk(context_dist, self.topk, dim=1).values
@@ -85,11 +86,11 @@ class MemoryEncoder2D(MemoryEncoder):
     """
     Memory Encoder usable with 2D convolutions
     """
-    def __init__(self, conv_channels: int, keydim: int, valdim: int, gcv: GlobalContextVolume) -> None:
-        super().__init__(keydim, valdim)
+    def __init__(self, conv_channels: int, keydim: int, reconstruction_encoder: nn.ModuleList, gcv: GlobalContextVolume) -> None:
+        super().__init__(keydim, reconstruction_encoder)
 
-        self.key_value_encoder = KeyValueEncoder(nn.Conv2d, conv_channels, keydim, valdim)
-        self.global_context    = gcv
+        self.key_layer      = nn.Conv2d(conv_channels, keydim, kernel_size=4, padding='same')
+        self.global_context = gcv
 
     def _get_context_from_key_value_pair(self, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
         """

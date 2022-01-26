@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from itertools import repeat
 
 
 class ConvBlock(nn.Module):
@@ -85,14 +86,15 @@ class GlobalContextVolume(nn.Module):
     in memory
     """
 
-    def __init__(self, keydim: int, valdim: int, topk: int = 0) -> None:
+    def __init__(self, keydim: int, valdim: int, n_layers: int, topk: int = 0) -> None:
         super().__init__()
 
-        self.register_buffer("context_volume", torch.zeros((valdim, keydim)))
+        self.register_buffer("context_volume", torch.zeros((n_layers, valdim, keydim)))
         self.topk = topk if topk > 0 else None
 
         # for running average
-        self.step = 1
+        self.n_layers = n_layers
+        self.step = list(repeat(1, n_layers))
 
     def forward(self, query: torch.Tensor) -> torch.Tensor:
         """
@@ -109,7 +111,7 @@ class GlobalContextVolume(nn.Module):
         """
         return NotImplemented
 
-    def update(self, context: torch.Tensor) -> None:
+    def update(self, context: torch.Tensor, layer_idx) -> None:
         """
         Update the global context volume using the local context matrices at different timesteps
         v1:
@@ -118,17 +120,18 @@ class GlobalContextVolume(nn.Module):
         Args:
             local_contexts (list[ torch.Tensor[C_v x C_k] ] -- length=T)
         """
-        if self.step == 1:
-            self.context_volume = context
+        if self.step[layer_idx] == 1:
+            self.context_volume[layer_idx] = context
         else:
-            self.context_volume = (self.step - 1) / self.step * self.context_volume + 1 / self.step * context
-        self.step += 1
+            step = self.step[layer_idx]
+            self.context_volume[layer_idx] = (step - 1) / step * self.context_volume[layer_idx] + 1 / step * context
+        self.step[layer_idx] += 1
 
     def reset_steps(self):
         """
         Reset the self.step variable to start a new running average
         """
-        self.step = 1
+        self.step = list(repeat(1, self.n_layers))
 
 class MemoryEncoder(nn.Module):
     """
@@ -137,32 +140,39 @@ class MemoryEncoder(nn.Module):
     Encodes the input into a global context
     """
 
-    def __init__(self, keydim: int, valdim: int) -> None:
+    def __init__(self, keydim: int, reconstruction_encoder: nn.ModuleList) -> None:
         super().__init__()
 
-        self.key_value_encoder      = NotImplemented
-        self.global_context         = NotImplemented
+        self.backbone       = reconstruction_encoder
+        self.key_layer      = NotImplemented
+        self.global_context = NotImplemented
 
-        self.valdim    = valdim
+        # self.valdim    = valdim
         self.keydim    = keydim
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
         Update the global context distribution
         """
-        
-        key, value = self.key_value_encoder(input)
 
-        context = self._get_context_from_key_value_pair(key, value)
+        values = []
+        with torch.no_grad():
+            for l in range(input.shape[1]):
+                x = input[:, l]
+                for layer in self.backbone:
+                    x = layer(x)
 
-        # update the memory of the current layer
-        for b in range(context.shape[0]):
-            self.global_context.update(context[b])
+                values.append(x)
 
+        for l in range(len(values)):
 
-        # DataParallel requires a tensor as output
-        # return torch.ones(1)
+            key = F.softmax(self.key_layer(values[l]), dim=1)
 
+            context = self._get_context_from_key_value_pair(key, values[l])
+
+            # update the memory of the current layer
+            for b in range(context.shape[0]):
+                self.global_context.update(context[b], l)
 
     def _get_context_from_key_value_pair(self, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
         """

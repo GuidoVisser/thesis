@@ -260,6 +260,7 @@ class ExperimentRunner(object):
                     valdim=self.args.valdim,
                     keydim=self.args.keydim,
                     topk=self.args.topk,
+                    n_layers=len(self.args.initial_mask) + 1,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,
@@ -358,7 +359,7 @@ class ExperimentRunner(object):
             )                  
 
         if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
-            context_network = MemoryEncoder2D(args.conv_channels * 4, args.keydim, args.valdim, network.global_context)            
+            context_network = MemoryEncoder2D(args.conv_channels * 4, args.keydim, network.encoder, network.global_context)            
 
         if self.args.device != "cpu":
             network = DataParallel(network).to(args.device)
@@ -436,7 +437,7 @@ if __name__ == "__main__":
     model_args.add_argument("--use_2d_loss_module", action="store_true", help="Use 2d loss module in stead of 3d loss module")
     model_args.add_argument("--no_static_background", action="store_true", help="Don't use separated static and dynamic background")
     model_args.add_argument("--memory_t_strided", action="store_true", help="If 3D convolutions are used in memory encoders, set them to be strided in time dimension")
-    model_args.add_argument("--use_depth", action="store_false", help="specify that you want to use depth estimation as an input channel")
+    model_args.add_argument("--use_depth", action="store_true", help="specify that you want to use depth estimation as an input channel")
     model_args.add_argument("--topk", type=int, default=0, help="k value for topk channel selection in context distribution")
     model_args.add_argument("--corr_diff", action="store_true", help="use corr_diff dynamics regularization in stead of alpha composite")
     model_args.add_argument("--alpha_reg_layers", action="store_true", help="alpha regularization loss is l1 and l0 on alpha layers in stead of composite")
