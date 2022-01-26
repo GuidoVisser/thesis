@@ -120,6 +120,15 @@ class GlobalContextVolume(nn.Module):
         Args:
             local_contexts (list[ torch.Tensor[C_v x C_k] ] -- length=T)
         """
+        print(context.device)
+        print(self.context_volume[layer_idx].device)
+        
+        if context.device != self.context_volume[layer_idx].device:
+            context.to(self.context_volume[layer_idx].device)
+
+        print(context.device)
+        print(self.context_volume[layer_idx].device)
+
         if self.step[layer_idx] == 1:
             self.context_volume[layer_idx] = context
         else:
