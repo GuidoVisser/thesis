@@ -81,6 +81,7 @@ class LayerDecompositer(nn.Module):
 
                     #         for layer in encoder:
                     #             x = layer(x)
+                    input = input.to(next(self.context_network.parameters()).device)
 
                     self.context_network(input)
 
