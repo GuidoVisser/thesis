@@ -75,7 +75,7 @@ class LayerDecompositer(nn.Module):
 
                             if isinstance(self.net, DataParallel):
                                 encoder = self.net.module.encoder
-                                x.to(encoder.device)
+                                x.to(next(self.net.module.parameters()).device)
                             else:
                                 encoder = self.net.encoder
 
