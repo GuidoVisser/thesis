@@ -89,7 +89,7 @@ class GlobalContextVolume(nn.Module):
     def __init__(self, keydim: int, valdim: int, n_layers: int, topk: int = 0) -> None:
         super().__init__()
 
-        self.register_buffer("context_volume", torch.zeros((n_layers, valdim, keydim)))
+        self.context_volume = [torch.zeros(valdim, keydim)]*n_layers
         self.topk = topk if topk > 0 else None
 
         # for running average
