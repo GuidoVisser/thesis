@@ -68,19 +68,7 @@ class LayerDecompositer(nn.Module):
                 else:
                     self.context_network.global_context.reset_steps()
                 for iteration, input in enumerate(self.context_loader):
-                    # for l in range(input.shape[1]):
 
-                    #     x = input[:, l]
-                    #     with torch.no_grad():
-
-                    #         if isinstance(self.net, DataParallel):
-                    #             encoder = self.net.module.encoder
-                    #             x = x.to(next(self.net.module.parameters()).device)
-                    #         else:
-                    #             encoder = self.net.encoder
-
-                    #         for layer in encoder:
-                    #             x = layer(x)
                     input = input.to(next(self.context_network.parameters()).device)
 
                     self.context_network(input)

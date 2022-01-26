@@ -364,7 +364,7 @@ class ExperimentRunner(object):
         if self.args.device != "cpu":
             network = DataParallel(network).to(args.device)
             if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
-                context_network = context_network.to(args.device)
+                context_network = DataParallel(context_network).to(args.device)
 
         if self.args.continue_from != "":
             network.load_state_dict(torch.load(f"{args.continue_from}/reconstruction_weights.pth"))
