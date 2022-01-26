@@ -146,7 +146,7 @@ class MemoryEncoder(nn.Module):
         self.valdim    = valdim
         self.keydim    = keydim
 
-    def forward(self, input: torch.Tensor) -> GlobalContextVolume:
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
         Update the global context distribution
         """
@@ -159,7 +159,9 @@ class MemoryEncoder(nn.Module):
         for b in range(context.shape[0]):
             self.global_context.update(context[b])
 
-        return self.global_context
+
+        # DataParallel requires a tensor as output
+        # return torch.ones(1)
 
 
     def _get_context_from_key_value_pair(self, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
