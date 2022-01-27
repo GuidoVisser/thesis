@@ -360,7 +360,7 @@ class ExperimentRunner(object):
 
         if self.args.device != "cpu":
             network = DataParallel(network).to(args.device)
-
+        
         if self.args.continue_from != "":
             network.load_state_dict(torch.load(f"{args.continue_from}/reconstruction_weights.pth"))
 

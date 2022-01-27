@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 
 from InputProcessing.flowHandler import FlowHandler
 from models.DynamicLayerDecomposition.modules.base_modules import *
@@ -142,7 +141,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         }
         return out
     
-    def encode_context(self, context_loader: DataLoader) -> None:
+    def encode_context(self, input: torch.Tensor) -> None:
         """
         Add the input to the encoded context volume
 
@@ -150,10 +149,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             input (torch.Tensor[B, L, C, H, W])
             layer_idx (int)
         """
-        self.global_context.reset_steps()
-        for iteration, input in enumerate(context_loader):
-            input = input.to(next(self.context_encoder.parameters()).device)
-            self.context_encoder(input)
+        input = input.to(next(self.context_encoder.parameters()).device)
+        self.context_encoder(input)
 
     @property
     def reconstruction_parameters(self) -> list:
@@ -518,6 +515,11 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         Returns RGBa for the input layer and the final feature maps.
         """
+
+        print(self.reconstruction_parameters[0].device)
+        print(next(self.context_parameters).device)
+        print(self.global_context.context_volume[0].device)
+
         T = x.shape[-3]
 
         outputs = []
