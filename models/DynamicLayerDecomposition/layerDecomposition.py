@@ -35,10 +35,20 @@ class LayerDecompositer(nn.Module):
         self.loss_module = loss_module
         self.net = network
         self.learning_rate = learning_rate
-        self._check_parameters()
-        self.optimizer = Adam(self.net.reconstruction_parameters, self.learning_rate)
+
+        # get network
+        if isinstance(self.net, DataParallel):
+            net = self.net.module
+        else:
+            net = self.net
+
+        # check if all parameters are returned by the parameter properties
+        self._check_parameters(net)
+        
+        # define optimizers
+        self.optimizer = Adam(net.reconstruction_parameters, self.learning_rate)
         if using_context:
-            self.context_optimizer = Adam(self.net.context_parameters, self.learning_rate)
+            self.context_optimizer = Adam(net.context_parameters, self.learning_rate)
 
         self.results_root = results_root
         self.save_dir = f"{results_root}/decomposition"
@@ -258,14 +268,15 @@ class LayerDecompositer(nn.Module):
         
         return torch.clamp(rgba_with_detail, -1, 1)
 
-    def _check_parameters(self):
-        for param in self.net.parameters():
+    def _check_parameters(self, net):
+        for param in net.parameters():
             claimed = False
-            for r_p in self.net.reconstruction_parameters:
+            for r_p in net.reconstruction_parameters:
                 if param is r_p:
                     claimed = True
-                else:
-                    for c_p in self.net.context_parameters:
+                elif self.using_context:
+                    for c_p in net.context_parameters:
                         if param is c_p:
                             claimed = True
             assert claimed, "You have parameters in the network that are not added to any optimizer"
+    
