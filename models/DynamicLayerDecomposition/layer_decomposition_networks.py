@@ -168,7 +168,6 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
     @property
     def context_parameters(self) -> list:
-        print(next(self.context_encoder.key_layer.parameters()).device)
         return self.context_encoder.key_layer.parameters()
 
     def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
@@ -519,7 +518,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         Returns RGBa for the input layer and the final feature maps.
         """
         r = self.reconstruction_parameters[0].device
-        c = 3 #list(self.context_parameters)[0].device
+        c = next(self.context_encoder.key_layer.parameters()).device
         v = self.global_context.context_volume[0].device
         print(f"recon: {r}\ncontext: {c}\nvolume: {v}")
 
