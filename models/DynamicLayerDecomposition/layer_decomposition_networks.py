@@ -168,7 +168,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
     @property
     def context_parameters(self) -> list:
-        print(next(self.context_encoder.key_layer.parameters()))
+        print(next(self.context_encoder.key_layer.parameters()).device)
         return self.context_encoder.key_layer.parameters()
 
     def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
