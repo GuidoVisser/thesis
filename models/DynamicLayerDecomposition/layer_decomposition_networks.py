@@ -168,6 +168,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
     @property
     def context_parameters(self) -> list:
+        print(self.context_encoder.key_layer.parameters())
         return self.context_encoder.key_layer.parameters()
 
     def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
@@ -497,7 +498,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         self.context_encoder = MemoryEncoder2D(conv_channels * 4, keydim, self.encoder, self.value_layer, self.global_context)
         self.dynamics_layer  = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
 
-        print(self.context_encoder)
+        print(self.context_encoder.key_layer.parameters())
 
         self.decoder = nn.ModuleList([
             ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
