@@ -35,6 +35,16 @@ class LayerDecompositer(nn.Module):
         self.loss_module = loss_module
         self.net = network
         self.learning_rate = learning_rate
+        
+        self.using_context = using_context
+        self.results_root = results_root
+        self.save_dir = f"{results_root}/decomposition"
+        self.n_epochs = n_epochs
+        self.save_freq = save_freq
+        self.batch_size = batch_size
+        self.writer = summary_writer
+        self.separate_bg = separate_bg
+        self.use_depth = use_depth
 
         # get network
         if isinstance(self.net, DataParallel):
@@ -49,16 +59,6 @@ class LayerDecompositer(nn.Module):
         self.optimizer = Adam(net.reconstruction_parameters, self.learning_rate)
         if using_context:
             self.context_optimizer = Adam(net.context_parameters, self.learning_rate)
-
-        self.results_root = results_root
-        self.save_dir = f"{results_root}/decomposition"
-        self.n_epochs = n_epochs
-        self.save_freq = save_freq
-        self.batch_size = batch_size
-        self.writer = summary_writer
-        self.separate_bg = separate_bg
-        self.use_depth = use_depth
-        self.using_context = using_context
 
     def run_training(self, start_epoch=0):
 
