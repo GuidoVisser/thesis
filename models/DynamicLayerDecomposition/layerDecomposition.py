@@ -75,13 +75,13 @@ class LayerDecompositer(nn.Module):
                 self.context_optimizer.zero_grad()
 
                 if isinstance(self.net, DataParallel):
-                    self.net.module.global_context.reset_steps()
-                    for iteration, input in enumerate(self.context_loader):
-                        self.net.module.encode_context(input)
+                    # self.net.module.global_context.reset_steps()
+                    # for iteration, input in enumerate(self.context_loader):
+                    self.net.module.encode_context(self.context_loader)
                 else:
-                    self.net.global_context.reset_steps()
-                    for iteration, input in enumerate(self.context_loader):
-                        self.net.encode_context(input)
+                    # self.net.global_context.reset_steps()
+                    # for iteration, input in enumerate(self.context_loader):
+                    self.net.encode_context(self.context_loader)
 
             for iteration, (input, targets) in enumerate(self.dataloader):
 

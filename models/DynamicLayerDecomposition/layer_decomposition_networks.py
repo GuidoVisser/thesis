@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
 from InputProcessing.flowHandler import FlowHandler
 from models.DynamicLayerDecomposition.modules.base_modules import *
@@ -141,7 +142,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         }
         return out
     
-    def encode_context(self, input: torch.Tensor) -> None:
+    def encode_context(self, context_loader: DataLoader) -> None:
         """
         Add the input to the encoded context volume
 
@@ -149,8 +150,10 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             input (torch.Tensor[B, L, C, H, W])
             layer_idx (int)
         """
-        input = input.to(next(self.context_encoder.parameters()).device)
-        self.context_encoder(input)
+        self.global_context.reset_steps()
+        for iteration, input in enumerate(context_loader):
+            input = input.to(next(self.context_encoder.parameters()).device)
+            self.context_encoder(input)
 
     @property
     def reconstruction_parameters(self) -> list:
