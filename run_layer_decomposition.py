@@ -356,53 +356,29 @@ class ExperimentRunner(object):
                     max_frames=len(dataloader.dataset.frame_iterator),
                     coarseness=self.args.coarseness,
                     force_dynamics_layer=True
-            )                  
-
-        if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
-            context_network = MemoryEncoder2D(args.conv_channels * 4, args.keydim, network.encoder, network.global_context)            
+            )
 
         if self.args.device != "cpu":
             network = DataParallel(network).to(args.device)
-            if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
-                context_network = DataParallel(context_network).to(args.device)
 
         if self.args.continue_from != "":
             network.load_state_dict(torch.load(f"{args.continue_from}/reconstruction_weights.pth"))
-            if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
-                context_network.load_state_dict(torch.load(f"{args.continue_from}/context_weights.pth"))
 
-        if args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]:
-            model = LayerDecompositer(
-                dataloader, 
-                context_loader,
-                loss_module, 
-                network, 
-                context_network,
-                writer,
-                self.args.learning_rate, 
-                results_root=self.args.out_dir, 
-                batch_size=self.args.batch_size,
-                n_epochs=self.args.n_epochs,
-                save_freq=self.args.save_freq,
-                separate_bg=not self.args.no_static_background,
-                use_depth=self.args.use_depth
-            )
-        else:
-            model = LayerDecompositer(
-                dataloader, 
-                context_loader,
-                loss_module, 
-                network, 
-                None,
-                writer,
-                self.args.learning_rate, 
-                results_root=self.args.out_dir, 
-                batch_size=self.args.batch_size,
-                n_epochs=self.args.n_epochs,
-                save_freq=self.args.save_freq,
-                separate_bg=not self.args.no_static_background,
-                use_depth=self.args.use_depth
-            )
+        model = LayerDecompositer(
+            dataloader, 
+            context_loader,
+            loss_module, 
+            network, 
+            writer,
+            self.args.learning_rate, 
+            results_root=self.args.out_dir, 
+            batch_size=self.args.batch_size,
+            n_epochs=self.args.n_epochs,
+            save_freq=self.args.save_freq,
+            separate_bg=not self.args.no_static_background,
+            use_depth=self.args.use_depth,
+            using_context=(args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"])
+        )
 
         return model
 

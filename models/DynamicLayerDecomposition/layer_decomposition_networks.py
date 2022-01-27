@@ -7,7 +7,8 @@ from models.DynamicLayerDecomposition.modules.base_modules import *
 from models.DynamicLayerDecomposition.modules.modules_2d import *
 from models.DynamicLayerDecomposition.modules.modules_3d import *
 
-
+# TODO add context encoder to network
+# TODO add context encoder forward pass to network
 class LayerDecompositionAttentionMemoryNet(nn.Module):
     """
     Layer Decomposition Attention Memory Net base class
@@ -17,13 +18,16 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         # initialize foreground encoder and decoder
                        
-        self.encoder        = NotImplemented
-        self.memory_encoder = NotImplemented
-        self.decoder        = NotImplemented
-        self.final_rgba     = NotImplemented
-        self.final_flow     = NotImplemented
+        self.encoder         = NotImplemented
+        self.value_layer     = NotImplemented
+        self.query_layer     = NotImplemented
+        self.decoder         = NotImplemented
+        self.final_rgba      = NotImplemented
+        self.final_flow      = NotImplemented
+        self.dynamics_layer  = NotImplemented
 
-        self.global_context = NotImplemented
+        self.context_encoder = NotImplemented
+        self.global_context  = NotImplemented
 
         self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
@@ -137,6 +141,35 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         }
         return out
     
+    def encode_context(self, input: torch.Tensor) -> None:
+        """
+        Add the input to the encoded context volume
+
+        Args:
+            input (torch.Tensor[B, L, C, H, W])
+            layer_idx (int)
+        """
+        input = input.to(next(self.context_encoder.parameters()).device)
+        self.context_encoder(input)
+
+    @property
+    def reconstruction_parameters(self) -> list:
+        reconstruction_parameters = list(self.encoder.parameters()) 
+        reconstruction_parameters += list(self.value_layer.parameters())
+        reconstruction_parameters += list(self.decoder.parameters())
+        reconstruction_parameters += list(self.final_flow.parameters())
+        reconstruction_parameters += list(self.final_rgba.parameters())
+        reconstruction_parameters += list(self.query_layer.parameters())
+        reconstruction_parameters += list(self.dynamics_layer.parameters())
+        reconstruction_parameters.append(self.bg_offset)
+        reconstruction_parameters.append(self.brightness_scale)
+
+        return reconstruction_parameters
+
+    @property
+    def context_parameters(self) -> list:
+        return self.context_encoder.key_layer.parameters()
+
     def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
         Get the background offset of the current set of frames
@@ -458,9 +491,11 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
                 
-        self.query_layer    = nn.Conv2d(conv_channels * 4, keydim, kernel_size=4, padding='same')
-        self.global_context = GlobalContextVolume2D(keydim, valdim, n_layers, topk)
-        self.dynamics_layer = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
+        self.query_layer     = nn.Conv2d(conv_channels * 4, keydim, kernel_size=4, padding='same')
+        self.value_layer     = nn.Conv2d(conv_channels * 4, valdim, kernel_size=4, padding='same')
+        self.global_context  = GlobalContextVolume2D(keydim, valdim, n_layers, topk)
+        self.context_encoder = MemoryEncoder2D(conv_channels * 4, keydim, self.encoder, self.value_layer, self.global_context)
+        self.dynamics_layer  = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
             ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8

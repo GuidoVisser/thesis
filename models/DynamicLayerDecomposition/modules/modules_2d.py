@@ -86,10 +86,11 @@ class MemoryEncoder2D(MemoryEncoder):
     """
     Memory Encoder usable with 2D convolutions
     """
-    def __init__(self, conv_channels: int, keydim: int, reconstruction_encoder: nn.ModuleList, gcv: GlobalContextVolume) -> None:
+    def __init__(self, conv_channels: int, keydim: int, reconstruction_encoder: nn.ModuleList, value_layer: nn.Module, gcv: GlobalContextVolume) -> None:
         super().__init__(keydim, reconstruction_encoder)
 
         self.key_layer      = nn.Conv2d(conv_channels, keydim, kernel_size=4, padding='same')
+        self.value_layer    = value_layer
         self.global_context = gcv
 
     def _get_context_from_key_value_pair(self, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:

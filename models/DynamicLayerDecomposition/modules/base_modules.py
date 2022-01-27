@@ -148,6 +148,7 @@ class MemoryEncoder(nn.Module):
 
         self.backbone       = reconstruction_encoder
         self.key_layer      = NotImplemented
+        self.value_layer    = NotImplemented
         self.global_context = NotImplemented
 
         # self.valdim    = valdim
@@ -158,6 +159,7 @@ class MemoryEncoder(nn.Module):
         Update the global context distribution
         """
 
+        feature_maps = []
         values = []
         with torch.no_grad():
             for l in range(input.shape[1]):
@@ -165,11 +167,13 @@ class MemoryEncoder(nn.Module):
                 for layer in self.backbone:
                     x = layer(x)
 
-                values.append(x)
+                feature_maps.append(x)
+                val = F.leaky_relu(self.value_layer(x))
+                values.append(val)
 
-        for l in range(len(values)):
+        for l in range(len(feature_maps)):
 
-            key = F.softmax(self.key_layer(values[l]), dim=1)
+            key = F.softmax(self.key_layer(feature_maps[l]), dim=1)
 
             context = self._get_context_from_key_value_pair(key, values[l])
 

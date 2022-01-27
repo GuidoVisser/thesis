@@ -19,7 +19,6 @@ class LayerDecompositer(nn.Module):
                  context_loader: DataLoader,
                  loss_module: nn.Module,
                  network: nn.Module,
-                 context_network: nn.Module,
                  summary_writer: SummaryWriter,
                  learning_rate: float,
                  results_root: str,
@@ -27,18 +26,19 @@ class LayerDecompositer(nn.Module):
                  n_epochs: int,
                  save_freq: int,
                  separate_bg: bool,
-                 use_depth: bool):
+                 use_depth: bool,
+                 using_context: bool):
         super().__init__()
 
         self.dataloader = dataloader
         self.context_loader = context_loader
         self.loss_module = loss_module
         self.net = network
-        self.context_network = context_network
         self.learning_rate = learning_rate
-        self.optimizer = Adam(self.net.parameters(), self.learning_rate)
-        if self.context_network is not None:
-            self.context_optimizer = Adam(self.context_network.parameters(), self.learning_rate)
+        self._check_parameters()
+        self.optimizer = Adam(self.net.reconstruction_parameters, self.learning_rate)
+        if using_context:
+            self.context_optimizer = Adam(self.net.context_parameters, self.learning_rate)
 
         self.results_root = results_root
         self.save_dir = f"{results_root}/decomposition"
@@ -48,6 +48,7 @@ class LayerDecompositer(nn.Module):
         self.writer = summary_writer
         self.separate_bg = separate_bg
         self.use_depth = use_depth
+        self.using_context = using_context
 
     def run_training(self, start_epoch=0):
 
@@ -59,19 +60,17 @@ class LayerDecompositer(nn.Module):
             if epoch % self.save_freq == 0:
                 self.create_save_dirs(f"intermediate/{epoch}")
 
-            if self.context_network is not None:
+            if self.using_context:
 
                 self.context_optimizer.zero_grad()
 
-                if isinstance(self.context_network, DataParallel):
-                    self.context_network.module.global_context.reset_steps()
+                if isinstance(self.net, DataParallel):
+                    self.net.context_encoder.module.global_context.reset_steps()
                 else:
-                    self.context_network.global_context.reset_steps()
+                    self.net.context_encoder.global_context.reset_steps()
+                
                 for iteration, input in enumerate(self.context_loader):
-
-                    input = input.to(next(self.context_network.parameters()).device)
-
-                    self.context_network(input)
+                    self.net.encode_context(input)
 
             for iteration, (input, targets) in enumerate(self.dataloader):
 
@@ -95,7 +94,7 @@ class LayerDecompositer(nn.Module):
                     frame_indices = input["index"][:, 0].tolist()
                     self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
 
-            if self.context_network is not None:
+            if self.using_context:
                 self.context_optimizer.step()
             self.loss_module.update_lambdas()
 
@@ -109,10 +108,9 @@ class LayerDecompositer(nn.Module):
         with open(path.join(self.results_root, "time.txt"), "w") as f:
             f.write(str(sum(t_avg) / len(t_avg)))
 
-        torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth")) 
-        if self.context_network is not None:
-            torch.save(self.context_network.state_dict(), path.join(self.results_root, "context_weights.pth"))           
+        torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
 
+    # TODO Change to include context encoding step
     @torch.no_grad()
     def decomposite(self):
 
@@ -259,3 +257,15 @@ class LayerDecompositer(nn.Module):
             transmission_composite = layer_alpha + (1 - layer_alpha) * transmission_composite
         
         return torch.clamp(rgba_with_detail, -1, 1)
+
+    def _check_parameters(self):
+        for param in self.net.parameters():
+            claimed = False
+            for r_p in self.net.reconstruction_parameters:
+                if param is r_p:
+                    claimed = True
+                else:
+                    for c_p in self.net.context_parameters:
+                        if param is c_p:
+                            claimed = True
+            assert claimed, "You have parameters in the network that are not added to any optimizer"
