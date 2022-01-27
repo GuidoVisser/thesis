@@ -515,8 +515,10 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         Returns RGBa for the input layer and the final feature maps.
         """
-
-        print(f"{self.reconstruction_parameters[0].device}\n{next(self.context_parameters).device}\n{self.global_context.context_volume[0].device}")
+        r = self.reconstruction_parameters[0].device
+        c = next(self.context_parameters).device
+        v = self.global_context.context_volume[0].device
+        print(f"recon: {r}\ncontext: {c}\nvolume: {v}")
 
         T = x.shape[-3]
 
