@@ -497,6 +497,8 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         self.context_encoder = MemoryEncoder2D(conv_channels * 4, keydim, self.encoder, self.value_layer, self.global_context)
         self.dynamics_layer  = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
 
+        print(context_encoder)
+
         self.decoder = nn.ModuleList([
             ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
             ConvBlock2D(conv_channels * 2 * 4,      conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/4
