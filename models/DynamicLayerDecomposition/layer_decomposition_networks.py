@@ -151,6 +151,11 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         input = input.to(next(self.context_encoder.parameters()).device)
         self.context_encoder(input)
 
+    def get_context(self) -> torch.Tensor:
+        """
+        Contstruct a global context distribution for the current reconstruction frame
+        """
+
     def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
         Get the background offset of the current set of frames
