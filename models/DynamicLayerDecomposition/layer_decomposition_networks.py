@@ -7,8 +7,7 @@ from models.DynamicLayerDecomposition.modules.base_modules import *
 from models.DynamicLayerDecomposition.modules.modules_2d import *
 from models.DynamicLayerDecomposition.modules.modules_3d import *
 
-# TODO add context encoder to network
-# TODO add context encoder forward pass to network
+
 class LayerDecompositionAttentionMemoryNet(nn.Module):
     """
     Layer Decomposition Attention Memory Net base class
@@ -151,24 +150,6 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         """
         input = input.to(next(self.context_encoder.parameters()).device)
         self.context_encoder(input)
-
-    @property
-    def reconstruction_parameters(self) -> list:
-        reconstruction_parameters = list(self.encoder.parameters()) 
-        reconstruction_parameters += list(self.value_layer.parameters())
-        reconstruction_parameters += list(self.decoder.parameters())
-        reconstruction_parameters += list(self.final_flow.parameters())
-        reconstruction_parameters += list(self.final_rgba.parameters())
-        reconstruction_parameters += list(self.query_layer.parameters())
-        reconstruction_parameters += list(self.dynamics_layer.parameters())
-        reconstruction_parameters.append(self.bg_offset)
-        reconstruction_parameters.append(self.brightness_scale)
-
-        return reconstruction_parameters
-
-    @property
-    def context_parameters(self) -> list:
-        return self.context_encoder.key_layer.parameters()
 
     def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
@@ -515,11 +496,6 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         Returns RGBa for the input layer and the final feature maps.
         """
-        r = self.reconstruction_parameters[0].device
-        c = 3#next(self.context_encoder.key_layer.parameters()).device
-        v = self.global_context.context_volume[0].device
-        print(f"recon: {r}\ncontext: {c}\nvolume: {v}")
-
         T = x.shape[-3]
 
         outputs = []

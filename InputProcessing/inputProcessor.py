@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch.nn.functional as F
 from os import path
+from math import ceil
 from typing import Union
 from InputProcessing.depthHandler import DepthHandler
 
@@ -396,8 +397,9 @@ class ContextDataset(object):
         super().__init__()
 
         # initialize attributes
-        self.frame_size = (args.frame_width, args.frame_height)
-        self.use_depth  = args.use_depth
+        self.frame_size   = (args.frame_width, args.frame_height)
+        self.use_depth    = args.use_depth
+        self.context_freq = args.mem_freq
 
         if isinstance(args.initial_mask, str):
             self.N_objects = 1
@@ -436,6 +438,9 @@ class ContextDataset(object):
             b: The number of background layers (1 if only static, 2 if also dynamic)
 
         """
+        # update index to skip frames based on context frequency
+        idx = min(self.context_freq * idx, len(self.flow_handler) - 1)
+
         # Get inputs
         _, binary_masks = self.mask_handler[idx]      # [L-b, C, H, W]
         _, _, object_flow, _ = self.flow_handler[idx] # [L-b, C, H, W]
@@ -460,7 +465,7 @@ class ContextDataset(object):
         return query_input
 
     def __len__(self):
-        return len(self.flow_handler)
+        return ceil(len(self.flow_handler) / self.context_freq) + 1
 
     def get_rgb_layers(self, rgb, masks):
         """
@@ -515,7 +520,7 @@ class ContextDataset(object):
                 create_new = True
 
         if create_new:
-            for _ in range(len(self) + 1):
+            for _ in range(len(self.flow_handler) + 1):
                 self.composite_order.append(tuple([int(i+1) for i in range(self.mask_handler.N_objects)]))
 
 

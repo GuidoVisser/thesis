@@ -424,7 +424,7 @@ if __name__ == "__main__":
     input_args.add_argument("--num_static_channels", type=int, default=5, help="number of input channels that are static in time")
     input_args.add_argument("--timesteps", type=int, default=4, help="Temporal depth of the query input")
     input_args.add_argument("--memory_timesteps", type=int, default=4, help="Temporal depth of the memory input")
-    input_args.add_argument("--mem_freq", type=int, default=1, help="period between frames that are added to memory")
+    input_args.add_argument("--mem_freq", type=int, default=3, help="period between frames that are added to memory")
     input_args.add_argument("--frame_height", type=int, default=256, help="target height of the frames")
     input_args.add_argument("--frame_width", type=int, default=448, help="target width of the frames")
     input_args.add_argument("--jitter_rate", type=float, default=0.75, help="rate of applying jitter to the input")

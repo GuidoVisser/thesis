@@ -160,7 +160,6 @@ class MemoryEncoder(nn.Module):
         """
 
         feature_maps = []
-        values = []
         with torch.no_grad():
             for l in range(input.shape[1]):
                 x = input[:, l]
@@ -168,14 +167,13 @@ class MemoryEncoder(nn.Module):
                     x = layer(x)
 
                 feature_maps.append(x)
-                val = F.leaky_relu(self.value_layer(x))
-                values.append(val)
 
         for l in range(len(feature_maps)):
 
             key = F.softmax(self.key_layer(feature_maps[l]), dim=1)
+            val = F.leaky_relu(self.value_layer(x))
 
-            context = self._get_context_from_key_value_pair(key, values[l])
+            context = self._get_context_from_key_value_pair(key, val)
 
             # update the memory of the current layer
             for b in range(context.shape[0]):

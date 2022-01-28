@@ -46,20 +46,9 @@ class LayerDecompositer(nn.Module):
         self.separate_bg = separate_bg
         self.use_depth = use_depth
 
-        # get network
-        if isinstance(self.net, DataParallel):
-            net = self.net.module
-        else:
-            net = self.net
-
-        # check if all parameters are returned by the parameter properties
-        self._check_parameters(net)
-        
         # define optimizers
-        self.optimizer = Adam(net.reconstruction_parameters, self.learning_rate)
-        if using_context:
-            self.context_optimizer = Adam(net.context_parameters, self.learning_rate)
-
+        self.optimizer = Adam(self.net.parameters(), self.learning_rate)
+        
     def run_training(self, start_epoch=0):
 
         t_avg = []
@@ -70,20 +59,18 @@ class LayerDecompositer(nn.Module):
             if epoch % self.save_freq == 0:
                 self.create_save_dirs(f"intermediate/{epoch}")
 
-            if self.using_context:
-
-                self.context_optimizer.zero_grad()
-
-                if isinstance(self.net, DataParallel):
-                    self.net.module.global_context.reset_steps()
-                    for iteration, input in enumerate(self.context_loader):
-                        self.net.module.encode_context(input)
-                else:
-                    self.net.global_context.reset_steps()
-                    for iteration, input in enumerate(self.context_loader):
-                        self.net.encode_context(input)
-
             for iteration, (input, targets) in enumerate(self.dataloader):
+
+                if self.using_context:
+
+                    if isinstance(self.net, DataParallel):
+                        net = self.net.module
+                    else:
+                        net = self.net
+
+                    net.global_context.reset_steps()
+                    for context_input in self.context_loader:
+                        net.encode_context(context_input)
 
                 self.optimizer.zero_grad()
                 output = self.net(input)
@@ -105,8 +92,6 @@ class LayerDecompositer(nn.Module):
                     frame_indices = input["index"][:, 0].tolist()
                     self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
 
-            if self.using_context:
-                self.context_optimizer.step()
             self.loss_module.update_lambdas()
 
             t_avg.append((datetime.now() - t0).total_seconds())
