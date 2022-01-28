@@ -61,17 +61,6 @@ class LayerDecompositer(nn.Module):
 
             for iteration, (input, targets) in enumerate(self.dataloader):
 
-                if self.using_context:
-
-                    if isinstance(self.net, DataParallel):
-                        net = self.net.module
-                    else:
-                        net = self.net
-
-                    net.global_context.reset_steps()
-                    for context_input in self.context_loader:
-                        net.encode_context(context_input)
-
                 self.optimizer.zero_grad()
                 output = self.net(input)
 

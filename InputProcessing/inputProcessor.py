@@ -424,7 +424,7 @@ class ContextDataset(object):
         # Load a custom compositing order if it's given, otherwise initialize a new one
         self._initialize_composite_order(args.composite_order)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: tuple):
         """
         Get the optical flow input for the layer decompostion model
 
@@ -438,18 +438,20 @@ class ContextDataset(object):
             b: The number of background layers (1 if only static, 2 if also dynamic)
 
         """
+        frame_idx, layer_idx = idx
+
         # update index to skip frames based on context frequency
-        idx = min(self.context_freq * idx, len(self.flow_handler) - 1)
+        frame_idx = min(self.context_freq * frame_idx, len(self.flow_handler) - 1)
 
         # Get inputs
-        _, binary_masks = self.mask_handler[idx]      # [L-b, C, H, W]
-        _, _, object_flow, _ = self.flow_handler[idx] # [L-b, C, H, W]
+        _, binary_masks = self.mask_handler[frame_idx]      # [L-b, C, H, W]
+        _, _, object_flow, _ = self.flow_handler[frame_idx] # [L-b, C, H, W]
         if self.use_depth:
-            _, object_depth = self.depth_handler[idx] # [L-b, C, H, W]
-        spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, idx].unsqueeze(0) # [C-4, H, W]
+            _, object_depth = self.depth_handler[frame_idx] # [L-b, C, H, W]
+        spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, frame_idx].unsqueeze(0) # [C-4, H, W]
 
         # Construct query input        
-        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - 1, 1, 1, 1) # [L-b, 1, H, W] 
+        pids = binary_masks * (torch.Tensor(self.composite_order[frame_idx]) + 1).view(self.N_layers - 1, 1, 1, 1) # [L-b, 1, H, W] 
         if self.use_depth:
             query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise.expand(self.N_layers - 1, -1, -1, -1)), dim=1) # [L-b, C, H, W]
         else:
@@ -462,7 +464,8 @@ class ContextDataset(object):
 
         query_input = torch.cat((dynamic_background_input, query_input)) # [L, C, H, W]
 
-        return query_input
+        # TODO: update handler classes to handle tuple input so we can select one layer.
+        return query_input[layer_idx:layer_idx+1]
 
     def __len__(self):
         return ceil(len(self.flow_handler) / self.context_freq) + 1

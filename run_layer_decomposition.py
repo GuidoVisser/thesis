@@ -191,7 +191,7 @@ class ExperimentRunner(object):
             shuffle=True
         )
 
-        context_dataset = ContextDataset(
+        context_loader = ContextDataset(
             self.args,
             frame_iterator,
             mask_handler,
@@ -199,11 +199,6 @@ class ExperimentRunner(object):
             homography_handler,
             depth_handler,
             background_volume
-        )
-
-        context_loader = DataLoader(
-            context_dataset,
-            batch_size=args.batch_size
         )
 
         return dataloader, context_loader
@@ -255,12 +250,12 @@ class ExperimentRunner(object):
         if self.args.model_type == "3d_bottleneck":
             if not self.args.use_depth:
                 network = LayerDecompositionAttentionMemoryNet3DBottleneck(
+                    context_loader=context_loader,
                     in_channels=self.args.in_channels,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
                     keydim=self.args.keydim,
                     topk=self.args.topk,
-                    n_layers=len(self.args.initial_mask) + 1,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,

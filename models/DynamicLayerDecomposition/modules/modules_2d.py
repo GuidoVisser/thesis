@@ -53,10 +53,10 @@ class GlobalContextVolume2D(GlobalContextVolume):
     """
     Global Context Volume usable with 2D convolutions
     """
-    def __init__(self, keydim: int, valdim: int, n_layers: int, topk: int) -> None:
-        super().__init__(keydim, valdim, n_layers, topk)
+    def __init__(self, keydim: int, valdim: int, topk: int) -> None:
+        super().__init__(keydim, valdim, topk)
 
-    def forward(self, query: torch.Tensor, layer_idx: int) -> torch.Tensor:
+    def forward(self, query: torch.Tensor) -> torch.Tensor:
         """
         Returns a context distribution defined by the global context and the local query
 
@@ -64,7 +64,6 @@ class GlobalContextVolume2D(GlobalContextVolume):
 
         Args:
             query (torch.Tensor[B x C_k x H, W])
-            layer_idx (int)
 
         Returns:
             context_dist (torch.Tensor[B x C_v x H x W])
@@ -73,7 +72,7 @@ class GlobalContextVolume2D(GlobalContextVolume):
         B, _, H, W = query.shape
 
         query = query.view(B, -1, H*W)                                     # -> [B x C_k x HW]
-        context_dist = torch.matmul(self.context_volume[layer_idx], query) # -> [B x C_v x HW]
+        context_dist = torch.matmul(self.context_volume, query) # -> [B x C_v x HW]
         context_dist = context_dist.view(B, -1, H, W)                      # -> [B x C_v x H x W]
 
         if self.topk is not None:
@@ -86,8 +85,8 @@ class MemoryEncoder2D(MemoryEncoder):
     """
     Memory Encoder usable with 2D convolutions
     """
-    def __init__(self, conv_channels: int, keydim: int, reconstruction_encoder: nn.ModuleList, value_layer: nn.Module, gcv: GlobalContextVolume) -> None:
-        super().__init__(keydim, reconstruction_encoder)
+    def __init__(self, conv_channels: int, keydim: int, value_layer: nn.Module, gcv: GlobalContextVolume) -> None:
+        super().__init__(keydim)
 
         self.key_layer      = nn.Conv2d(conv_channels, keydim, kernel_size=4, padding='same')
         self.value_layer    = value_layer

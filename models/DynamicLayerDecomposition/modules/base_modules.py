@@ -86,17 +86,14 @@ class GlobalContextVolume(nn.Module):
     in memory
     """
 
-    def __init__(self, keydim: int, valdim: int, n_layers: int, topk: int = 0) -> None:
+    def __init__(self, keydim: int, valdim: int, topk: int = 0) -> None:
         super().__init__()
 
-        self.context_volume = [torch.zeros(valdim, keydim)]*n_layers
-        for i, c in enumerate(self.context_volume):
-            self.register_buffer(f"context_volume_{i}", c)
+        # self.register_buffer(f"context_volume", torch.zeros(valdim, keydim))
         self.topk = topk if topk > 0 else None
 
         # for running average
-        self.n_layers = n_layers
-        self.step = list(repeat(1, n_layers))
+        self.step = 1
 
     def forward(self, query: torch.Tensor) -> torch.Tensor:
         """
@@ -113,7 +110,7 @@ class GlobalContextVolume(nn.Module):
         """
         return NotImplemented
 
-    def update(self, context: torch.Tensor, layer_idx) -> None:
+    def update(self, context: torch.Tensor) -> None:
         """
         Update the global context volume using the local context matrices at different timesteps
         v1:
@@ -123,18 +120,18 @@ class GlobalContextVolume(nn.Module):
             local_contexts (list[ torch.Tensor[C_v x C_k] ] -- length=T)
         """
 
-        if self.step[layer_idx] == 1:
-            self.context_volume[layer_idx] = context
+        if self.step == 1:
+            self.context_volume = context
         else:
-            step = self.step[layer_idx]
-            self.context_volume[layer_idx] = (step - 1) / step * self.context_volume[layer_idx] + 1 / step * context
-        self.step[layer_idx] += 1
+            step = self.step
+            self.context_volume = (step - 1) / step * self.context_volume + 1 / step * context
+        self.step += 1
 
     def reset_steps(self):
         """
         Reset the self.step variable to start a new running average
         """
-        self.step = list(repeat(1, self.n_layers))
+        self.step = 1
 
 class MemoryEncoder(nn.Module):
     """
@@ -143,10 +140,9 @@ class MemoryEncoder(nn.Module):
     Encodes the input into a global context
     """
 
-    def __init__(self, keydim: int, reconstruction_encoder: nn.ModuleList) -> None:
+    def __init__(self, keydim: int) -> None:
         super().__init__()
 
-        self.backbone       = reconstruction_encoder
         self.key_layer      = NotImplemented
         self.value_layer    = NotImplemented
         self.global_context = NotImplemented
@@ -159,25 +155,13 @@ class MemoryEncoder(nn.Module):
         Update the global context distribution
         """
 
-        feature_maps = []
-        with torch.no_grad():
-            for l in range(input.shape[1]):
-                x = input[:, l]
-                for layer in self.backbone:
-                    x = layer(x)
+        key = F.softmax(self.key_layer(input), dim=1)
+        val = F.leaky_relu(self.value_layer(input))
 
-                feature_maps.append(x)
+        context = self._get_context_from_key_value_pair(key, val)
 
-        for l in range(len(feature_maps)):
-
-            key = F.softmax(self.key_layer(feature_maps[l]), dim=1)
-            val = F.leaky_relu(self.value_layer(x))
-
-            context = self._get_context_from_key_value_pair(key, val)
-
-            # update the memory of the current layer
-            for b in range(context.shape[0]):
-                self.global_context.update(context[b], l)
+        # update the memory of the current layer 
+        self.global_context.update(context[0])
 
     def _get_context_from_key_value_pair(self, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
         """

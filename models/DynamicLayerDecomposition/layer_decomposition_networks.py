@@ -1,3 +1,4 @@
+from glob import glob
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,7 +14,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
     """
     Layer Decomposition Attention Memory Net base class
     """
-    def __init__(self, max_frames=200, coarseness=10, do_adjustment=True):
+    def __init__(self, context_loader, max_frames=200, coarseness=10, do_adjustment=True):
         super().__init__()
 
         # initialize foreground encoder and decoder
@@ -28,6 +29,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         self.context_encoder = NotImplemented
         self.global_context  = NotImplemented
+
+        self.context_loader  = context_loader
 
         self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
@@ -152,10 +155,23 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         input = input.to(next(self.context_encoder.parameters()).device)
         self.context_encoder(input)
 
-    def get_context(self) -> torch.Tensor:
+    def get_context(self, layer_idx) -> torch.Tensor:
         """
         Contstruct a global context distribution for the current reconstruction frame
         """
+        self.global_context.reset_steps()
+        for i in range(len(self.context_loader)):
+
+            x = self.context_loader[i, layer_idx]
+            x = x.to(next(self.context_encoder.parameters()).device)
+
+            with torch.no_grad():
+                for layer in self.encoder:
+                    x = layer(x)
+
+            self.context_encoder(x)
+            
+        return self.context_encoder.global_context
 
     def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """
@@ -453,18 +469,18 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
     Layer Decomposition Attention Memory Net with 2D convolutions and one 3D convolution in the middle to function as a temporal bottleneck
     """
     def __init__(self, 
+                 context_loader,
                  in_channels, 
                  conv_channels=64, 
                  valdim=128, 
                  keydim=64, 
                  topk=0,
-                 n_layers=1,
                  max_frames=200, 
                  transposed_bottleneck=True,
                  coarseness=10, 
                  do_adjustment=True):
 
-        super().__init__(max_frames, coarseness, do_adjustment)
+        super().__init__(context_loader, max_frames, coarseness, do_adjustment)
 
         valdim = conv_channels * 4
         context_dim = topk if topk > 0 and topk < valdim else valdim
@@ -480,8 +496,8 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
                 
         self.query_layer     = nn.Conv2d(conv_channels * 4, keydim, kernel_size=4, padding='same')
         self.value_layer     = nn.Conv2d(conv_channels * 4, valdim, kernel_size=4, padding='same')
-        self.global_context  = GlobalContextVolume2D(keydim, valdim, n_layers, topk)
-        self.context_encoder = MemoryEncoder2D(conv_channels * 4, keydim, self.encoder, self.value_layer, self.global_context)
+        self.global_context  = GlobalContextVolume2D(keydim, valdim, topk)
+        self.context_encoder = MemoryEncoder2D(conv_channels * 4, keydim, self.value_layer, self.global_context)
         self.dynamics_layer  = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
@@ -502,6 +518,9 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         Returns RGBa for the input layer and the final feature maps.
         """
+
+        context = self.get_context(layer_idx)
+
         T = x.shape[-3]
 
         outputs = []
@@ -517,7 +536,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             
             query = F.softmax(self.query_layer(x_t), dim=1)
 
-            global_features = self.global_context(query, layer_idx)
+            global_features = context(query)
 
             x_t = torch.cat((global_features, x_t), dim=1)
             
