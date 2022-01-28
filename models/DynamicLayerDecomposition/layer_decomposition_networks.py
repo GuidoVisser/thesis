@@ -152,7 +152,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         for i in range(len(self.context_loader)):
 
             x = self.context_loader[i, layer_idx]
-            print(next(self.encoder.parameters()).device)
+            print(next(self.context_encoder.key_layer.weight.device))
             x = x.to(next(self.encoder.parameters()).device)
 
             with torch.no_grad():
