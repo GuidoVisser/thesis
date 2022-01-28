@@ -518,7 +518,6 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         r = self.reconstruction_parameters[0].device
         c = 3#next(self.context_encoder.key_layer.parameters()).device
         v = self.global_context.context_volume[0].device
-        print(self.context_encoder)
         print(f"recon: {r}\ncontext: {c}\nvolume: {v}")
 
         T = x.shape[-3]
