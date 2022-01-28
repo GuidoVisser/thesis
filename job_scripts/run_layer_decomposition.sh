@@ -35,6 +35,7 @@ echo "$SLURM_JOBID | Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decompos
 python $HOME/thesis/run_layer_decomposition.py \
             --model_setup 4 \
             --memory_setup 1 \
+            --device cuda \
             --img_dir $TMPDIR/video \
             --initial_mask $TMPDIR/00/00006.png $TMPDIR/01/00006.png \
             --out_dir $TMPDIR/output_dir \
