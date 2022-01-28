@@ -143,17 +143,6 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             "full_static_bg": full_static_bg                # [B,    3, T, H, W]
         }
         return out
-    
-    def encode_context(self, input: torch.Tensor) -> None:
-        """
-        Add the input to the encoded context volume
-
-        Args:
-            input (torch.Tensor[B, L, C, H, W])
-            layer_idx (int)
-        """
-        input = input.to(next(self.context_encoder.parameters()).device)
-        self.context_encoder(input)
 
     def get_context(self, layer_idx) -> torch.Tensor:
         """
@@ -163,8 +152,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         for i in range(len(self.context_loader)):
 
             x = self.context_loader[i, layer_idx]
-            print(self.context_encoder)
-            x = x.to(next(self.context_encoder.parameters()).device)
+            print(next(self.context_encoder.parameters()).device)
+            x = x.to(next(self.encoder.parameters()).device)
 
             with torch.no_grad():
                 for layer in self.encoder:
