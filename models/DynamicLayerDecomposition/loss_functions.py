@@ -112,6 +112,28 @@ class DecompositeLoss(nn.Module):
         
         return loss
 
+    def get_alpha_composite(self, alpha_layers: torch.Tensor):
+        """
+        Get the alpha composite from the alpha layers.
+        The static background layer is ignored.
+
+        Args:
+            alpha_layers (torch.Tensor) [B, L, 1, T, H, W]
+
+        Returns the alpha composite given by the update rule
+
+        c_i = (1 - a_i) * c_{i-1} + a_i
+        """
+        L = alpha_layers.shape[1]
+
+        alpha_composite = alpha_layers[:, 1]
+
+        for l in range(2, L):
+            alpha_composite = (1 - alpha_layers[:, l]) * alpha_composite + alpha_layers[:, l]
+
+        return alpha_composite
+
+
     def cal_dynamics_reg(self, alpha_layers: torch.Tensor, binary_masks: torch.Tensor) -> torch.Tensor:
         """
         Calculate the dynamics regularization loss that guides the learning to discourage the 
@@ -119,16 +141,16 @@ class DecompositeLoss(nn.Module):
         dynamic background layer to take care of this.
 
         Args:
-            alpha_layers (torch.Tensor) [B',     L, 1, H, W] (B' = B * 2)
-            binary_masks (torch.Tensor) [B', L - 2, 1, H, W]
+            alpha_layers (torch.Tensor) [B',     L, 1, T, H, W] (B' = B * 2)
+            binary_masks (torch.Tensor) [B', L - 2, 1, T, H, W]
         
         Returns the dynamic regularization loss term
         """
 
-        dynamics_layer = alpha_layers[:, 1].unsqueeze(1) * .5 + .5  # [B',   1, 1, H, W]
-        object_layers  = alpha_layers[:, 2:] * .5 + .5              # [B', L-2, 1, H, W]
+        dynamics_layer = alpha_layers[:, 1].unsqueeze(1) * .5 + .5  # [B',   1, 1, T, H, W]
+        object_layers  = alpha_layers[:, 2:] * .5 + .5              # [B', L-2, 1, T, H, W]
 
-        dynamics_layer.expand(object_layers.shape)
+        dynamics_layer = dynamics_layer.expand(object_layers.shape)
 
 
         if self.corr_diff:
@@ -230,8 +252,9 @@ class DecompositeLoss3D(DecompositeLoss):
         rgba_reconstruction  = predictions["rgba_reconstruction"]   # [B,    4, T, H, W]
         flow_reconstruction  = predictions["flow_reconstruction"]   # [B,    2, T, H, w]
         rgb_reconstruction   = rgba_reconstruction[:, :3]           # [B,    3, T, H, W]
-        alpha_composite      = rgba_reconstruction[:, 3:]           # [B,    1, T, H, W]
+        # alpha_composite      = rgba_reconstruction[:, 3:]           # [B,    1, T, H, W]
         alpha_layers         = predictions["layers_rgba"][:, :, 3:] # [B, L, 1, T, H, W]
+        alpha_composite      = self.get_alpha_composite(alpha_layers)
 
         # Calculate main loss
         rgb_reconstruction_loss   = self.calculate_loss(rgb_reconstruction, rgb_gt)

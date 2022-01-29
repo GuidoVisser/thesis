@@ -186,10 +186,18 @@ class LayerDecompositer(nn.Module):
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_offset/{img_name}"), flow_to_image(background_offset_img[:, :, :2], convert_to_bgr=True))
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/brightness_scale/{img_name}"), brightness_scale_img)
 
-                for l in range(1, n_layers):
-                    create_dirs(path.join(self.save_dir, f"{epoch_name}/foreground/{l:02}"),
-                                path.join(self.save_dir, f"{epoch_name}/alpha/{l:02}"),
-                                path.join(self.save_dir, f"{epoch_name}/flow/{l:02}"))
+                for l in range(0, n_layers):
+
+                    if l == 0:
+                        layer_name = "static_background"
+                    elif l == 1:
+                        layer_name = "dynamic_background"
+                    else:
+                        layer_name = f"{l:02}"
+
+                    create_dirs(path.join(self.save_dir, f"{epoch_name}/foreground/{layer_name}"),
+                                path.join(self.save_dir, f"{epoch_name}/alpha/{layer_name}"),
+                                path.join(self.save_dir, f"{epoch_name}/flow/{layer_name}"))
                     foreground_rgba    = torch.clone(rgba_layers[b, l, :, t]).detach()
                     foreground_flow    = torch.clone(flow_layers[b, l, :, t]).detach()
                     foreground_alpha   = torch.clone(rgba_layers[b, l, 3, t]).detach()
@@ -197,16 +205,16 @@ class LayerDecompositer(nn.Module):
                     foreground_img      = cv2.cvtColor((foreground_rgba.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGBA2BGRA)
                     alpha_img           = (foreground_alpha.cpu().numpy() + 1) / 2. * 255
                     foreground_flow_img = flow_to_image(foreground_flow.permute(1, 2, 0).cpu().numpy(), convert_to_bgr=True)
-
-                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/flow/{l:02}/{img_name}"), foreground_flow_img)
-                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/foreground/{l:02}/{img_name}"), foreground_img)
-                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/alpha/{l:02}/{img_name}"), alpha_img)
+                    
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/flow/{layer_name}/{img_name}"), foreground_flow_img)
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/foreground/{layer_name}/{img_name}"), foreground_img)
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/alpha/{layer_name}/{img_name}"), alpha_img)
 
                     if self.use_depth:
-                        create_dir(path.join(self.save_dir, f"{epoch_name}/depth/{l:02}"))
+                        create_dir(path.join(self.save_dir, f"{epoch_name}/depth/{layer_name}"))
                         foreground_depth   = torch.clone(depth_layers[b, l, 0, t]).detach()
                         depth_img           = (1 - ((foreground_depth.cpu().numpy() + 1) / 2.)) * 255
-                        cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/depth/{l:02}/{img_name}"), depth_img)
+                        cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/depth/{layer_name}/{img_name}"), depth_img)
 
 
     def create_save_dirs(self, epoch):
