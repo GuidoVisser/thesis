@@ -387,11 +387,11 @@ if __name__ == "__main__":
     parser.add_argument("--memory_setup", type=int, default=1, help="id of memory input setup")
 
     dataset = "Videos"
-    video = "scooter-black"
+    video = "kruispunt_rijks"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00000.png"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00006.png", f"datasets/{dataset}/Annotations/{video}/01/00006.png"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/Images/{video}", 
         help="path to the directory in which the video frames are stored")
@@ -438,7 +438,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--seed", type=int, default=1, help="Random seed for libraries")
 
     lambdas = parser.add_argument_group("lambdas")
-    lambdas.add_argument("--lambda_mask", nargs="+", default=[50., 1, 51., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
+    lambdas.add_argument("--lambda_mask", nargs="+", default=[100., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
     lambdas.add_argument("--lambda_recon_flow", nargs="+", default=[1.], help="lambda of the flow reconstruction loss")
     lambdas.add_argument("--lambda_recon_warp", nargs="+", default=[0.], help="lambda of the warped rgb reconstruction loss")
     lambdas.add_argument("--lambda_recon_depth", nargs="+", default=[1.], help="lambda of the depth reconstruction loss")
