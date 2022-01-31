@@ -432,8 +432,7 @@ class ContextDataset(object):
             spatiotemporal_noise = self.background_volume.spatiotemporal_noise_uv_sampled[:, frame_idx].unsqueeze(0) # [C-4, H, W]
 
         # Construct query input        
-        # pids = binary_masks * (torch.Tensor(self.composite_order[frame_idx])).view(self.N_layers - 1, 1, 1, 1) # [L-b, 1, H, W] 
-        pids = binary_masks
+        pids = binary_masks * (torch.Tensor(self.composite_order[frame_idx])).view(self.N_layers - 1, 1, 1, 1) # [L-b, 1, H, W] 
         if self.use_depth:
             query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise.expand(self.N_layers - 1, -1, -1, -1)), dim=1) # [L-b, C, H, W]
         else:
