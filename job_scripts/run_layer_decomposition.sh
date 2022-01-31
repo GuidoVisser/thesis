@@ -48,8 +48,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 128 \
             --valdim 256 \
             --timesteps 4 \
-            --mem_freq 10 \
-            --description 'The input noise is mostly static'
+            --num_context_frames 10 \
+            --description 'New context method'
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
