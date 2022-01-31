@@ -288,23 +288,23 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
-            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
+            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/8
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
                 
         self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.value_layer         = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
         self.global_context      = GlobalContextVolume2D(keydim, valdim, topk)
         self.context_encoder     = MemoryEncoder2D(conv_channels * 4, keydim, self.value_layer, self.global_context)
-        self.temporal_bottleneck = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
+        self.temporal_bottleneck = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.InstanceNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
-            ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
-            ConvBlock2D(conv_channels * 2 * 4,      conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/4
-            ConvBlock2D(conv_channels * 2 * 2,      conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/2
-            ConvBlock2D(conv_channels * 2,          conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
+            ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/8
+            ConvBlock2D(conv_channels * 2 * 4,      conv_channels * 2, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/4
+            ConvBlock2D(conv_channels * 2 * 2,      conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/2
+            ConvBlock2D(conv_channels * 2,          conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
@@ -423,19 +423,19 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
-            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
+            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/8
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
 
-        self.dynamics_layer = ConvBlock3D(conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
+        self.dynamics_layer = ConvBlock3D(conv_channels * 4, conv_channels * 4, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.InstanceNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
-            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
-            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/4
-            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/2
-            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
+            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 4, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/8
+            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/4
+            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/2
+            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
@@ -613,11 +613,11 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
-            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
+            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/8
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
                 
         self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.value_layer         = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
@@ -628,10 +628,10 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
         decoder_in_channels = conv_channels * 4 + valdim + context_dim
 
         self.decoder = nn.ModuleList([
-            ConvBlock2D(decoder_in_channels,   conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
-            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/4
-            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/2
-            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
+            ConvBlock2D(decoder_in_channels,   conv_channels * 4, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/8
+            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/4
+            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/2
+            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
@@ -971,23 +971,23 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
-            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
+            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/8
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
 
         self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.value_layer         = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
         self.global_context      = GlobalContextVolume2D(keydim, valdim, topk)
         self.context_encoder     = MemoryEncoder2D(conv_channels * 4, keydim, self.value_layer, self.global_context)
-        self.temporal_bottleneck = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.BatchNorm3d, transposed=transposed_bottleneck)
+        self.temporal_bottleneck = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.InstanceNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
-            ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
-            ConvBlock2D(conv_channels * 2 * 4,      conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/4
-            ConvBlock2D(conv_channels * 2 * 2,      conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/2
-            ConvBlock2D(conv_channels * 2,          conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
+            ConvBlock2D(conv_channels * 4 + valdim, conv_channels * 4, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/8
+            ConvBlock2D(conv_channels * 2 * 4,      conv_channels * 2, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/4
+            ConvBlock2D(conv_channels * 2 * 2,      conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/2
+            ConvBlock2D(conv_channels * 2,          conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True)]) # 1
 
         self.final_rgba  = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow  = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
@@ -1117,11 +1117,11 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
-            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/4
-            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/8
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),  # 1/16
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')]) # 1/16
+            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
+            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/8
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
         
         self.query_layer = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.value_layer = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
@@ -1129,10 +1129,10 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
         self.context_encoder = MemoryEncoder2D(conv_channels * 4, keydim, self.value_layer, self.global_context)
 
         self.decoder = nn.ModuleList([
-            ConvBlock2D(decoder_in_channels,   conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/8
-            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/4
-            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),  # 1/2
-            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)]) # 1
+            ConvBlock2D(decoder_in_channels,   conv_channels * 4, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/8
+            ConvBlock2D(conv_channels * 2 * 4, conv_channels * 2, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/4
+            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/2
+            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True)]) # 1
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
@@ -1371,19 +1371,19 @@ class Omnimatte(nn.Module):
         super().__init__()
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),
-            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),
-            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.BatchNorm2d, activation='leaky'),
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky'),
-            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.BatchNorm2d, activation='leaky')])
+            ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),
+            ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),
+            ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')])
         
         self.decoder = nn.ModuleList([
-            ConvBlock2D(conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),
-            ConvBlock2D(conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),
-            ConvBlock2D(conv_channels * 4 * 2, conv_channels * 2, ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),
-            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True),
-            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.BatchNorm2d, transposed=True)])
+            ConvBlock2D(conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),
+            ConvBlock2D(conv_channels * 4 * 2, conv_channels * 4, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),
+            ConvBlock2D(conv_channels * 4 * 2, conv_channels * 2, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),
+            ConvBlock2D(conv_channels * 2 * 2, conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),
+            ConvBlock2D(conv_channels * 2,     conv_channels,     ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True)])
         
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
