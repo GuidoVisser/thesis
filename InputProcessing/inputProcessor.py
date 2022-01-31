@@ -4,17 +4,8 @@ import cv2
 import numpy as np
 import torch.nn.functional as F
 from os import path
-from math import ceil
-from typing import Union
-from InputProcessing.depthHandler import DepthHandler
 
 from utils.video_utils import opencv_folder_to_video
-from utils.utils import create_dir, create_dirs
-from .backgroundVolume import BackgroundVolume
-from .maskHandler import MaskHandler
-from .flowHandler import FlowHandler
-from .frameIterator import FrameIterator
-from .homography import HomographyHandler
 
 
 class InputProcessor(object):
@@ -40,11 +31,6 @@ class InputProcessor(object):
         self.num_bg_layers             = 1 if args.no_static_background else 2
         self.use_depth                 = args.use_depth
 
-        # directories
-        # video = args.img_dir
-        # out_root = args.out_dir
-        # initial_mask = args.initial_mask
-
         if isinstance(args.initial_mask, str):
             self.N_objects = 1
         else:
@@ -54,15 +40,6 @@ class InputProcessor(object):
 
         # create input directories
         self.out_root  = args.out_dir
-
-        # img_dir        = path.join(out_root, "images")
-        # mask_dir       = path.join(out_root, "masks")
-        # flow_dir       = path.join(out_root, "flow")
-        # depth_dir      = path.join(out_root, "depth")
-        # background_dir = path.join(out_root, "background")
-
-        # save resized ground truth frames in the input directory
-        # self._prepare_image_dir(video, img_dir)
 
         # create helper classes 
         #   These helpers prepare the mask propagation, homography estimation and optical flow calculation 
@@ -75,7 +52,7 @@ class InputProcessor(object):
         self.background_volume  = background_volume
 
         # Load a custom compositing order if it's given, otherwise initialize a new one
-        self._initialize_composite_order(args.composite_order)
+        self._initialize_composite_order(path.join(args.out_dir, args.composite_order))
         
     def __getitem__(self, idx):
         """
@@ -163,7 +140,7 @@ class InputProcessor(object):
 
         # Construct query input        
         # [L-b, 1, T, H, W]
-        pids = binary_masks * (torch.Tensor(self.composite_order[idx]) + 1).view(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)
+        pids = binary_masks * (torch.Tensor(self.composite_order[idx])).view(self.N_layers - self.num_bg_layers, 1, 1, 1, 1)
         if self.use_depth:
             # [L-b, C, T, H, W]
             query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise.expand(self.N_layers - self.num_bg_layers, -1, -1, -1, -1)), dim=1)
@@ -368,19 +345,18 @@ class InputProcessor(object):
         """
         self.composite_order = []
         
-        if fp == None:
-            create_new = True
+        if path.exists(fp):
+            with open(fp, "r") as f:
+                for line in f.readlines():
+                    self.composite_order.append(tuple([int(frame_idx) for frame_idx in line.split(" ")]))
         else:
-            if path.exists(fp):
-                with open(fp, "r") as f:
-                    for line in f.readlines():
-                        self.composite_order.append(tuple([int(frame_idx) for frame_idx in line.split(" ")]))
-            else:
-                create_new = True
-
-        if create_new:
-            for _ in range(len(self) + 1):
+            for _ in range(len(self.frame_iterator)):
                 self.composite_order.append(tuple([int(i+1) for i in range(self.mask_handler.N_objects)]))
+
+            with open(fp, "a") as f:
+                for frame in self.composite_order:
+                    f.write(" ".join([str(layer) for layer in frame]))
+                    f.write("\n")
 
 
 class ContextDataset(object):
@@ -399,7 +375,7 @@ class ContextDataset(object):
         # initialize attributes
         self.frame_size   = (args.frame_width, args.frame_height)
         self.use_depth    = args.use_depth
-        self.context_freq = args.mem_freq
+        # self.num_context_frames = args.num_context_frames
 
         if isinstance(args.initial_mask, str):
             self.N_objects = 1
@@ -422,7 +398,7 @@ class ContextDataset(object):
         self.background_volume  = background_volume
         
         # Load a custom compositing order if it's given, otherwise initialize a new one
-        self._initialize_composite_order(args.composite_order)
+        self._initialize_composite_order(path.join(args.out_dir, args.composite_order))
 
     def __getitem__(self, idx: tuple):
         """
@@ -441,7 +417,7 @@ class ContextDataset(object):
         frame_idx, layer_idx = idx
 
         # update index to skip frames based on context frequency
-        frame_idx = min(self.context_freq * frame_idx, len(self.flow_handler) - 1)
+        # frame_idx = min(self.context_freq * frame_idx, len(self.flow_handler) - 1)
 
         # Get inputs
         _, binary_masks = self.mask_handler[frame_idx]      # [L-b, C, H, W]
@@ -451,7 +427,7 @@ class ContextDataset(object):
         spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, frame_idx].unsqueeze(0) # [C-4, H, W]
 
         # Construct query input        
-        pids = binary_masks * (torch.Tensor(self.composite_order[frame_idx]) + 1).view(self.N_layers - 1, 1, 1, 1) # [L-b, 1, H, W] 
+        pids = binary_masks * (torch.Tensor(self.composite_order[frame_idx])).view(self.N_layers - 1, 1, 1, 1) # [L-b, 1, H, W] 
         if self.use_depth:
             query_input = torch.cat((pids, object_depth, object_flow, spatiotemporal_noise.expand(self.N_layers - 1, -1, -1, -1)), dim=1) # [L-b, C, H, W]
         else:
@@ -468,7 +444,7 @@ class ContextDataset(object):
         return query_input[layer_idx:layer_idx+1]
 
     def __len__(self):
-        return ceil(len(self.flow_handler) / self.context_freq) + 1
+        return len(self.flow_handler)
 
     def get_rgb_layers(self, rgb, masks):
         """
@@ -512,19 +488,18 @@ class ContextDataset(object):
         """
         self.composite_order = []
         
-        if fp == None:
-            create_new = True
+        if path.exists(fp):
+            with open(fp, "r") as f:
+                for line in f.readlines():
+                    self.composite_order.append(tuple([int(frame_idx) for frame_idx in line.split(" ")]))
         else:
-            if path.exists(fp):
-                with open(fp, "r") as f:
-                    for line in f.readlines():
-                        self.composite_order.append(tuple([int(frame_idx) for frame_idx in line.split(" ")]))
-            else:
-                create_new = True
-
-        if create_new:
-            for _ in range(len(self.flow_handler) + 1):
+            for _ in range(len(self.frame_iterator)):
                 self.composite_order.append(tuple([int(i+1) for i in range(self.mask_handler.N_objects)]))
+
+            with open(fp, "w") as f:
+                for frame in self.composite_order:
+                    f.write(" ".join([layer for layer in frame]))
+                    f.write("\n")
 
 
     ########################

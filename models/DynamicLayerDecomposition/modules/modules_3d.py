@@ -6,9 +6,6 @@ import numpy as np
 from models.DynamicLayerDecomposition.modules.base_modules import ConvBlock
 from models.DynamicLayerDecomposition.modules.base_modules import GlobalContextVolume
 from models.DynamicLayerDecomposition.modules.base_modules import MemoryEncoder
-from models.DynamicLayerDecomposition.modules.base_modules import KeyValueEncoder
-
-import cv2
 
 class ConvBlock3D(ConvBlock):
     """

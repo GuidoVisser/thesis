@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from typing import Protocol, Tuple
+from typing import Tuple
 
 
 class LambdaScheduler(object):

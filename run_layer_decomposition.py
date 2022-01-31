@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 from torch.utils.data import DataLoader
 import torch
-import torch.nn as nn
+import json
 from os import path, listdir
 from torch.nn.parallel import DataParallel
 from torch.utils.tensorboard import SummaryWriter
@@ -21,8 +21,8 @@ from InputProcessing.depthHandler import DepthHandler
 
 from utils.demo import create_decomposite_demo
 from utils.utils import create_dir, seed_all, create_dirs
-from models.DynamicLayerDecomposition.model_config import default_config, read_config, load_config, save_config, update_config
 
+import cv2
 
 class ExperimentRunner(object):
     """
@@ -52,77 +52,48 @@ class ExperimentRunner(object):
         super().__init__()
 
         self.args = args
-        model_setup = args.model_setup
-        memory_setup = args.memory_setup
 
-        self._set_configs(model_setup, memory_setup)
+        self._set_configs()
 
         # update and save arguments   
         if args.continue_from != "":
-            config = load_config(f"{args.continue_from}/config.txt")
+            new_epochs = args.n_epochs
+            with open(f"{args.out_dir}/config.json", "r") as f:
+                args.__dict__ = json.load(f)
 
-            # initialize epoch count
-            self.start_epoch = config["training_parameters"]["n_epochs"] + 1
-            config["training_parameters"]["n_epochs"] += args.n_epochs
-            
-            # update namespace
-            args = read_config(args, config)
-            save_config(f"{args.out_dir}/config.txt", config)
+            self.start_epoch = args.n_epochs + 1
+            args.n_epochs += new_epochs
+
+            with open(f"{args.out_dir}/config.json", "w") as f:
+                json.dump(args.__dict__, f, indent=2)
+
         else:
             create_dir(args.out_dir)
             self.start_epoch = 0
-            config = update_config(args, default_config())
-            save_config(f"{args.out_dir}/config.txt", config)
-    
-    def _set_configs(self, model_setup: int, memory_setup: int) -> None:
 
-        if model_setup == 1:
-            self.args.model_type = "3d_memory"
-        elif model_setup == 2:
-            self.args.model_type = "3d_memory"
-            self.args.memory_t_strided = True
-            self.args.memory_timesteps = 16
-        elif model_setup == 3:
-            self.args.model_type = "3d_bottleneck"
-        elif model_setup == 4:
-            self.args.model_type = "3d_bottleneck"
-            self.args.shared_backbone = True
-        elif model_setup == 5:
-            self.args.model_type = "fully_2d"            
+            with open(f"{args.out_dir}/config.json", "w") as f:
+                json.dump(args.__dict__, f, indent=2)
+            
+        with open(f"{args.out_dir}/config.txt", "w") as f:
+            for arg in vars(args):
+                f.write(f"{arg}{' '*(30 - len(arg))}{getattr(args, arg)}\n")
+        
+    
+    def _set_configs(self) -> None:
+
+        if self.args.model_type == "fully_2d":
             self.args.use_2d_loss_module = True
             self.args.timesteps = 2
-        elif model_setup == 6:
-            self.args.model_type = "fully_2d"   
-            self.args.shared_backbone = True
+        elif self.args.model_type == "no_addons":
             self.args.use_2d_loss_module = True
             self.args.timesteps = 2
-        elif model_setup == 7:
-            self.args.model_type = "omnimatte"
+            self.args.lambda_alpha_warp = [0.]
+        elif self.args.model_type == "omnimatte":
+            self.args.use_2d_loss_module = True
             self.args.timesteps = 2
             self.args.num_static_channels = self.args.in_channels
-            self.args.use_2d_loss_module = True
             self.args.lambda_recon_depth = [0.]
             self.args.use_depth = False
-        elif model_setup == 8:
-            self.args.model_type = "bottleneck_no_attention"
-        elif model_setup == 9:
-            self.args.model_type = "no_addons"
-            self.args.timesteps = 2
-            self.args.use_2d_loss_module = True
-            self.args.lambda_alpha_warp = [0.]
-
-        if memory_setup == 1:
-            self.args.memory_input_type = "noise"
-            self.args.memory_in_channels = self.args.in_channels
-        elif memory_setup == 2:
-            self.args.memory_input_type = "rgb"
-            self.args.memory_in_channels = 3
-        elif memory_setup == 3:
-            self.args.memory_input_type = "noise+"
-            self.args.memory_in_channels = self.args.in_channels
-        elif memory_setup == 4:
-            self.args.memory_input_type = "rgb+"
-            self.args.memory_in_channels = 5 + int(self.args.use_depth)
 
     def start(self):
         # set seeds
@@ -251,6 +222,7 @@ class ExperimentRunner(object):
             if not self.args.use_depth:
                 network = LayerDecompositionAttentionMemoryNet3DBottleneck(
                     context_loader=context_loader,
+                    num_context_frames=args.num_context_frames,
                     in_channels=self.args.in_channels,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
@@ -263,6 +235,8 @@ class ExperimentRunner(object):
                 )
             else:
                 network = LayerDecompositionAttentionMemoryDepthNet3DBottleneck(
+                    context_loader,
+                    num_context_frames=args.num_context_frames,
                     in_channels=self.args.in_channels,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
@@ -272,34 +246,7 @@ class ExperimentRunner(object):
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,
                     coarseness=self.args.coarseness
-                )
-        # elif self.args.model_type == "3d_memory":
-        #     if not self.args.use_depth:
-        #         network = LayerDecompositionAttentionMemoryNet3DMemoryEncoder(
-        #             in_channels=self.args.in_channels,
-        #             memory_in_channels=self.args.memory_in_channels,
-        #             t_strided=self.args.memory_t_strided,
-        #             conv_channels=self.args.conv_channels,
-        #             valdim=self.args.valdim,
-        #             keydim=self.args.keydim,
-        #             topk=self.args.topk,
-        #             do_adjustment=True, 
-        #             max_frames=len(dataloader.dataset.frame_iterator),
-        #             coarseness=self.args.coarseness,
-        #         )
-        #     else:
-        #         network = LayerDecompositionAttentionMemoryDepthNet3DMemoryEncoder(
-        #             in_channels=self.args.in_channels,
-        #             memory_in_channels=self.args.memory_in_channels,
-        #             t_strided=self.args.memory_t_strided,
-        #             conv_channels=self.args.conv_channels,
-        #             valdim=self.args.valdim,
-        #             keydim=self.args.keydim,
-        #             topk=self.args.topk,
-        #             do_adjustment=True, 
-        #             max_frames=len(dataloader.dataset.frame_iterator),
-        #             coarseness=self.args.coarseness,
-        #         )     
+                )    
         elif self.args.model_type == "omnimatte":
             network = Omnimatte(
                 in_channels=self.args.in_channels,
@@ -311,6 +258,8 @@ class ExperimentRunner(object):
         elif self.args.model_type == "fully_2d":
             if not self.args.use_depth:
                 network = LayerDecompositionAttentionMemoryNet2D(
+                    context_loader,
+                    num_context_frames=args.num_context_frames,
                     in_channels=self.args.in_channels,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
@@ -322,6 +271,8 @@ class ExperimentRunner(object):
                 )
             else:
                 network = LayerDecompositionAttentionMemoryDepthNet2D(
+                    context_loader,
+                    num_context_frames=args.num_context_frames,
                     in_channels=self.args.in_channels,
                     conv_channels=self.args.conv_channels,
                     valdim=self.args.valdim,
@@ -335,6 +286,8 @@ class ExperimentRunner(object):
             if self.args.use_depth:
                 raise NotImplementedError("Bottleneck model without context module is not supported with depth estimation")
             network = LayerDecompositionNet3DBottleneck(
+                    context_loader=None,
+                    num_context_frames=None,
                     in_channels=self.args.in_channels,
                     conv_channels=self.args.conv_channels,
                     do_adjustment=True, 
@@ -383,8 +336,6 @@ if __name__ == "__main__":
     print(f"Running on {torch.cuda.device_count()} GPU{'s' if torch.cuda.device_count() > 1 else ''}")
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
-    parser.add_argument("--model_setup", type=int, default=4, help="id of model setup")
-    parser.add_argument("--memory_setup", type=int, default=1, help="id of memory input setup")
 
     dataset = "Videos"
     video = "kruispunt_rijks"
@@ -398,12 +349,11 @@ if __name__ == "__main__":
     directory_args.add_argument("--continue_from", type=str, default="", help="root directory of training run from which you wish to continue")
 
     model_args = parser.add_argument_group("model")
-    model_args.add_argument("--model_type", type=str, default="3d_bottleneck", choices=["3d_bottleneck", "3d_memory", "fully_2d", "fully_3d", "omnimatte"], help="The type of decomposition network to use")
+    model_args.add_argument("--model_type", type=str, default="3d_bottleneck", choices=["3d_bottleneck", "fully_2d", "omnimatte", "bottleneck_no_attention", "no_addons"], help="The type of decomposition network to use")
     model_args.add_argument("--conv_channels", type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
     model_args.add_argument("--keydim", type=int, default=8, help="number of key channels in the attention memory network")
     model_args.add_argument("--valdim", type=int, default=16, help="number of value channels in the attention memory network")
     model_args.add_argument("--in_channels", type=int, default=16, help="number of channels in the input")
-    model_args.add_argument("--memory_in_channels", type=int, default=16, help="number of channels in the memory input")
     model_args.add_argument("--coarseness", type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
     model_args.add_argument("--use_2d_loss_module", action="store_true", help="Use 2d loss module in stead of 3d loss module")
     model_args.add_argument("--no_static_background", action="store_true", help="Don't use separated static and dynamic background")
@@ -418,15 +368,13 @@ if __name__ == "__main__":
     input_args = parser.add_argument_group("model input")
     input_args.add_argument("--num_static_channels", type=int, default=5, help="number of input channels that are static in time")
     input_args.add_argument("--timesteps", type=int, default=4, help="Temporal depth of the query input")
-    input_args.add_argument("--memory_timesteps", type=int, default=4, help="Temporal depth of the memory input")
-    input_args.add_argument("--mem_freq", type=int, default=3, help="period between frames that are added to memory")
+    input_args.add_argument("--num_context_frames", type=int, default=10, help="period between frames that are added to memory")
     input_args.add_argument("--frame_height", type=int, default=256, help="target height of the frames")
     input_args.add_argument("--frame_width", type=int, default=448, help="target width of the frames")
     input_args.add_argument("--jitter_rate", type=float, default=0.75, help="rate of applying jitter to the input")
-    input_args.add_argument("--composite_order", type=str, help="path to a text file containing the compositing order of the foreground objects")
+    input_args.add_argument("--composite_order", type=str, default="composite_order.txt", help="path to a text file containing the compositing order of the foreground objects")
     input_args.add_argument("--noise_temporal_coarseness", type=int, default=2, help="temporal coarseness of the dynamic noise input")
     input_args.add_argument("--noise_upsample_size", type=int, default=16, help="determines the spatial coarseness of both the spatial the and dynamic noise input")
-    input_args.add_argument("--memory_input_type", type=str, default="noise+", choices=["rgb", "rgb+", "noise", "noise+"])
 
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--batch_size", type=int, default=1, help="Batch size")

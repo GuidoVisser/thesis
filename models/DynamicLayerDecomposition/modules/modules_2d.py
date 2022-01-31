@@ -6,7 +6,6 @@ import numpy as np
 from models.DynamicLayerDecomposition.modules.base_modules import ConvBlock
 from models.DynamicLayerDecomposition.modules.base_modules import GlobalContextVolume
 from models.DynamicLayerDecomposition.modules.base_modules import MemoryEncoder
-from models.DynamicLayerDecomposition.modules.base_modules import KeyValueEncoder
 
 
 class ConvBlock2D(ConvBlock):
@@ -88,7 +87,7 @@ class MemoryEncoder2D(MemoryEncoder):
     def __init__(self, conv_channels: int, keydim: int, value_layer: nn.Module, gcv: GlobalContextVolume) -> None:
         super().__init__(keydim)
 
-        self.key_layer      = nn.Conv2d(conv_channels, keydim, kernel_size=4, padding='same')
+        self.key_layer      = ConvBlock2D(conv_channels, keydim, ksize=4, activation='channel_softmax')
         self.value_layer    = value_layer
         self.global_context = gcv
 

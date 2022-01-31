@@ -1,12 +1,10 @@
 import cv2
 import torch.nn as nn
 import torch
-from torch.utils import data
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from os import path
 from datetime import datetime
-from torch.nn.parallel import DataParallel
 
 from torch.utils.tensorboard.writer import SummaryWriter
 

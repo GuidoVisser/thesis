@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from itertools import repeat
 
 
 class ConvBlock(nn.Module):
@@ -39,43 +38,14 @@ class ConvBlock(nn.Module):
             self.activation = nn.ReLU()
         elif activation == 'tanh':
             self.activation = nn.Tanh()
+        elif activation == 'channel_softmax':
+            self.activation = nn.Softmax(dim=1)
         else:
             self.activation = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass. Compute necessary padding and cropping because pytorch doesn't have pad=same."""
         return NotImplemented
-
-
-class KeyValueEncoder(nn.Module):
-    """
-    Key-Value encoder network base class
-    
-    Usable with both 2D and 3D convolutions
-    """
-    def __init__(self, conv_module: nn.Module, conv_channels: int, keydim: int, valdim: int) -> None:
-        super().__init__()
-
-        self.key_layer = conv_module(conv_channels, keydim, kernel_size=4, padding='same')
-        self.val_layer = conv_module(conv_channels, valdim, kernel_size=4, padding='same')
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Pass input through the network
-
-        Args:
-            x (torch.Tensor)
-
-        Returns:
-            key (torch.Tensor): key tensor
-            val (torch.Tensor): value tensor
-            skips (list[torch.Tensor]): list of skip connections
-        """
-        
-        key = F.softmax(self.key_layer(x), dim=1)
-        val = F.leaky_relu(self.val_layer(x), negative_slope=0.2)
-        
-        return key, val
 
 
 class GlobalContextVolume(nn.Module):
@@ -147,7 +117,6 @@ class MemoryEncoder(nn.Module):
         self.value_layer    = NotImplemented
         self.global_context = NotImplemented
 
-        # self.valdim    = valdim
         self.keydim    = keydim
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -155,8 +124,8 @@ class MemoryEncoder(nn.Module):
         Update the global context distribution
         """
 
-        key = F.softmax(self.key_layer(input), dim=1)
-        val = F.leaky_relu(self.value_layer(input))
+        key = self.key_layer(input)
+        val = self.value_layer(input)
 
         context = self._get_context_from_key_value_pair(key, val)
 
@@ -178,37 +147,3 @@ class MemoryEncoder(nn.Module):
             context (torch.Tensor)
         """
         return NotImplemented
-
-
-# class MemoryReader(nn.Module):
-#     """
-#     Memory Reader base class
-
-#     Encodes the input into a key value pair. the key is used as query to retrieve a feature map from the 
-#     global context distribution. The value tensor, feature map and skip connections are passed on.
-
-#     Usable with both 2D and 3D convolutions
-#     """
-#     def __init__(self, conv_module: nn.Module, conv_channels: int, keydim: int, valdim: int, backbone: nn.Module) -> None:
-#         super().__init__()
-
-#         self.query_encoder = KeyValueEncoder(conv_module, conv_channels, keydim, valdim, backbone)
-
-#         self.keydim = keydim
-#         self.valdim = valdim
-
-#     def forward(self, input: torch.Tensor, global_context: GlobalContextVolume) -> torch.Tensor:
-#         """
-#         Args:
-#             input (torch.Tensor)
-
-#         Returns:
-#             context_distribution (torch.Tensor)
-#             value (torch.Tensor)
-#             skips (list[torch.Tensor])
-#         """
-#         query, value, skips = self.query_encoder(input)
-
-#         context_distribution = global_context(query)
-
-#         return context_distribution, value, skips
