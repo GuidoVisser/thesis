@@ -231,7 +231,8 @@ class ExperimentRunner(object):
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,
-                    coarseness=self.args.coarseness
+                    coarseness=self.args.coarseness,
+                    separate_value_layer=self.args.separate_value_layer
                 )
             else:
                 network = LayerDecompositionAttentionMemoryDepthNet3DBottleneck(
@@ -245,7 +246,8 @@ class ExperimentRunner(object):
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,
-                    coarseness=self.args.coarseness
+                    coarseness=self.args.coarseness,
+                    separate_value_layer=self.args.separate_value_layer
                 )    
         elif self.args.model_type == "omnimatte":
             network = Omnimatte(
@@ -267,7 +269,8 @@ class ExperimentRunner(object):
                     topk=self.args.topk,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
-                    coarseness=self.args.coarseness
+                    coarseness=self.args.coarseness,
+                    separate_value_layer=self.args.separate_value_layer
                 )
             else:
                 network = LayerDecompositionAttentionMemoryDepthNet2D(
@@ -280,7 +283,8 @@ class ExperimentRunner(object):
                     topk=self.args.topk,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
-                    coarseness=self.args.coarseness
+                    coarseness=self.args.coarseness,
+                    separate_value_layer=self.args.separate_value_layer
                 )
         elif self.args.model_type == "bottleneck_no_attention":
             if self.args.use_depth:
@@ -338,11 +342,11 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
     dataset = "Videos"
-    video = "kruispunt_rijks"
+    video = "scooter-black"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00006.png", f"datasets/{dataset}/Annotations/{video}/01/00006.png"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00000.png"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/Images/{video}", 
         help="path to the directory in which the video frames are stored")
@@ -363,12 +367,12 @@ if __name__ == "__main__":
     model_args.add_argument("--corr_diff", action="store_true", help="use corr_diff dynamics regularization in stead of alpha composite")
     model_args.add_argument("--alpha_reg_layers", action="store_true", help="alpha regularization loss is l1 and l0 on alpha layers in stead of composite")
     model_args.add_argument("--bottleneck_normal", action="store_true", help="have a normal 3d conv as bottleneck in stead of a transposed conv")
-
+    model_args.add_argument("--separate_value_layer", action="store_true", help="specify wether to use a separate value layer for the context and reconstruction encoder")
 
     input_args = parser.add_argument_group("model input")
     input_args.add_argument("--num_static_channels", type=int, default=5, help="number of input channels that are static in time")
     input_args.add_argument("--timesteps", type=int, default=4, help="Temporal depth of the query input")
-    input_args.add_argument("--num_context_frames", type=int, default=10, help="period between frames that are added to memory")
+    input_args.add_argument("--num_context_frames", type=int, default=5, help="period between frames that are added to memory")
     input_args.add_argument("--frame_height", type=int, default=256, help="target height of the frames")
     input_args.add_argument("--frame_width", type=int, default=448, help="target width of the frames")
     input_args.add_argument("--jitter_rate", type=float, default=0.75, help="rate of applying jitter to the input")

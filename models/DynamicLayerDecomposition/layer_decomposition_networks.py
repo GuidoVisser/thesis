@@ -278,6 +278,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
                  topk=0,
                  max_frames=200, 
                  transposed_bottleneck=True,
+                 separate_value_layer=True,
                  coarseness=10, 
                  do_adjustment=True):
 
@@ -294,10 +295,14 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
                 
-        self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.value_layer         = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
+        if separate_value_layer:
+            context_value_layer  = self.value_layer
+        else:
+            context_value_layer  = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
+        self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.global_context      = GlobalContextVolume2D(keydim, valdim, topk)
-        self.context_encoder     = MemoryEncoder2D(conv_channels * 4, keydim, self.value_layer, self.global_context)
+        self.context_encoder     = MemoryEncoder2D(conv_channels * 4, keydim, context_value_layer, self.global_context)
         self.temporal_bottleneck = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.InstanceNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
@@ -604,7 +609,18 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
     """
     Layer Decomposition Attention Memory Net with 2D convolutions
     """
-    def __init__(self, context_loader, num_context_frames, in_channels, conv_channels=64, valdim=128, keydim=64, topk=0, max_frames=200, coarseness=10, do_adjustment=True):
+    def __init__(self, 
+                 context_loader, 
+                 num_context_frames, 
+                 in_channels, 
+                 conv_channels=64, 
+                 valdim=128, 
+                 keydim=64, 
+                 topk=0, 
+                 max_frames=200, 
+                 coarseness=10, 
+                 do_adjustment=True,
+                 separate_value_layer=True):
         super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment)
 
         self.keydim = keydim
@@ -619,10 +635,14 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
                 
-        self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.value_layer         = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
+        if separate_value_layer:
+            context_value_layer  = self.value_layer
+        else:
+            context_value_layer  = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
+        self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.global_context      = GlobalContextVolume2D(keydim, valdim, topk)
-        self.context_encoder     = MemoryEncoder2D(conv_channels * 4, keydim, self.value_layer, self.global_context)
+        self.context_encoder     = MemoryEncoder2D(conv_channels * 4, keydim, context_value_layer, self.global_context)
 
         context_dim = topk if topk > 0 and topk < valdim else valdim
         decoder_in_channels = conv_channels * 4 + valdim + context_dim
@@ -961,6 +981,7 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
                  topk=0,
                  max_frames=200,
                  transposed_bottleneck=True, 
+                 separate_value_layer=True,
                  coarseness=10, 
                  do_adjustment=True):
 
@@ -977,10 +998,15 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
 
-        self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.value_layer         = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
+        if separate_value_layer:
+            context_value_layer  = self.value_layer
+        else:
+            context_value_layer  = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
+
+        self.query_layer         = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.global_context      = GlobalContextVolume2D(keydim, valdim, topk)
-        self.context_encoder     = MemoryEncoder2D(conv_channels * 4, keydim, self.value_layer, self.global_context)
+        self.context_encoder     = MemoryEncoder2D(conv_channels * 4, keydim, context_value_layer, self.global_context)
         self.temporal_bottleneck = ConvBlock3D(valdim + context_dim, valdim, ksize=(4, 4, 4), stride=(1, 1, 1), norm=nn.InstanceNorm3d, transposed=transposed_bottleneck)
 
         self.decoder = nn.ModuleList([
@@ -1105,7 +1131,8 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
                  topk=0, 
                  max_frames=200, 
                  coarseness=10, 
-                 do_adjustment=True):
+                 do_adjustment=True,
+                 separate_value_layer=True):
         super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment)
 
         self.keydim = keydim
@@ -1123,10 +1150,15 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
         
-        self.query_layer = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.value_layer = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
+        if separate_value_layer:
+            context_value_layer = self.value_layer
+        else:
+            context_value_layer = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
+
+        self.query_layer = ConvBlock2D(conv_channels * 4, keydim, ksize=4, activation='channel_softmax')
         self.global_context = GlobalContextVolume2D(keydim, valdim, topk)
-        self.context_encoder = MemoryEncoder2D(conv_channels * 4, keydim, self.value_layer, self.global_context)
+        self.context_encoder = MemoryEncoder2D(conv_channels * 4, keydim, context_value_layer, self.global_context)
 
         self.decoder = nn.ModuleList([
             ConvBlock2D(decoder_in_channels,   conv_channels * 4, ksize=4, stride=2, norm=nn.InstanceNorm2d, transposed=True),  # 1/8
