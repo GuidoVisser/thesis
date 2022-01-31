@@ -109,6 +109,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             # Object layers
             else:
                 rgba, flow = self.render(layer_input, i - 1)
+                if i == 1:
+                    rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 alpha = self.get_alpha_from_rgba(rgba)
 
                 composite_rgba = self.composite_rgba(composite_rgba, rgba)
@@ -493,6 +495,8 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
             # Object layers
             else:
                 rgba, flow = self.render(layer_input)
+                if i == 1:
+                    rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 alpha = self.get_alpha_from_rgba(rgba)
 
                 composite_rgba = self.composite_rgba(composite_rgba, rgba)
@@ -782,6 +786,8 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
             # Object layers
             else:
                 rgba, flow = self.render(layer_input, i-1)
+                if i == 1:
+                    rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 alpha = self.get_alpha_from_rgba(rgba)
 
                 composite_rgba = self.composite_rgba(composite_rgba, rgba)
@@ -927,6 +933,8 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
             # Object layers
             else:
                 rgba, flow, depth = self.render(layer_input, i - 1)
+                if i == 1:
+                    rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 alpha = self.get_alpha_from_rgba(rgba)
 
                 composite_rgba = self.composite_rgba(composite_rgba, rgba)
@@ -1297,6 +1305,8 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
             # Object layers
             else:
                 rgba, flow, depth = self.render(layer_input, i - 1)
+                if i == 1:
+                    rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 alpha = self.get_alpha_from_rgba(rgba)
 
                 composite_rgba = self.composite_rgba(composite_rgba, rgba)
@@ -1511,10 +1521,13 @@ class Omnimatte(nn.Module):
                 rgba_warped      = rgba[:B]
                 composite_warped = rgba_warped[:, :3]
             # Omnimatte doesn't have a dynamic background layer
-            if i == 1 and not self.force_dynamics_layer:
-                rgba        = -1 * torch.ones_like(rgba)
-                flow        = -1 * torch.ones_like(flow)
-                rgba_warped = -1 * torch.ones_like(rgba[:B])
+            if i == 1:
+                if self.force_dynamics_layer:
+                    rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
+                else:
+                    rgba        = -1 * torch.ones_like(rgba)
+                    flow        = -1 * torch.ones_like(flow)
+                    rgba_warped = -1 * torch.ones_like(rgba[:B])
             # Object layers
             else:
                 composite_rgba = rgba * alpha + composite_rgba * (1. - alpha)

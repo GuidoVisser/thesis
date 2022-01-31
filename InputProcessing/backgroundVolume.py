@@ -33,10 +33,9 @@ class BackgroundVolume(object):
                 self.spatiotemporal_noise = torch.cat((self.spatial_noise_upsampled[:args.num_static_channels].unsqueeze(1).repeat(1, num_frames, 1, 1), spatiotemporal_noise_upsampled))
             else:
                 self.spatiotemporal_noise = self.spatial_noise_upsampled.unsqueeze(1).repeat(1, num_frames, 1, 1)
-
-            # NOTE: spatiotemporal noise has dimensions [C, T, H, W]. C and T are ignored by grid sample
-            self.spatiotemporal_noise = F.grid_sample(self.spatiotemporal_noise.permute(1, 0, 2, 3), homography_handler.uv_maps).permute(1, 0, 2, 3)
             
             torch.save(self.spatial_noise,           path.join(save_dir, "spatial_noise.pth"))
             torch.save(self.spatial_noise_upsampled, path.join(save_dir, "spatial_noise_upsampled.pth"))
             torch.save(self.spatiotemporal_noise,    path.join(save_dir, "spatiotemporal_noise.pth"))
+
+        self.spatiotemporal_noise_uv_sampled = F.grid_sample(self.spatiotemporal_noise.permute(1, 0, 2, 3), homography_handler.uv_maps).permute(1, 0, 2, 3)

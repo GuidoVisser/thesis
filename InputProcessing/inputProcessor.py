@@ -98,8 +98,8 @@ class InputProcessor(object):
         # background_noise:  [1, C-4, T, H, W]
         # background_uv_map: [T, H, W, 2]
         if self.num_bg_layers == 2:
-            background_noise = self.background_volume.spatial_noise_upsampled
-            background_noise = background_noise.unsqueeze(0).unsqueeze(2).repeat(1, 1, self.timesteps, 1, 1) 
+            static_background_noise = self.background_volume.spatial_noise_upsampled
+            static_background_noise = static_background_noise.unsqueeze(0).unsqueeze(2).repeat(1, 1, self.timesteps, 1, 1) 
 
         # UV maps for sampling the static background
         background_uv_map = self.homography_handler.uv_maps[idx:idx+self.timesteps]
@@ -111,7 +111,8 @@ class InputProcessor(object):
 
         # Get spatiotemporal noise input
         # spatiotemporal_noise:   [C-4, T, H, W]
-        spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, idx:idx+self.timesteps].unsqueeze(0)
+        dynamic_background_noise = self.background_volume.spatiotemporal_noise[:, idx:idx+self.timesteps].unsqueeze(0)
+        spatiotemporal_noise = self.background_volume.spatiotemporal_noise_uv_sampled[:, idx:idx+self.timesteps].unsqueeze(0)
 
         ### Temp code ###
 
@@ -151,8 +152,8 @@ class InputProcessor(object):
         zeros_channels = 4 if self.use_depth else 3
         zeros = torch.zeros((1, zeros_channels, self.timesteps, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [1, 4, T, H, W]
         if self.num_bg_layers == 2:
-            static_background_input  = torch.cat((zeros, background_noise), dim=1)            # [1, C, T, H, W]
-            dynamic_background_input = torch.cat((zeros, spatiotemporal_noise), dim=1)        # [1, C, T, H, W]
+            static_background_input  = torch.cat((zeros, static_background_noise), dim=1)            # [1, C, T, H, W]
+            dynamic_background_input = torch.cat((zeros, dynamic_background_noise), dim=1)        # [1, C, T, H, W]
             background_input = torch.cat((static_background_input, dynamic_background_input)) # [2, C, T, H, W]
         else:
             # [1, C, T, H, W]
@@ -424,7 +425,11 @@ class ContextDataset(object):
         _, _, object_flow, _ = self.flow_handler[frame_idx] # [L-b, C, H, W]
         if self.use_depth:
             _, object_depth = self.depth_handler[frame_idx] # [L-b, C, H, W]
-        spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, frame_idx].unsqueeze(0) # [C-4, H, W]
+
+        if layer_idx == 0:
+            spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, frame_idx].unsqueeze(0) # [C-4, H, W]
+        else:
+            spatiotemporal_noise = self.background_volume.spatiotemporal_noise_uv_sampled[:, frame_idx].unsqueeze(0) # [C-4, H, W]
 
         # Construct query input        
         pids = binary_masks * (torch.Tensor(self.composite_order[frame_idx])).view(self.N_layers - 1, 1, 1, 1) # [L-b, 1, H, W] 
