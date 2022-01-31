@@ -41,7 +41,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --depth_model $TMPDIR/weights/depth_model.pth \
-            --batch_size 8 \
+            --batch_size 4 \
             --n_epochs 100 \
             --save_freq 500 \
             --conv_channels 64 \
