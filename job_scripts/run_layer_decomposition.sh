@@ -49,6 +49,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 256 \
             --timesteps 4 \
             --num_context_frames 10 \
+            --separate_value_layer \
             --description 'New context method. Uses InstanceNorm in stead of BatchNorm'
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
