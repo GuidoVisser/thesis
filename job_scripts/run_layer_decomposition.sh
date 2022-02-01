@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 #SBATCH -n 1
-#SBATCH -t 24:00:00
+#SBATCH -t 3:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -16,12 +16,12 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='kruispunt_rijks'
+VIDEO='kruispunt_rijks_all'
 cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/video
 mkdir $TMPDIR/00
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00/00006.png $TMPDIR/00/00006.png
-mkdir $TMPDIR/01
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01/00006.png $TMPDIR/01/00006.png
+cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/combined/00006.png $TMPDIR/00/00006.png
+# mkdir $TMPDIR/01
+# cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01/00006.png $TMPDIR/01/00006.png
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -42,7 +42,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --depth_model $TMPDIR/weights/depth_model.pth \
             --batch_size 4 \
-            --n_epochs 1500 \
+            --n_epochs 100 \
             --save_freq 500 \
             --conv_channels 64 \
             --keydim 128 \

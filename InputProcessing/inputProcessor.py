@@ -446,7 +446,10 @@ class ContextDataset(object):
         query_input = torch.cat((dynamic_background_input, query_input)) # [L, C, H, W]
 
         # TODO: update handler classes to handle tuple input so we can select one layer.
-        return query_input[layer_idx:layer_idx+1]
+        # return query_input[layer_idx:layer_idx+1]
+        
+        #  TEST
+        return query_input[0:1]
 
     def __len__(self):
         return len(self.flow_handler)
