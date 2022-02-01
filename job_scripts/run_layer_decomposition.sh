@@ -16,10 +16,10 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='kruispunt_rijks_all'
+VIDEO='kruispunt_rijks'
 cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/video
 mkdir $TMPDIR/00
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/combined/00006.png $TMPDIR/00/00006.png
+cp -RT $HOME/thesis/datasets/Videos/Annotations/kruispunt_rijks_all/combined/00006.png $TMPDIR/00/00006.png
 # mkdir $TMPDIR/01
 # cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01/00006.png $TMPDIR/01/00006.png
 mkdir $TMPDIR/weights
@@ -50,6 +50,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --timesteps 4 \
             --num_context_frames 55 \
             --separate_value_layer \
+            --corr_diff \
             --description 'Test generalization to previous setup'
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

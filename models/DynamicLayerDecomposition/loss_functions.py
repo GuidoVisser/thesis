@@ -60,7 +60,8 @@ class DecompositeLoss(nn.Module):
                  lambda_dynamics_reg_l0,
                  lambda_dynamics_reg_l1,
                  corr_diff,
-                 alpha_reg_layers) -> None:
+                 alpha_reg_layers,
+                 alpha_bg_scale = 1.) -> None:
         super().__init__()
 
         self.criterion = nn.L1Loss()
@@ -78,6 +79,7 @@ class DecompositeLoss(nn.Module):
         self.lambda_dynamics_reg_diff = LambdaScheduler(lambda_dynamics_reg_diff)
         self.lambda_dynamics_reg_l0   = LambdaScheduler(lambda_dynamics_reg_l0)
         self.lambda_dynamics_reg_l1   = LambdaScheduler(lambda_dynamics_reg_l1)
+        self.alpha_bg_scale           = LambdaScheduler(alpha_bg_scale)
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -126,7 +128,7 @@ class DecompositeLoss(nn.Module):
         """
         L = alpha_layers.shape[1]
 
-        alpha_composite = alpha_layers[:, 1]
+        alpha_composite = self.alpha_bg_scale.value * alpha_layers[:, 1]
 
         for l in range(2, L):
             alpha_composite = (1 - alpha_layers[:, l]) * alpha_composite + alpha_layers[:, l]
@@ -189,6 +191,41 @@ class DecompositeLoss(nn.Module):
             l0_prediction = (torch.sigmoid(prediction * 5.0) - 0.5) * 2.0
             loss += self.lambda_alpha_l0.value * torch.mean(l0_prediction)
         return loss
+
+    def cal_detail_reg(self, alpha_layers: torch.Tensor, binary_masks: torch.Tensor) -> torch.Tensor:
+        """
+        Calculate the detail bleed regularization. The model reconstructs parts of lower object layers in the upper object layers 
+        in order to fill in some details earlier in the training process.
+
+        The regularization punishes this effect by calculating for every layer the elementwise product of 
+        the binary mask, alpha layer and the composite of all lower alpha layers.
+
+        Args:
+            alpha_layers (torch.Tensor[B, L, C, T, H, W]): alpha layers inferred by the model
+            binary_masks (torch.Tensor[B, L, C, T, H, W]): ground truth binary object masks
+
+        Returns:
+            loss (torch.Tensor[1]): loss value
+        """
+        _, L, _, _, _, _ = alpha_layers.shape
+
+        layers = []
+        alpha_composite = alpha_layers[:, 0]
+        # mask_composite = binary_masks[:, 0]
+        # ones = torch.ones_like(mask_composite)
+        for l in range(1, L):
+            layers.append(alpha_layers[:, l] * alpha_composite) # * mask_composite)
+
+            # update alpha_composite
+            alpha_composite = (1 - alpha_layers[:, l]) * alpha_composite + alpha_layers[:, l]
+
+            # update mask composite
+            # mask_composite = torch.minimum(mask_composite + binary_masks[:, l], ones)
+
+        loss = torch.mean(torch.stack(layers))
+
+        return loss
+
 
     def update_lambdas(self):
         return NotImplemented
