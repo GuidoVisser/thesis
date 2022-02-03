@@ -42,8 +42,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --n_epochs 250 \
             --save_freq 50 \
             --conv_channels 64 \
-            --keydim 128 \
-            --valdim 256 \
+            --keydim 64 \
+            --valdim 128 \
             --timesteps 4 \
             --num_context_frames 55 \
             --separate_value_layer \
