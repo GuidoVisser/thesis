@@ -42,8 +42,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --depth_model $TMPDIR/weights/depth_model.pth \
             --batch_size 4 \
-            --n_epochs 100 \
-            --save_freq 500 \
+            --n_epochs 250 \
+            --save_freq 50 \
             --conv_channels 64 \
             --keydim 128 \
             --valdim 256 \
