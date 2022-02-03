@@ -61,7 +61,7 @@ class DecompositeLoss(nn.Module):
                  lambda_dynamics_reg_l1,
                  corr_diff,
                  alpha_reg_layers,
-                 alpha_bg_scale = 1.) -> None:
+                 alpha_bg_scale = [1.]) -> None:
         super().__init__()
 
         self.criterion = nn.L1Loss()

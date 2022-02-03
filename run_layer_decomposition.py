@@ -401,6 +401,7 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_l1", nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_l0", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
+    lambdas.add_argument("--alpha_bg_scale", nargs="+", default=[1.], help="downscaling factor for dynamic background in alpha regularization.")
 
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
