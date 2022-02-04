@@ -59,6 +59,7 @@ class DecompositeLoss(nn.Module):
                  lambda_dynamics_reg_diff,
                  lambda_dynamics_reg_l0,
                  lambda_dynamics_reg_l1,
+                 lambda_detail_reg,
                  corr_diff,
                  alpha_reg_layers,
                  alpha_bg_scale = [1.]) -> None:
@@ -79,6 +80,7 @@ class DecompositeLoss(nn.Module):
         self.lambda_dynamics_reg_diff = LambdaScheduler(lambda_dynamics_reg_diff)
         self.lambda_dynamics_reg_l0   = LambdaScheduler(lambda_dynamics_reg_l0)
         self.lambda_dynamics_reg_l1   = LambdaScheduler(lambda_dynamics_reg_l1)
+        self.lambda_detail_reg        = LambdaScheduler(lambda_detail_reg)
         self.alpha_bg_scale           = LambdaScheduler(alpha_bg_scale)
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
@@ -248,6 +250,7 @@ class DecompositeLoss3D(DecompositeLoss):
                  lambda_dynamics_reg_diff,
                  lambda_dynamics_reg_l0,
                  lambda_dynamics_reg_l1,
+                 lambda_detail_reg,                 
                  corr_diff,
                  alpha_reg_layers) -> None:
         
@@ -261,6 +264,7 @@ class DecompositeLoss3D(DecompositeLoss):
                          lambda_dynamics_reg_diff,
                          lambda_dynamics_reg_l0,
                          lambda_dynamics_reg_l1,
+                         lambda_detail_reg,
                          corr_diff,
                          alpha_reg_layers)
         
@@ -289,7 +293,6 @@ class DecompositeLoss3D(DecompositeLoss):
         rgba_reconstruction  = predictions["rgba_reconstruction"]   # [B,    4, T, H, W]
         flow_reconstruction  = predictions["flow_reconstruction"]   # [B,    2, T, H, w]
         rgb_reconstruction   = rgba_reconstruction[:, :3]           # [B,    3, T, H, W]
-        # alpha_composite      = rgba_reconstruction[:, 3:]           # [B,    1, T, H, W]
         alpha_layers         = predictions["layers_rgba"][:, :, 3:] # [B, L, 1, T, H, W]
         alpha_composite      = self.get_alpha_composite(alpha_layers)
 
@@ -297,7 +300,8 @@ class DecompositeLoss3D(DecompositeLoss):
         rgb_reconstruction_loss   = self.calculate_loss(rgb_reconstruction, rgb_gt)
         flow_reconstruction_loss  = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
         mask_bootstrap_loss       = self.calculate_loss(alpha_layers, masks, mask_loss=True)
-        dynamics_reg_loss         = self.cal_dynamics_reg(alpha_layers, binary_masks)
+        # dynamics_reg_loss         = self.cal_dynamics_reg(alpha_layers, binary_masks)
+        detail_reg_loss           = self.cal_detail_reg(alpha_layers, binary_masks)
         if self.alpha_reg_layers:
             alpha_reg_loss        = self.cal_alpha_reg(alpha_layers * 0.5 + 0.5)
         else:
@@ -325,18 +329,21 @@ class DecompositeLoss3D(DecompositeLoss):
         # Combine loss values
         loss = rgb_reconstruction_loss + \
                alpha_reg_loss + \
-               dynamics_reg_loss + \
+               self.lambda_detail_reg.value     * detail_reg_loss + \
                self.lambda_recon_flow.value     * flow_reconstruction_loss + \
                self.lambda_recon_depth.value    * depth_reconstruction_loss + \
                self.lambda_mask_bootstrap.value * mask_bootstrap_loss + \
                self.lambda_stabilization.value  * stabilization_loss
+
+        # loss += dynamics_reg_loss
 
         # create dict of all separate losses for logging
         loss_values = {
             "total":                          loss.item(),
             "rgb_reconstruction_loss":        rgb_reconstruction_loss.item(),
             "alpha_regularization_loss":      alpha_reg_loss.item(),
-            "dynamics_regularization_loss":   dynamics_reg_loss.item(),
+            # "dynamics_regularization_loss":   dynamics_reg_loss.item(),
+            "detail regularization loss":     detail_reg_loss.item(),
             "flow_reconstruction_loss":       self.lambda_recon_flow.value     * flow_reconstruction_loss.item(),
             "depth_reconstruction_loss":      self.lambda_recon_depth.value    * depth_reconstruction_loss.item(),
             "mask_bootstrap_loss":            self.lambda_mask_bootstrap.value * mask_bootstrap_loss.item(),
@@ -364,6 +371,10 @@ class DecompositeLoss3D(DecompositeLoss):
         self.lambda_stabilization.update()
         self.lambda_dynamics_reg_corr.update()
         self.lambda_dynamics_reg_diff.update()
+        self.lambda_detail_reg.update()
+        self.alpha_bg_scale.update()
+        self.lambda_dynamics_reg_l0.update()
+        self.lambda_dynamics_reg_l1.update()
 
 class DecompositeLoss2D(DecompositeLoss):
     """
