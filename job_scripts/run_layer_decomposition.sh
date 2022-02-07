@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 #SBATCH -n 1
-#SBATCH -t 5:00:00
+#SBATCH -t 24:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -40,7 +40,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --depth_model $TMPDIR/weights/depth_model.pth \
             --batch_size 4 \
             --n_epochs 700 \
-            --save_freq 350 \
+            --save_freq 50 \
             --conv_channels 64 \
             --keydim 128 \
             --valdim 256 \
