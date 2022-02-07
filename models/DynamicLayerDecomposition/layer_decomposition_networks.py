@@ -158,8 +158,9 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             if torch.cuda.is_available():
                 x = x.to(torch.cuda.current_device())
 
-            for layer in self.encoder:
-                x = layer(x)
+            with torch.no_grad():
+                for layer in self.encoder:
+                    x = layer(x)
 
             self.context_encoder(x)
             
