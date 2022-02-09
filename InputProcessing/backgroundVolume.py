@@ -3,6 +3,8 @@ from os import path
 import torch
 import torch.nn.functional as F
 from math import ceil
+import cv2
+import numpy as np
 
 from .homography import HomographyHandler
 
@@ -39,3 +41,24 @@ class BackgroundVolume(object):
             torch.save(self.spatiotemporal_noise,    path.join(save_dir, "spatiotemporal_noise.pth"))
 
         self.spatiotemporal_noise_uv_sampled = F.grid_sample(self.spatiotemporal_noise.permute(1, 0, 2, 3), homography_handler.uv_maps).permute(1, 0, 2, 3)
+
+        self.homography_handler = homography_handler
+
+    def visualize(self, frame_idx):
+        spatial_noise_img = (self.spatial_noise_upsampled[-3:].permute(1, 2, 0).numpy() * .5 + .5) * 255
+        spatiotemporal_noise_img = (self.spatiotemporal_noise[-3:, frame_idx].permute(1, 2, 0).numpy() * .5 + .5) * 255
+        sampled_noise = (self.spatiotemporal_noise_uv_sampled[-3:, frame_idx].permute(1, 2, 0).numpy() * .5 + .5) * 255
+
+        uv = self.homography_handler.get_frame_uv(frame_idx).clone().cpu().numpy()
+        corners = [uv[0, 0], uv[0, -1], uv[-1, -1], uv[-1, 0]]
+
+        corners = np.array([(c * .5 + .5) * np.array([448, 256]) for c in corners]).reshape((-1, 1, 2)).astype(np.int32)
+
+        color = (255, 255, 255)
+        thickness = 3
+
+        spatiotemporal_noise_img = cv2.polylines(np.ascontiguousarray(spatiotemporal_noise_img), [corners], True, color, thickness, cv2.LINE_AA)
+
+        cv2.imwrite(f"{self.save_dir}/spatial_noise.png", spatial_noise_img)
+        cv2.imwrite(f"{self.save_dir}/spatiotemporal_noise.png", spatiotemporal_noise_img)
+        cv2.imwrite(f"{self.save_dir}/sampled_spatiotemporal_noise.png", sampled_noise)

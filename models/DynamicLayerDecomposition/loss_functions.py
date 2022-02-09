@@ -60,9 +60,9 @@ class DecompositeLoss(nn.Module):
                  lambda_dynamics_reg_l0,
                  lambda_dynamics_reg_l1,
                  lambda_detail_reg,
+                 lambda_bg_scaling,
                  corr_diff,
-                 alpha_reg_layers,
-                 alpha_bg_scale = [1.]) -> None:
+                 alpha_reg_layers) -> None:
         super().__init__()
 
         self.criterion = nn.L1Loss()
@@ -81,7 +81,7 @@ class DecompositeLoss(nn.Module):
         self.lambda_dynamics_reg_l0   = LambdaScheduler(lambda_dynamics_reg_l0)
         self.lambda_dynamics_reg_l1   = LambdaScheduler(lambda_dynamics_reg_l1)
         self.lambda_detail_reg        = LambdaScheduler(lambda_detail_reg)
-        self.alpha_bg_scale           = LambdaScheduler(alpha_bg_scale)
+        self.lambda_bg_scaling        = LambdaScheduler(lambda_bg_scaling)
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -130,7 +130,7 @@ class DecompositeLoss(nn.Module):
         """
         L = alpha_layers.shape[1]
 
-        alpha_composite = self.alpha_bg_scale.value * alpha_layers[:, 1]
+        alpha_composite = self.lambda_bg_scaling.value * alpha_layers[:, 1]
 
         for l in range(2, L):
             alpha_composite = (1 - alpha_layers[:, l]) * alpha_composite + alpha_layers[:, l]
@@ -250,7 +250,8 @@ class DecompositeLoss3D(DecompositeLoss):
                  lambda_dynamics_reg_diff,
                  lambda_dynamics_reg_l0,
                  lambda_dynamics_reg_l1,
-                 lambda_detail_reg,                 
+                 lambda_detail_reg,
+                 lambda_bg_scaling,
                  corr_diff,
                  alpha_reg_layers) -> None:
         
@@ -265,6 +266,7 @@ class DecompositeLoss3D(DecompositeLoss):
                          lambda_dynamics_reg_l0,
                          lambda_dynamics_reg_l1,
                          lambda_detail_reg,
+                         lambda_bg_scaling,
                          corr_diff,
                          alpha_reg_layers)
         
@@ -372,7 +374,7 @@ class DecompositeLoss3D(DecompositeLoss):
         self.lambda_dynamics_reg_corr.update()
         self.lambda_dynamics_reg_diff.update()
         self.lambda_detail_reg.update()
-        self.alpha_bg_scale.update()
+        self.lambda_bg_scaling.update()
         self.lambda_dynamics_reg_l0.update()
         self.lambda_dynamics_reg_l1.update()
 
@@ -396,6 +398,7 @@ class DecompositeLoss2D(DecompositeLoss):
                  lambda_dynamics_reg_diff,
                  lambda_dynamics_reg_l0,
                  lambda_dynamics_reg_l1,
+                 lambda_bg_scaling,
                  corr_diff,
                  alpha_reg_layers) -> None:
         super().__init__(lambda_mask, 
@@ -408,6 +411,7 @@ class DecompositeLoss2D(DecompositeLoss):
                          lambda_dynamics_reg_diff,
                          lambda_dynamics_reg_l0,
                          lambda_dynamics_reg_l1,
+                         lambda_bg_scaling,
                          corr_diff,
                          alpha_reg_layers)
 

@@ -143,7 +143,7 @@ class ExperimentRunner(object):
         homography_handler = HomographyHandler(self.args.out_dir, img_dir, path.join(flow_dir, "dynamics_mask"), self.args.device, (self.args.frame_width, self.args.frame_height))
         depth_handler      = DepthHandler(img_dir, depth_dir, self.args, mask_handler)
         background_volume  = BackgroundVolume(background_dir, homography_handler, self.args)
-
+        background_volume.visualize(0)
 
         input_processor = InputProcessor(
             self.args,
@@ -194,6 +194,7 @@ class ExperimentRunner(object):
                 self.args.lambda_dynamics_reg_l0,
                 self.args.lambda_dynamics_reg_l1,
                 self.args.lambda_detail_reg,
+                self.args.lambda_bg_scaling,
                 self.args.corr_diff,
                 self.args.alpha_reg_layers
             )
@@ -210,6 +211,7 @@ class ExperimentRunner(object):
                 self.args.lambda_dynamics_reg_l0,
                 self.args.lambda_dynamics_reg_l1,
                 self.args.lambda_detail_reg,
+                self.args.lambda_bg_scaling,
                 self.args.corr_diff,
                 self.args.alpha_reg_layers
             )
@@ -398,7 +400,7 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_alpha_l1",          nargs="+", default=[0.01, 100, 0.], help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization",     nargs="+", default=[0.001], help="lambda of the camera stabilization loss")
     lambdas.add_argument("--lambda_detail_reg",        nargs="+", default=[10, 50, 0.01], help="lambda of the detail bleed regularization loss")
-    lambdas.add_argument("--alpha_bg_scale",           nargs="+", default=[.995], help="downscaling factor for dynamic background in alpha regularization.")
+    lambdas.add_argument("--lambda_bg_scaling",        nargs="+", default=[.995], help="downscaling factor for dynamic background in alpha regularization.")
 
     lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
