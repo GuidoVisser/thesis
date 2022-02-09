@@ -1,5 +1,6 @@
 import cv2
 import torch.nn as nn
+import torch.nn.functional as F
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
@@ -79,6 +80,7 @@ class LayerDecompositer(nn.Module):
 
                 if epoch % self.save_freq == 0:
                     frame_indices = input["index"][:, 0].tolist()
+                    self.visualize_attention_maps(f"intermediate/{epoch}")
                     self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
 
             self.loss_module.update_lambdas()
@@ -101,6 +103,8 @@ class LayerDecompositer(nn.Module):
 
         self.create_save_dirs("final")
 
+        self.visualize_attention_maps("final")
+
         for (input, targets) in self.dataloader:
 
             # Forward pass through network
@@ -121,19 +125,30 @@ class LayerDecompositer(nn.Module):
             frame_indices = input["index"][:, 0].tolist()
             self.visualize_and_save_output(output, targets, frame_indices, "final")
 
-    def visualize_attention_maps(self):
-        """WIP"""
+    def visualize_attention_maps(self, epoch_name):
+
         if isinstance(self.net, DataParallel):
             net = self.net.module
         else:
             net = self.net
         
         for frame_idx in range(len(self.context_loader)):
+            frame_img = cv2.imread(f"{self.results_root}/images/{frame_idx:05}.jpg", cv2.COLOR_RGB2BGR)
+
             for layer_idx in range(self.context_loader.N_layers):
-                key = net.get_attention_maps(frame_idx, layer_idx)
+                with torch.no_grad():
+                    key = net.get_attention_maps(frame_idx, layer_idx)
 
-                create_dir(f"{self.save_dir}/attention_maps/{layer_idx:02}/{frame_idx:02}")
+                create_dir(f"{self.save_dir}/{epoch_name}/attention_maps/{layer_idx:02}/{frame_idx:02}")
 
+                for c in range(key.shape[1]):
+                    attention_map = F.interpolate(key[:, c:c+1], (self.context_loader.frame_size[1], self.context_loader.frame_size[0]), mode='bilinear')[0]
+                    attention_img = (attention_map.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
+                    attention_img = cv2.applyColorMap(attention_img, cv2.COLORMAP_JET)
+
+                    img = cv2.addWeighted(frame_img, 0.5, attention_img, 0.5, 0)
+
+                    cv2.imwrite(f"{self.save_dir}/{epoch_name}/attention_maps/{layer_idx:02}/{frame_idx:02}/{c:03}.png", img)
 
     def visualize_and_save_output(self, model_output, targets, frame_indices, epoch_name):
         """
