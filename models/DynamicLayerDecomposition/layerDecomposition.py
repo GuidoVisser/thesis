@@ -1,6 +1,7 @@
 import cv2
 import torch.nn as nn
 import torch
+import numpy as np
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from os import path
@@ -198,6 +199,7 @@ class LayerDecompositer(nn.Module):
                     foreground_img      = cv2.cvtColor((foreground_rgba.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGBA2BGRA)
                     alpha_img           = (foreground_alpha.cpu().numpy() + 1) / 2. * 255
                     foreground_flow_img = flow_to_image(foreground_flow.permute(1, 2, 0).cpu().numpy(), convert_to_bgr=True)
+                    foreground_flow_img = np.concatenate([foreground_flow_img, np.expand_dims(alpha_img, 2)], axis=2)
                     
                     cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/flow/{layer_name}/{img_name}"), foreground_flow_img)
                     cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/layers/{layer_name}/{img_name}"), foreground_img)

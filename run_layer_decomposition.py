@@ -344,11 +344,11 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
     dataset = "Videos"
-    video = "kruispunt_rijks"
+    video = "scooter-black"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00000.png", f"datasets/{dataset}/Annotations/{video}/01/00000.png"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00000.png"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/Images/{video}", 
         help="path to the directory in which the video frames are stored")
