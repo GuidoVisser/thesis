@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
+from torch.nn.parallel import DataParallel
 from torch.optim import Adam
 from os import path
 from datetime import datetime
@@ -119,6 +120,20 @@ class LayerDecompositer(nn.Module):
             # Save results
             frame_indices = input["index"][:, 0].tolist()
             self.visualize_and_save_output(output, targets, frame_indices, "final")
+
+    def visualize_attention_maps(self):
+        """WIP"""
+        if isinstance(self.net, DataParallel):
+            net = self.net.module
+        else:
+            net = self.net
+        
+        for frame_idx in range(len(self.context_loader)):
+            for layer_idx in range(self.context_loader.N_layers):
+                key = net.get_attention_maps(frame_idx, layer_idx)
+
+                create_dir(f"{self.save_dir}/attention_maps/{layer_idx:02}/{frame_idx:02}")
+
 
     def visualize_and_save_output(self, model_output, targets, frame_indices, epoch_name):
         """

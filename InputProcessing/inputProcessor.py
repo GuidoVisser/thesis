@@ -447,9 +447,8 @@ class ContextDataset(object):
 
         # TODO: update handler classes to handle tuple input so we can select one layer.
         # return query_input[layer_idx:layer_idx+1]
-        
-        #  TEST
-        return query_input[0:1]
+
+        return query_input
 
     def __len__(self):
         return len(self.flow_handler)

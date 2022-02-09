@@ -132,6 +132,8 @@ class MemoryEncoder(nn.Module):
         # update the memory of the current layer 
         self.global_context.update(context[0])
 
+        return key
+
     def _get_context_from_key_value_pair(self, key: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
         """
         Takes as argument a key value pair and returns the corresponding context matrix
