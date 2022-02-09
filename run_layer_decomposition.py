@@ -344,11 +344,11 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
     dataset = "Videos"
-    video = "scooter-black"
+    video = "kruispunt_rijks"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00000.png"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00000.png", f"datasets/{dataset}/Annotations/{video}/01/00000.png"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/Images/{video}", 
         help="path to the directory in which the video frames are stored")
@@ -393,19 +393,20 @@ if __name__ == "__main__":
     lambdas = parser.add_argument_group("lambdas")
     lambdas.add_argument("--lambda_mask",              nargs="+", default=[1000., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
     lambdas.add_argument("--lambda_recon_flow",        nargs="+", default=[1.], help="lambda of the flow reconstruction loss")
-    lambdas.add_argument("--lambda_recon_warp",        nargs="+", default=[0.], help="lambda of the warped rgb reconstruction loss")
     lambdas.add_argument("--lambda_recon_depth",       nargs="+", default=[1.], help="lambda of the depth reconstruction loss")
-    lambdas.add_argument("--lambda_alpha_warp",        nargs="+", default=[0.005], help="lambda of the warped alpha estimation loss")
     lambdas.add_argument("--lambda_alpha_l0",          nargs="+", default=[0.005], help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1",          nargs="+", default=[0.01, 100, 0.], help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization",     nargs="+", default=[0.001], help="lambda of the camera stabilization loss")
+    lambdas.add_argument("--lambda_detail_reg",        nargs="+", default=[10, 50, 0.01], help="lambda of the detail bleed regularization loss")
+    lambdas.add_argument("--alpha_bg_scale",           nargs="+", default=[.995], help="downscaling factor for dynamic background in alpha regularization.")
+
     lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_l1",   nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_l0",   nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
-    lambdas.add_argument("--lambda_detail_reg",        nargs="+", default=[0.0], help="lambda of the detail bleed regularization loss")
-    lambdas.add_argument("--alpha_bg_scale",           nargs="+", default=[1.], help="downscaling factor for dynamic background in alpha regularization.")
 
+    lambdas.add_argument("--lambda_alpha_warp",        nargs="+", default=[0.005], help="lambda of the warped alpha estimation loss")
+    lambdas.add_argument("--lambda_recon_warp",        nargs="+", default=[0.], help="lambda of the warped rgb reconstruction loss")
 
     pretrained_model_args = parser.add_argument_group("pretrained_models")
     pretrained_model_args.add_argument("--propagation_model", type=str, default="models/third_party/weights/topkstm.pth", 

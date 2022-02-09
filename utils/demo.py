@@ -10,7 +10,7 @@ from utils.utils import create_dirs
 from typing import Union
 from math import ceil
 
-def create_decomposite_demo(roots: Union[str, list], fps=10, end_pause=3):
+def create_decomposite_demo(roots: Union[str, list], fps=10, end_pause=3, include_bg_layers=False):
 
     if isinstance(roots, str):
         video_path = path.join(roots, "demo.gif")
@@ -34,12 +34,18 @@ def create_decomposite_demo(roots: Union[str, list], fps=10, end_pause=3):
             img_array[i+j+1] = np.concatenate((img_array[i+j+1], img), axis=1)
 
         object_imgs = []
-        for object_idx, object in enumerate(sorted(listdir(path.join(root, "foreground")))):
-            for i, fn in enumerate(sorted(glob.glob(path.join(root, "foreground", object, "*.png")))):
+        first_object = 0
+        for object_idx, object in enumerate(sorted(listdir(path.join(root, "layers")))):
+
+            if not include_bg_layers and object_idx <= 1:
+                first_object += 1
+                continue
+
+            for i, fn in enumerate(sorted(glob.glob(path.join(root, "layers", object, "*.png")))):
                 img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
                 alpha = np.stack([img[:, :, 3]]*3, axis=2) / 255
                 img = np.uint8(img[:, :, :3] * alpha)
-                if object_idx == 0:
+                if object_idx == first_object:
                     object_imgs.append(img)
                 else:
                     object_imgs[i] = np.concatenate((object_imgs[i], img), axis=1)
