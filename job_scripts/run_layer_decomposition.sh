@@ -39,14 +39,17 @@ python $HOME/thesis/run_layer_decomposition.py \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --depth_model $TMPDIR/weights/depth_model.pth \
             --batch_size 4 \
-            --n_epochs 700 \
-            --save_freq 50 \
+            --n_epochs 750 \
+            --save_freq 250 \
             --conv_channels 64 \
             --keydim 128 \
             --valdim 256 \
             --timesteps 4 \
             --num_context_frames 9 \
-            --description 'Test final setup'
+            --lambda_bg_scaling 0.995 \
+            --lambda_detail_reg 10 50 0.005 \
+            --lambda_mask 1000 50 0
+            --description 'Trying lambda settings'
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 

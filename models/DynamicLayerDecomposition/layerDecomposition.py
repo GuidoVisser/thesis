@@ -132,7 +132,7 @@ class LayerDecompositer(nn.Module):
         else:
             net = self.net
         
-        for frame_idx in range(len(self.context_loader)):
+        for frame_idx in range(0, len(self.context_loader), 5):
             frame_img = cv2.imread(f"{self.results_root}/images/{frame_idx:05}.jpg", cv2.COLOR_RGB2BGR)
 
             for layer_idx in range(self.context_loader.N_layers):
