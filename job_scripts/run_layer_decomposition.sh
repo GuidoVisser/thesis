@@ -42,13 +42,13 @@ python $HOME/thesis/run_layer_decomposition.py \
             --n_epochs 750 \
             --save_freq 250 \
             --conv_channels 64 \
-            --keydim 128 \
+            --keydim 64 \
             --valdim 256 \
             --timesteps 4 \
             --num_context_frames 9 \
-            --lambda_bg_scaling 0.995 \
-            --lambda_detail_reg 10 50 0.005 \
-            --lambda_mask 1000 50 0
+            --lambda_bg_scaling 0.999 \
+            --lambda_detail_reg 10 50 0.01 \
+            --lambda_mask 1000 50 0 \
             --description 'Trying lambda settings'
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
