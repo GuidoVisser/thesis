@@ -28,7 +28,8 @@ class LayerDecompositer(nn.Module):
                  save_freq: int,
                  separate_bg: bool,
                  use_depth: bool,
-                 using_context: bool):
+                 using_context: bool,
+                 do_detail_transfer: bool):
         super().__init__()
 
         self.dataloader = dataloader
@@ -38,6 +39,7 @@ class LayerDecompositer(nn.Module):
         self.learning_rate = learning_rate
         
         self.using_context = using_context
+        self.do_detail_transfer = do_detail_transfer
         self.results_root = results_root
         self.save_dir = f"{results_root}/decomposition"
         self.n_epochs = n_epochs
@@ -116,10 +118,11 @@ class LayerDecompositer(nn.Module):
                 targets = {k:v.to(device) for (k, v) in targets.items()}
 
             # Do detail transfer
-            reconstruction = output["rgba_reconstruction"]
-            rgba_layers    = output["layers_rgba"]
-            gt_image       = targets["rgb"]
-            output["layers_rgba"] = self.transfer_detail(reconstruction[:, :3], rgba_layers, gt_image)
+            if self.do_detail_transfer:
+                reconstruction = output["rgba_reconstruction"]
+                rgba_layers    = output["layers_rgba"]
+                gt_image       = targets["rgb"]
+                output["layers_rgba"] = self.transfer_detail(reconstruction[:, :3], rgba_layers, gt_image)
 
             # Save results
             frame_indices = input["index"][:, 0].tolist()

@@ -316,10 +316,10 @@ class ExperimentRunner(object):
             )
 
         if self.args.device != "cpu":
-            network = DataParallel(network).to(args.device)
+            network = DataParallel(network).to(self.args.device)
         
         if self.args.continue_from != "":
-            network.load_state_dict(torch.load(f"{args.continue_from}/reconstruction_weights.pth"))
+            network.load_state_dict(torch.load(f"{self.args.continue_from}/reconstruction_weights.pth"))
 
         model = LayerDecompositer(
             dataloader, 
@@ -334,7 +334,8 @@ class ExperimentRunner(object):
             save_freq=self.args.save_freq,
             separate_bg=not self.args.no_static_background,
             use_depth=self.args.use_depth,
-            using_context=(args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"])
+            using_context=(self.args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]),
+            do_detail_transfer=self.args.do_detail_transfer
         )
 
         return model
@@ -372,6 +373,7 @@ if __name__ == "__main__":
     model_args.add_argument("--alpha_reg_layers",     action="store_true", help="alpha regularization loss is l1 and l0 on alpha layers in stead of composite")
     model_args.add_argument("--bottleneck_normal",    action="store_true", help="have a normal 3d conv as bottleneck in stead of a transposed conv")
     model_args.add_argument("--separate_value_layer", action="store_true", help="specify wether to use a separate value layer for the context and reconstruction encoder")
+    model_args.add_argument("--do_detail_transfer",   action="store_true", help="specify whether to do detail transfer on the output at inference.")
 
     input_args = parser.add_argument_group("model input")
     input_args.add_argument("--composite_order",            type=str,   default="composite_order.txt", help="path to a text file containing the compositing order of the foreground objects")
