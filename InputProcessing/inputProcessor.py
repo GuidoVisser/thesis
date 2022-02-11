@@ -22,14 +22,15 @@ class InputProcessor(object):
         super().__init__()
 
         # initialize attributes
-        self.timesteps                 = args.timesteps
-        self.use_3d                    = not args.use_2d_loss_module
-        self.frame_size                = (args.frame_width, args.frame_height)
-        self.do_jitter                 = do_jitter
-        self.jitter_rate               = args.jitter_rate
-        self.jitter_mode               = 'bilinear'
-        self.num_bg_layers             = 1 if args.no_static_background else 2
-        self.use_depth                 = args.use_depth
+        self.timesteps                  = args.timesteps
+        self.use_3d                     = not args.use_2d_loss_module
+        self.frame_size                 = (args.frame_width, args.frame_height)
+        self.do_jitter                  = do_jitter
+        self.jitter_rate                = args.jitter_rate
+        self.jitter_mode                = 'bilinear'
+        self.num_bg_layers              = 1 if args.no_static_background else 2
+        self.use_depth                  = args.use_depth
+        self.unsampled_dynamic_bg_input = args.unsampled_dynamic_bg_input
 
         if isinstance(args.initial_mask, str):
             self.N_objects = 1
@@ -111,33 +112,11 @@ class InputProcessor(object):
 
         # Get spatiotemporal noise input
         # spatiotemporal_noise:   [C-4, T, H, W]
-        dynamic_background_noise = self.background_volume.spatiotemporal_noise[:, idx:idx+self.timesteps].unsqueeze(0)
         spatiotemporal_noise = self.background_volume.spatiotemporal_noise_uv_sampled[:, idx:idx+self.timesteps].unsqueeze(0)
-
-        ### Temp code ###
-
-        # img_t = spatiotemporal_noise_t[:3, 0].permute(1, 2, 0).cpu().numpy() * .25 + 0.75
-        # img = spatiotemporal_noise[:3, idx].permute(1, 2, 0).cpu().numpy() * .25 + 0.75
-
-        # uv = background_uv_map[0].clone().cpu().numpy()
-        # corners = [uv[0, 0], uv[0, -1], uv[-1, -1], uv[-1, 0]]
-
-        # corners = np.array([(c * .5 + .5) * np.array([448, 256]) for c in corners]).reshape((-1, 1, 2)).astype(np.int32)
-
-        # color = (1, 0, 0)
-        # thickness = 3
-
-        # img = cv2.polylines(np.ascontiguousarray(img), [corners], True, color, thickness, cv2.LINE_AA)
-
-        # # color = (255, 0, 0)
-        # # thickness = 3
-
-        # # img = cv2.polylines(np.ascontiguousarray(img), [corners], True, color, thickness)
-
-        # cv2.imwrite(path.join(self.out_root, "st_noise.png"), img * 255)
-        # cv2.imwrite(path.join(self.out_root, "st_sampled_noise.png"), img_t * 255)
-
-        #################
+        if self.unsampled_dynamic_bg_input:
+            dynamic_background_noise = self.background_volume.spatiotemporal_noise[:, idx:idx+self.timesteps].unsqueeze(0)
+        else:
+            dynamic_background_noise = spatiotemporal_noise
 
         # Construct query input        
         # [L-b, 1, T, H, W]
@@ -376,7 +355,7 @@ class ContextDataset(object):
         # initialize attributes
         self.frame_size   = (args.frame_width, args.frame_height)
         self.use_depth    = args.use_depth
-        # self.num_context_frames = args.num_context_frames
+        self.unsampled_dynamic_bg_input = args.unsampled_dynamic_bg_input
 
         if isinstance(args.initial_mask, str):
             self.N_objects = 1
@@ -426,7 +405,7 @@ class ContextDataset(object):
         if self.use_depth:
             _, object_depth = self.depth_handler[frame_idx] # [L-b, C, H, W]
 
-        if layer_idx == 0:
+        if layer_idx == 0 and self.unsampled_dynamic_bg_input:
             spatiotemporal_noise = self.background_volume.spatiotemporal_noise[:, frame_idx].unsqueeze(0) # [C-4, H, W]
         else:
             spatiotemporal_noise = self.background_volume.spatiotemporal_noise_uv_sampled[:, frame_idx].unsqueeze(0) # [C-4, H, W]

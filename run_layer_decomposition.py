@@ -236,7 +236,8 @@ class ExperimentRunner(object):
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,
                     coarseness=self.args.coarseness,
-                    separate_value_layer=self.args.separate_value_layer
+                    separate_value_layer=self.args.separate_value_layer,
+                    unsampled_dynamic_bg_input=self.args.unsampled_dynamic_bg_input
                 )
             else:
                 network = LayerDecompositionAttentionMemoryDepthNet3DBottleneck(
@@ -382,6 +383,7 @@ if __name__ == "__main__":
     input_args.add_argument("--noise_temporal_coarseness",  type=int,   default=2,    help="temporal coarseness of the dynamic noise input")
     input_args.add_argument("--noise_upsample_size",        type=int,   default=16,   help="determines the spatial coarseness of both the spatial the and dynamic noise input")
     input_args.add_argument("--jitter_rate",                type=float, default=0.75, help="rate of applying jitter to the input")
+    input_args.add_argument("--unsampled_dynamic_bg_input", action="store_true", help="specify whether the dynamic background layer will have uv sampled noise are not")
 
     training_param_args = parser.add_argument_group("training_parameters")
     training_param_args.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for the reconstruction model")

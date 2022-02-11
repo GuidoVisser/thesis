@@ -13,7 +13,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
     """
     Layer Decomposition Attention Memory Net base class
     """
-    def __init__(self, context_loader, num_context_frames, max_frames=200, coarseness=10, do_adjustment=True):
+    def __init__(self, context_loader, num_context_frames, max_frames=200, coarseness=10, do_adjustment=True, unsampled_dynamic_bg_input=False):
         super().__init__()
 
         # initialize foreground encoder and decoder
@@ -36,6 +36,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         self.max_frames = max_frames
         self.do_adjustment = do_adjustment
+
+        self.unsampled_dynamic_bg_input = unsampled_dynamic_bg_input
 
         self.base_grid_bg_offset = None
         
@@ -109,7 +111,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
             # Object layers
             else:
                 rgba, flow = self.render(layer_input, i - 1)
-                if i == 1:
+                if i == 1 and self.unsampled_dynamic_bg_input:
                     rgba = F.grid_sample(rgba, background_uv_map, align_corners=True)
                 alpha = self.get_alpha_from_rgba(rgba)
 
@@ -306,9 +308,10 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
                  transposed_bottleneck=True,
                  separate_value_layer=True,
                  coarseness=10, 
-                 do_adjustment=True):
+                 do_adjustment=True,
+                 unsampled_dynamic_bg_input=False):
 
-        super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment)
+        super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment, unsampled_dynamic_bg_input)
 
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
