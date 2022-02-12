@@ -153,7 +153,7 @@ class ExperimentRunner(object):
             homography_handler,
             depth_handler,
             background_volume,
-            do_jitter=True
+            do_jitter=False
         )
 
         dataloader = DataLoader(
