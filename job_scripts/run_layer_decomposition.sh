@@ -13,12 +13,12 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='scooter-black'
-cp -RT $HOME/thesis/datasets/DAVIS/JPEGImages/480p/$VIDEO $TMPDIR/video
+VIDEO='kruispunt_rijks'
+cp -RT $HOME/thesis/datasets/Video/Images/$VIDEO $TMPDIR/video
 mkdir $TMPDIR/00
-cp -RT $HOME/thesis/datasets/DAVIS/Annotations/480p/$VIDEO $TMPDIR/00
-# mkdir $TMPDIR/01
-# cp -RT $HOME/thesis/datasets/DAVIS/Annotations/$VIDEO/01/ $TMPDIR/01/
+cp -RT $HOME/thesis/datasets/Video/Annotations/$VIDEO/00/00006.png $TMPDIR/00/00006.png
+mkdir $TMPDIR/01
+cp -RT $HOME/thesis/datasets/Video/Annotations/$VIDEO/01/00006.png $TMPDIR/01/00006.png
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -33,7 +33,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --model_type 3d_bottleneck \
             --device cuda \
             --img_dir $TMPDIR/video \
-            --initial_mask $TMPDIR/00/ \
+            --initial_mask $TMPDIR/00/00006.png $TMPDIR/01/00006.png\
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
@@ -45,7 +45,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --keydim 64 \
             --valdim 256 \
             --timesteps 4 \
-            --num_context_frames 7 \
+            --num_context_frames 9 \
             --lambda_bg_scaling 0.999 \
             --lambda_detail_reg 10 50 0.01 \
             --lambda_mask 1000 50 0 \

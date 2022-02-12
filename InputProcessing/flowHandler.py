@@ -98,10 +98,6 @@ class FlowHandler(object):
 
             h, w, _ = image0.shape
 
-            # if self.aligned:
-            #     # Align the frames using the pre-calculated homography
-            #     image1, image0 = self.homography_handler.align_frames([image0, image1], indices=[frame_idx, frame_idx + 1])
-
             # Prepare images for use with RAFT
             image0 = self.prepare_image_for_raft(image0)
             image1 = self.prepare_image_for_raft(image1)
@@ -130,13 +126,6 @@ class FlowHandler(object):
             flow_magnitude = flow_magnitude / torch.max(flow_magnitude)
 
             dynamics_mask = torch.where(flow_magnitude > torch.mean(flow_magnitude), torch.ones_like(flow_magnitude), torch.zeros_like(flow_magnitude))
-
-            # if self.aligned:
-            #     t = [-self.homography_handler.xmin, 
-            #          -self.homography_handler.ymin]
-
-            #     forward_flow = forward_flow[:, t[1]:h+t[1], t[0]:w+t[0]]
-            #     conf         = conf[t[1]:h+t[1], t[0]:w+t[0]]
 
             # Get object masks
             _, object_masks = self.mask_iterator[frame_idx]
