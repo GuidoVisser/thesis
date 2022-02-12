@@ -212,17 +212,17 @@ class DecompositeLoss(nn.Module):
         _, L, _, _, _, _ = alpha_layers.shape
 
         layers = []
-        alpha_composite = alpha_layers[:, 0]
-        # mask_composite = binary_masks[:, 0]
-        # ones = torch.ones_like(mask_composite)
+        # alpha_composite = alpha_layers[:, 0]
+        mask_composite = binary_masks[:, 0]
+        ones = torch.ones_like(mask_composite)
         for l in range(1, L):
-            layers.append(alpha_layers[:, l] * alpha_composite) # * mask_composite)
+            layers.append(alpha_layers[:, l] * mask_composite) # * mask_composite)
 
             # update alpha_composite
-            alpha_composite = (1 - alpha_layers[:, l]) * alpha_composite + alpha_layers[:, l]
+            # alpha_composite = (1 - alpha_layers[:, l]) * alpha_composite + alpha_layers[:, l]
 
             # update mask composite
-            # mask_composite = torch.minimum(mask_composite + binary_masks[:, l], ones)
+            mask_composite = torch.minimum(mask_composite + binary_masks[:, l-1], ones)
 
         loss = torch.mean(torch.stack(layers))
 
@@ -303,7 +303,8 @@ class DecompositeLoss3D(DecompositeLoss):
         flow_reconstruction_loss  = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
         mask_bootstrap_loss       = self.calculate_loss(alpha_layers, masks, mask_loss=True)
         # dynamics_reg_loss         = self.cal_dynamics_reg(alpha_layers, binary_masks)
-        detail_reg_loss           = self.cal_detail_reg(alpha_layers * 0.5 + 0.5, binary_masks)
+        if binary_masks.shape[1] > 1:
+            detail_reg_loss           = self.cal_detail_reg(alpha_layers[:, 2:] * 0.5 + 0.5, binary_masks)
         if self.alpha_reg_layers:
             alpha_reg_loss        = self.cal_alpha_reg(alpha_layers * 0.5 + 0.5)
         else:
