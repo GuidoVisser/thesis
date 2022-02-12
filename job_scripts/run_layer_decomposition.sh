@@ -16,7 +16,7 @@ pip install --user --upgrade torch && pip install --user --upgrade torchvision
 VIDEO='scooter-black'
 cp -RT $HOME/thesis/datasets/DAVIS/JPEGImages/480p/$VIDEO $TMPDIR/video
 mkdir $TMPDIR/00
-cp -RT $HOME/thesis/datasets/DAVIS/Annotations/480p/$VIDEO/00/ $TMPDIR/00/
+cp -RT $HOME/thesis/datasets/DAVIS/Annotations/480p/$VIDEO $TMPDIR/00
 # mkdir $TMPDIR/01
 # cp -RT $HOME/thesis/datasets/DAVIS/Annotations/$VIDEO/01/ $TMPDIR/01/
 mkdir $TMPDIR/weights
