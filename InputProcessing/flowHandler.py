@@ -141,6 +141,7 @@ class FlowHandler(object):
             # Get object masks
             _, object_masks = self.mask_iterator[frame_idx]
             object_masks = object_masks[:, 0]
+            object_masks.to(forward_flow.device)
 
             object_flow = self.get_object_flow(forward_flow, object_masks)
 
