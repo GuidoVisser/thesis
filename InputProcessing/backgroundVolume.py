@@ -45,9 +45,9 @@ class BackgroundVolume(object):
         self.homography_handler = homography_handler
 
     def visualize(self, frame_idx):
-        spatial_noise_img = (self.spatial_noise_upsampled[-3:].permute(1, 2, 0).numpy() * .5 + .5) * 255
-        spatiotemporal_noise_img = (self.spatiotemporal_noise[-3:, frame_idx].permute(1, 2, 0).numpy() * .5 + .5) * 255
-        sampled_noise = (self.spatiotemporal_noise_uv_sampled[-3:, frame_idx].permute(1, 2, 0).numpy() * .5 + .5) * 255
+        spatial_noise_img = (self.spatial_noise_upsampled[:3].permute(1, 2, 0).numpy() * .5 + .5) * 255
+        spatiotemporal_noise_img = (self.spatiotemporal_noise[:3, frame_idx].permute(1, 2, 0).numpy() * .5 + .5) * 255
+        sampled_noise = (self.spatiotemporal_noise_uv_sampled[:3, frame_idx].permute(1, 2, 0).numpy() * .5 + .5) * 255
 
         uv = self.homography_handler.get_frame_uv(frame_idx).clone().cpu().numpy()
         corners = [uv[0, 0], uv[0, -1], uv[-1, -1], uv[-1, 0]]

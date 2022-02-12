@@ -139,19 +139,26 @@ class LayerDecompositer(nn.Module):
             frame_img = cv2.imread(f"{self.results_root}/images/{frame_idx:05}.jpg", cv2.COLOR_RGB2BGR)
 
             for layer_idx in range(self.context_loader.N_layers):
-                with torch.no_grad():
-                    key = net.get_attention_maps(frame_idx, layer_idx)
+                key, query = net.get_attention_maps(frame_idx, layer_idx)
 
-                create_dir(f"{self.save_dir}/{epoch_name}/attention_maps/{layer_idx:02}/{frame_idx:02}")
+                create_dir(f"{self.save_dir}/{epoch_name}/attention_maps/key/{layer_idx:02}/{frame_idx:02}")
+                create_dir(f"{self.save_dir}/{epoch_name}/attention_maps/query/{layer_idx:02}/{frame_idx:02}")
 
                 for c in range(key.shape[1]):
-                    attention_map = F.interpolate(key[:, c:c+1], (self.context_loader.frame_size[1], self.context_loader.frame_size[0]), mode='bilinear')[0]
-                    attention_img = (attention_map.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
-                    attention_img = cv2.applyColorMap(attention_img, cv2.COLORMAP_JET)
+                    key_map   = F.interpolate(key[:, c:c+1], (self.context_loader.frame_size[1], self.context_loader.frame_size[0]), mode='bilinear')[0]
+                    query_map = F.interpolate(query[:, c:c+1], (self.context_loader.frame_size[1], self.context_loader.frame_size[0]), mode='bilinear')[0]
 
-                    img = cv2.addWeighted(frame_img, 0.5, attention_img, 0.5, 0)
+                    key_img   = (key_map.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
+                    query_img = (query_map.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
 
-                    cv2.imwrite(f"{self.save_dir}/{epoch_name}/attention_maps/{layer_idx:02}/{frame_idx:02}/{c:03}.png", img)
+                    key_img   = cv2.applyColorMap(key_img, cv2.COLORMAP_JET)
+                    query_img = cv2.applyColorMap(query_img, cv2.COLORMAP_JET)
+
+                    key_img   = cv2.addWeighted(frame_img, 0.5, key_img, 0.5, 0)
+                    query_img = cv2.addWeighted(frame_img, 0.5, query_img, 0.5, 0)
+
+                    cv2.imwrite(f"{self.save_dir}/{epoch_name}/attention_maps/key/{layer_idx:02}/{frame_idx:02}/{c:03}.png", key_img)
+                    cv2.imwrite(f"{self.save_dir}/{epoch_name}/attention_maps/query/{layer_idx:02}/{frame_idx:02}/{c:03}.png", query_img)
 
     def visualize_and_save_output(self, model_output, targets, frame_indices, epoch_name):
         """

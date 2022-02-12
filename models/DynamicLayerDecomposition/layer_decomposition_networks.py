@@ -168,6 +168,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         return self.context_encoder.global_context
 
+    @torch.no_grad()
     def get_attention_maps(self, frame_idx, layer_idx):
         """
         Get the attention maps for all channels of a particular frame-layer combination
@@ -184,13 +185,13 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         if torch.cuda.is_available():
             x = x.to(torch.cuda.current_device())
 
-        with torch.no_grad():
-            for layer in self.encoder:
-                x = layer(x)
+        for layer in self.encoder:
+            x = layer(x)
 
-        key = self.context_encoder(x)
+        key   = self.context_encoder(x)
+        query = self.query_layer(x)
 
-        return key
+        return key, query
 
     def get_background_offset(self, adjustment_grid: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         """

@@ -303,7 +303,7 @@ class DecompositeLoss3D(DecompositeLoss):
         flow_reconstruction_loss  = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
         mask_bootstrap_loss       = self.calculate_loss(alpha_layers, masks, mask_loss=True)
         # dynamics_reg_loss         = self.cal_dynamics_reg(alpha_layers, binary_masks)
-        detail_reg_loss           = self.cal_detail_reg(alpha_layers, binary_masks)
+        detail_reg_loss           = self.cal_detail_reg(alpha_layers * 0.5 + 0.5, binary_masks)
         if self.alpha_reg_layers:
             alpha_reg_loss        = self.cal_alpha_reg(alpha_layers * 0.5 + 0.5)
         else:

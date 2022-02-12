@@ -138,13 +138,25 @@ class FlowHandler(object):
             #     forward_flow = forward_flow[:, t[1]:h+t[1], t[0]:w+t[0]]
             #     conf         = conf[t[1]:h+t[1], t[0]:w+t[0]]
 
+            # Get object masks
+            _, object_masks = self.mask_iterator[frame_idx]
+            object_masks = object_masks[:, 0]
+
+            object_flow = self.get_object_flow(forward_flow, object_masks)
+
             forward_flow = forward_flow.permute(1, 2, 0).cpu().numpy()
+            object_flow  = object_flow.permute(0, 2, 3, 1).cpu().numpy()
             conf         = conf.cpu().numpy()
             dynamics_mask = torch.stack([dynamics_mask * 255]*3, dim=2).byte().cpu().numpy()
             writeFlow(path.join(self.output_dir, f"forward/flow/{frame_idx:05}.flo"), forward_flow)
             cv2.imwrite(path.join(self.output_dir, f"forward/png/{frame_idx:05}.png"), flow_to_image(forward_flow, convert_to_bgr=True))
             cv2.imwrite(path.join(self.output_dir, f"confidence/{frame_idx:05}.png"), np.expand_dims(conf, 2) * 255)
             cv2.imwrite(path.join(self.output_dir, f"dynamics_mask/{frame_idx:05}.png"), dynamics_mask)
+            for layer in range(object_masks.shape[0]):
+                if frame_idx == 0:
+                    create_dirs(path.join(self.output_dir, f"object_flow/{layer:02}"))
+                cv2.imwrite(path.join(self.output_dir, f"object_flow/{layer:02}/{frame_idx:05}.png"), flow_to_image(object_flow[layer], convert_to_bgr=True))
+
             
     def get_confidence(self, image0, image1, forward, backward):
         """
