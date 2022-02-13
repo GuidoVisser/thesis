@@ -46,9 +46,8 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 256 \
             --timesteps 4 \
             --num_context_frames 9 \
-            --use_alpha_detail_reg \
-            --lambda_detail_reg 10 50 0.01 \
-            --description 'alpha detail reg and corr diff reg'
+            --lambda_detail_reg 10 50 0.05 \
+            --description 'Mask detail reg without corr diff'
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
