@@ -18,7 +18,7 @@ cp -RT $HOME/thesis/datasets/Videos_small/Images/$VIDEO $TMPDIR/video
 cp -RT $HOME/thesis/datasets/Videos_small/Annotations/$VIDEO/ $TMPDIR/masks
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/weights/zip_serialization_false/edge_completion.pth $TMPDIR/weights/edge_completion.pth
-cp $HOME/thesis/models/weights/zip_serialization_false/raft.pth $TMPDIR/weights/raft-things.pth
+cp $HOME/thesis/models/weights/zip_serialization_false/raft-things.pth $TMPDIR/weights/raft.pth
 cp $HOME/thesis/models/weights/zip_serialization_false/imagenet_deepfill.pth $TMPDIR/weights/imagenet_deepfill.pth
 
 #Create output directory on scratch
