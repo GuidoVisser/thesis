@@ -3,6 +3,7 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
 import torch
 import numpy as np
 import cv2
+from research_archive.models.third_party.DeepFill_Models import DeepFill
 
 class DeepFillv1(object):
     def __init__(self,
