@@ -62,13 +62,15 @@ class DecompositeLoss(nn.Module):
                  lambda_detail_reg,
                  lambda_bg_scaling,
                  corr_diff,
-                 alpha_reg_layers) -> None:
+                 alpha_reg_layers,
+                 use_alpha_detail_reg) -> None:
         super().__init__()
 
         self.criterion = nn.L1Loss()
         self.mask_criterion = MaskLoss()
         self.corr_diff = corr_diff
         self.alpha_reg_layers = alpha_reg_layers
+        self.use_alpha_detail_reg = use_alpha_detail_reg
 
         self.lambda_alpha_l0          = LambdaScheduler(lambda_alpha_l0)
         self.lambda_alpha_l1          = LambdaScheduler(lambda_alpha_l1)
@@ -194,10 +196,10 @@ class DecompositeLoss(nn.Module):
             loss += self.lambda_alpha_l0.value * torch.mean(l0_prediction)
         return loss
 
-    def cal_detail_reg(self, alpha_layers: torch.Tensor, binary_masks: torch.Tensor) -> torch.Tensor:
+    def cal_detail_reg_mask(self, alpha_layers: torch.Tensor, binary_masks: torch.Tensor) -> torch.Tensor:
         """
-        Calculate the detail bleed regularization. The model reconstructs parts of lower object layers in the upper object layers 
-        in order to fill in some details earlier in the training process.
+        Calculate the detail bleed regularization using the object masks. The model reconstructs parts of lower object layers 
+        in the upper object layers in order to fill in some details earlier in the training process.
 
         The regularization punishes this effect by calculating for every layer the elementwise product of 
         the binary mask, alpha layer and the composite of all lower alpha layers.
@@ -212,14 +214,12 @@ class DecompositeLoss(nn.Module):
         _, L, _, _, _, _ = alpha_layers.shape
 
         layers = []
-        # alpha_composite = alpha_layers[:, 0]
+
         mask_composite = binary_masks[:, 0]
         ones = torch.ones_like(mask_composite)
+        
         for l in range(1, L):
-            layers.append(alpha_layers[:, l] * mask_composite) # * mask_composite)
-
-            # update alpha_composite
-            # alpha_composite = (1 - alpha_layers[:, l]) * alpha_composite + alpha_layers[:, l]
+            layers.append(alpha_layers[:, l] * mask_composite)
 
             # update mask composite
             mask_composite = torch.minimum(mask_composite + binary_masks[:, l-1], ones)
@@ -228,6 +228,34 @@ class DecompositeLoss(nn.Module):
 
         return loss
 
+    def cal_detail_reg_alpha(self, alpha_layers: torch.Tensor) -> torch.Tensor:
+        """
+        Calculate the detail bleed regularization using the alpha composite. The model reconstructs parts of lower object layers
+        in the upper object layers in order to fill in some details earlier in the training process.
+
+        The regularization punishes this effect by calculating for every layer the elementwise product of 
+        the alpha layer and the composite of all lower alpha layers.
+
+        Args:
+            alpha_layers (torch.Tensor[B, L, C, T, H, W]): alpha layers inferred by the model
+
+        Returns:
+            loss (torch.Tensor[1]): loss value
+        """
+        _, L, _, _, _, _ = alpha_layers.shape
+
+        layers = []
+        alpha_composite = alpha_layers[:, 0].detach()
+        for l in range(1, L):
+            layers.append(alpha_layers[:, l] * alpha_composite)
+
+            # update alpha_composite
+            new_alpha = alpha_layers[:, l].detach()
+            alpha_composite = (1 - new_alpha) * alpha_composite + new_alpha
+
+        loss = torch.mean(torch.stack(layers))
+
+        return loss
 
     def update_lambdas(self):
         return NotImplemented
@@ -253,7 +281,8 @@ class DecompositeLoss3D(DecompositeLoss):
                  lambda_detail_reg,
                  lambda_bg_scaling,
                  corr_diff,
-                 alpha_reg_layers) -> None:
+                 alpha_reg_layers,
+                 use_alpha_detail_reg) -> None:
         
         super().__init__(lambda_mask,
                          lambda_recon_flow,
@@ -268,7 +297,8 @@ class DecompositeLoss3D(DecompositeLoss):
                          lambda_detail_reg,
                          lambda_bg_scaling,
                          corr_diff,
-                         alpha_reg_layers)
+                         alpha_reg_layers,
+                         use_alpha_detail_reg)
         
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -302,9 +332,14 @@ class DecompositeLoss3D(DecompositeLoss):
         rgb_reconstruction_loss   = self.calculate_loss(rgb_reconstruction, rgb_gt)
         flow_reconstruction_loss  = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
         mask_bootstrap_loss       = self.calculate_loss(alpha_layers, masks, mask_loss=True)
-        # dynamics_reg_loss         = self.cal_dynamics_reg(alpha_layers, binary_masks)
-        if binary_masks.shape[1] > 1:
-            detail_reg_loss           = self.cal_detail_reg(alpha_layers[:, 2:] * 0.5 + 0.5, binary_masks)
+        if self.corr_diff:
+            dynamics_reg_loss     = self.cal_dynamics_reg(alpha_layers, binary_masks)
+        
+        if self.use_alpha_detail_reg:
+            detail_reg_loss = self.cal_detail_reg_alpha(alpha_layers[:, 1:] *.5 + .5)
+        elif binary_masks.shape[1] > 1:
+            detail_reg_loss = self.cal_detail_reg_mask(alpha_layers[:, 2:] * 0.5 + 0.5, binary_masks)
+        
         if self.alpha_reg_layers:
             alpha_reg_loss        = self.cal_alpha_reg(alpha_layers * 0.5 + 0.5)
         else:
@@ -338,7 +373,8 @@ class DecompositeLoss3D(DecompositeLoss):
                self.lambda_mask_bootstrap.value * mask_bootstrap_loss + \
                self.lambda_stabilization.value  * stabilization_loss
 
-        # loss += dynamics_reg_loss
+        if self.corr_diff:
+            loss += dynamics_reg_loss
 
         # create dict of all separate losses for logging
         loss_values = {
@@ -362,6 +398,9 @@ class DecompositeLoss3D(DecompositeLoss):
             "lambda_dynamics_reg_diff":       self.lambda_dynamics_reg_diff.value,
             "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr.value
         }
+
+        if self.corr_diff:
+            loss_values["dynamics_regularization_loss"] = dynamics_reg_loss.item()
 
         return loss, loss_values
 

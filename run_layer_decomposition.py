@@ -153,7 +153,7 @@ class ExperimentRunner(object):
             homography_handler,
             depth_handler,
             background_volume,
-            do_jitter=False
+            do_jitter=True
         )
 
         dataloader = DataLoader(
@@ -196,7 +196,8 @@ class ExperimentRunner(object):
                 self.args.lambda_detail_reg,
                 self.args.lambda_bg_scaling,
                 self.args.corr_diff,
-                self.args.alpha_reg_layers
+                self.args.alpha_reg_layers,
+                self.args.use_alpha_detail_reg
             )
         else:
             loss_module = DecompositeLoss3D(
@@ -213,7 +214,8 @@ class ExperimentRunner(object):
                 self.args.lambda_detail_reg,
                 self.args.lambda_bg_scaling,
                 self.args.corr_diff,
-                self.args.alpha_reg_layers
+                self.args.alpha_reg_layers,
+                self.args.use_alpha_detail_reg
             )
         return loss_module
 
@@ -371,6 +373,7 @@ if __name__ == "__main__":
     model_args.add_argument("--use_depth",            action="store_true", help="specify that you want to use depth estimation as an input channel")
     model_args.add_argument("--corr_diff",            action="store_true", help="use corr_diff dynamics regularization in stead of alpha composite")
     model_args.add_argument("--alpha_reg_layers",     action="store_true", help="alpha regularization loss is l1 and l0 on alpha layers in stead of composite")
+    model_args.add_argument("--use_alpha_detail_reg", action="store_true", help="use the alpha composite in detail bleed regularization")
     model_args.add_argument("--bottleneck_normal",    action="store_true", help="have a normal 3d conv as bottleneck in stead of a transposed conv")
     model_args.add_argument("--separate_value_layer", action="store_true", help="specify wether to use a separate value layer for the context and reconstruction encoder")
     model_args.add_argument("--do_detail_transfer",   action="store_true", help="specify whether to do detail transfer on the output at inference.")
@@ -403,8 +406,8 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_alpha_l0",          nargs="+", default=[0.005], help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1",          nargs="+", default=[0.01, 100, 0.], help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization",     nargs="+", default=[0.001], help="lambda of the camera stabilization loss")
-    lambdas.add_argument("--lambda_detail_reg",        nargs="+", default=[10, 50, 0.005], help="lambda of the detail bleed regularization loss")
-    lambdas.add_argument("--lambda_bg_scaling",        nargs="+", default=[.995], help="downscaling factor for dynamic background in alpha regularization.")
+    lambdas.add_argument("--lambda_detail_reg",        nargs="+", default=[10, 50, 0.05], help="lambda of the detail bleed regularization loss")
+    lambdas.add_argument("--lambda_bg_scaling",        nargs="+", default=[1.], help="downscaling factor for dynamic background in alpha regularization.")
 
     lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")
     lambdas.add_argument("--lambda_dynamics_reg_corr", nargs="+", default=[0.005], help="lambda of the correlation part of the dynamics regularization loss")
