@@ -1,3 +1,4 @@
+from models.third_party.RAFT.utils.frame_utils import writeFlow
 import cv2
 import torch.nn as nn
 import torch.nn.functional as F
@@ -170,6 +171,8 @@ class LayerDecompositer(nn.Module):
         if self.use_depth:
             depth_layers   = model_output["layers_depth"]
         reconstruction = model_output["rgba_reconstruction"]
+
+        flow_max_rad = torch.max(torch.sqrt(torch.square(flow_layers[:, :, 0]) + torch.square(flow_layers[:, :, 1]))).item()
         
         background_offset = model_output["background_offset"]
         brightness_scale  = model_output["brightness_scale"]
@@ -231,17 +234,24 @@ class LayerDecompositer(nn.Module):
 
                     create_dirs(path.join(self.save_dir, f"{epoch_name}/layers/{layer_name}"),
                                 path.join(self.save_dir, f"{epoch_name}/alpha/{layer_name}"),
-                                path.join(self.save_dir, f"{epoch_name}/flow/{layer_name}"))
-                    foreground_rgba    = torch.clone(rgba_layers[b, l, :, t]).detach()
-                    foreground_flow    = torch.clone(flow_layers[b, l, :, t]).detach()
-                    foreground_alpha   = torch.clone(rgba_layers[b, l, 3, t]).detach()
+                                path.join(self.save_dir, f"{epoch_name}/flow/flo/{layer_name}"),
+                                path.join(self.save_dir, f"{epoch_name}/flow/png/{layer_name}"))
+                    foreground_rgba    = torch.clone(rgba_layers[b, l, :, t]).detach().permute(1, 2, 0).cpu()
+                    foreground_flow    = torch.clone(flow_layers[b, l, :, t]).detach().permute(1, 2, 0).cpu()
+                    foreground_alpha   = torch.clone(rgba_layers[b, l, 3, t]).detach().cpu()
 
-                    foreground_img      = cv2.cvtColor((foreground_rgba.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGBA2BGRA)
-                    alpha_img           = (foreground_alpha.cpu().numpy() + 1) / 2. * 255
-                    foreground_flow_img = flow_to_image(foreground_flow.permute(1, 2, 0).cpu().numpy(), convert_to_bgr=True)
-                    foreground_flow_img = np.concatenate([foreground_flow_img, np.expand_dims(alpha_img, 2)], axis=2)
-                    
-                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/flow/{layer_name}/{img_name}"), foreground_flow_img)
+                    writeFlow(path.join(self.save_dir, f"{epoch_name}/flow/flo/{layer_name}/{img_name[:-4]}.flo"), foreground_flow)
+
+                    alpha_img           = (foreground_alpha.numpy() + 1) / 2. * 255
+                    foreground_flow_img = flow_to_image(foreground_flow.numpy(), convert_to_bgr=True, rad_max=flow_max_rad)
+                    foreground_img      = cv2.cvtColor((foreground_rgba.numpy() + 1) / 2. * 255, cv2.COLOR_RGBA2BGRA)
+
+                    if l > 0:
+                        foreground_flow_img = np.concatenate([foreground_flow_img, np.expand_dims(alpha_img, 2)], axis=2)
+                    else:
+                        foreground_img      = np.concatenate((foreground_img[..., :3], np.ones_like(foreground_img[..., 3:]) * 255), axis=2)
+                        
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/flow/png/{layer_name}/{img_name}"), foreground_flow_img)
                     cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/layers/{layer_name}/{img_name}"), foreground_img)
                     cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/alpha/{layer_name}/{img_name}"), alpha_img)
 
@@ -260,7 +270,8 @@ class LayerDecompositer(nn.Module):
                     path.join(self.save_dir, f"{epoch_name}/alpha"),
                     path.join(self.save_dir, f"{epoch_name}/reconstruction"),
                     path.join(self.save_dir, f"{epoch_name}/ground_truth"),
-                    path.join(self.save_dir, f"{epoch_name}/flow"),
+                    path.join(self.save_dir, f"{epoch_name}/flow/png"),
+                    path.join(self.save_dir, f"{epoch_name}/flow/flo"),
                     path.join(self.save_dir, f"{epoch_name}/depth"),
                     path.join(self.save_dir, f"{epoch_name}/background_offset"),
                     path.join(self.save_dir, f"{epoch_name}/brightness_scale"))

@@ -339,6 +339,8 @@ class DecompositeLoss3D(DecompositeLoss):
             detail_reg_loss = self.cal_detail_reg_alpha(alpha_layers[:, 1:] *.5 + .5)
         elif binary_masks.shape[1] > 1:
             detail_reg_loss = self.cal_detail_reg_mask(alpha_layers[:, 2:] * 0.5 + 0.5, binary_masks)
+        else:
+            detail_reg_loss = torch.Tensor([0.])
         
         if self.alpha_reg_layers:
             alpha_reg_loss        = self.cal_alpha_reg(alpha_layers * 0.5 + 0.5)

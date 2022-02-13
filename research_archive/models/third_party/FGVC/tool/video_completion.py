@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
+# sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..', '..', '..', '..', '..')))
 
 import argparse
 import os
@@ -15,20 +15,20 @@ import scipy.ndimage
 from skimage.feature import canny
 import torchvision.transforms.functional as F
 
-from models.edgeconnect.networks import EdgeGenerator_
-from models.DeepFill_Models import DeepFill
-from models.RAFT import utils
-from models.RAFT import RAFT
+from research_archive.models.third_party.edgeconnect.networks import EdgeGenerator_
+from research_archive.models.third_party.DeepFill_Models import DeepFill
+from models.third_party.RAFT import utils
+from models.third_party.RAFT import RAFT
 
-from models.FGVC.utils import region_fill
-from models.FGVC.utils.Poisson_blend import Poisson_blend
-from models.FGVC.utils.Poisson_blend_img import Poisson_blend_img
-from models.FGVC.utils.common_utils import flow_edge
+from research_archive.models.third_party.FGVC.utils import region_fill
+from research_archive.models.third_party.FGVC.utils.Poisson_blend import Poisson_blend
+from research_archive.models.third_party.FGVC.utils.Poisson_blend_img import Poisson_blend_img
+from research_archive.models.third_party.FGVC.utils.common_utils import flow_edge
 
-from models.FGVC.tool.get_flowNN import get_flowNN
-from models.FGVC.tool.get_flowNN_gradient import get_flowNN_gradient
-from models.FGVC.tool.spatial_inpaint import spatial_inpaint
-from models.FGVC.tool.frame_inpaint import DeepFillv1
+from research_archive.models.third_party.FGVC.tool.get_flowNN import get_flowNN
+from research_archive.models.third_party.FGVC.tool.get_flowNN_gradient import get_flowNN_gradient
+from research_archive.models.third_party.FGVC.tool.spatial_inpaint import spatial_inpaint
+from research_archive.models.third_party.FGVC.tool.frame_inpaint import DeepFillv1
 
 
 
@@ -324,8 +324,8 @@ def video_completion(args):
 
     else:
         # Loads masks.
-        filename_list = glob.glob(os.path.join(args.mask_dir, args.video, 'combined/*.png')) + \
-                        glob.glob(os.path.join(args.mask_dir, args.video, 'combined/*.jpg'))
+        filename_list = glob.glob(os.path.join(args.mask_dir, args.video, '*.png')) + \
+                        glob.glob(os.path.join(args.mask_dir, args.video, '*.jpg'))
 
         mask = []
         flow_mask = []
@@ -469,8 +469,8 @@ def video_completion_seamless(args):
 
     else:
         # Loads masks.
-        filename_list = glob.glob(os.path.join(args.mask_dir, args.video, 'id_0/*.png')) + \
-                        glob.glob(os.path.join(args.mask_dir, args.video, 'id_0/*.jpg'))
+        filename_list = glob.glob(os.path.join(args.mask_dir, args.video, '*.png')) + \
+                        glob.glob(os.path.join(args.mask_dir, args.video, '*.jpg'))
 
         mask = []
         mask_dilated = []
@@ -633,8 +633,7 @@ def video_completion_seamless(args):
 def main(args):
 
     assert args.mode in ('object_removal', 'video_extrapolation'), (
-        "Accepted modes: 'object_removal', 'video_extrapolation', but input is %s"
-    ) % mode
+        "Accepted modes: 'object_removal', 'video_extrapolation', but input is %s") % args.mode
 
     if args.seamless:
         video_completion_seamless(args)
@@ -660,7 +659,7 @@ if __name__ == '__main__':
     parser.add_argument('--Nonlocal', dest='Nonlocal', default=False, type=bool)
 
     # RAFT
-    parser.add_argument('--RAFT_weights', default='../weight/zip_serialization_false/raft-things.pth', help="restore checkpoint")
+    parser.add_argument('--RAFT_weights', default='models/third_party/weights/raft.pth', help="restore checkpoint")
     parser.add_argument('--small', action='store_true', help='use small model')
     parser.add_argument('--mixed_precision', action='store_true', help='use mixed precision')
     parser.add_argument('--alternate_corr', action='store_true', help='use efficent correlation implementation')
