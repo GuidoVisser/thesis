@@ -16,7 +16,6 @@ from skimage.feature import canny
 import torchvision.transforms.functional as F
 
 from research_archive.models.third_party.edgeconnect.networks import EdgeGenerator_
-from research_archive.models.third_party.DeepFill_Models import DeepFill
 from models.third_party.RAFT import utils
 from models.third_party.RAFT import RAFT
 

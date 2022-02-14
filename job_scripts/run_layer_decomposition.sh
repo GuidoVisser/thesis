@@ -13,12 +13,12 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='kruispunt_rijks'
+VIDEO='nescio_2'
 cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/video
 mkdir $TMPDIR/00
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00/00006.png $TMPDIR/00/00006.png
+cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00 $TMPDIR/00
 mkdir $TMPDIR/01
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01/00006.png $TMPDIR/01/00006.png
+cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01 $TMPDIR/01
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -33,7 +33,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --model_type 3d_bottleneck \
             --device cuda \
             --img_dir $TMPDIR/video \
-            --initial_mask $TMPDIR/00/00006.png $TMPDIR/01/00006.png\
+            --initial_mask $TMPDIR/00 $TMPDIR/01\
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
@@ -46,7 +46,10 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 256 \
             --timesteps 4 \
             --num_context_frames 9 \
-            --lambda_detail_reg 10 50 0.05 \
+            --corr_diff \
+            --lambda_dynamics_reg_corr 0.005 \
+            --lambda_dynamics_reg_diff 0.01 \
+            --lambda_detail_reg 10 50 0.1 \
             --description 'Mask detail reg without corr diff'
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log

@@ -45,13 +45,6 @@ if __name__ == "__main__":
     # profiling
     parser.add_argument('--profile_path', default='profile.csv', help="path where profile data is saved")
 
-
-    ######################
-    ######   VIS    ######
-    ######################
-
-    parser.add_argument('--vis_cfg', default='MaskTrackRCNN/configs/masktrack_rcnn_r50_fpn_1x_youtubevos.py')
-
     args = parser.parse_args()
 
     main(args)
