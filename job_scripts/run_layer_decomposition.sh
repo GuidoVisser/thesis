@@ -19,10 +19,10 @@ mkdir $TMPDIR/00
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00 $TMPDIR/00
 mkdir $TMPDIR/01
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01 $TMPDIR/01
-mkdir $TMPDIR/02
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/02 $TMPDIR/02
-mkdir $TMPDIR/03
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/03 $TMPDIR/03
+# mkdir $TMPDIR/02
+# cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/02 $TMPDIR/02
+# mkdir $TMPDIR/03
+# cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/03 $TMPDIR/03
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -37,7 +37,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --model_type 3d_bottleneck \
             --device cuda \
             --img_dir $TMPDIR/video \
-            --initial_mask $TMPDIR/00 $TMPDIR/01 $TMPDIR/02 $TMPDIR/03 \
+            --initial_mask $TMPDIR/00 $TMPDIR/01 \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
@@ -51,10 +51,13 @@ python $HOME/thesis/run_layer_decomposition.py \
             --timesteps 4 \
             --num_context_frames 9 \
             --corr_diff \
-            --lambda_dynamics_reg_corr 0.005 \
-            --lambda_dynamics_reg_diff 0.01 \
+            --lambda_dynamics_reg_corr 0.01 \
+            --lambda_dynamics_reg_diff 0.05 \
             --lambda_detail_reg 10 50 0.1 \
-            --description 'Mask detail reg without corr diff'
+            --lambda_bg_scaling 0.9 \
+            --lambda_alpha_reg_l0 0.02 \
+            --lambda_alpha_reg_l1 0.01 \
+            --description 'Mask detail reg and corr diff with very strong lambda'
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
