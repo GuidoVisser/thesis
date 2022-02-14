@@ -74,13 +74,13 @@ valids = valids.unsqueeze(0)
 model = nn.DataParallel(OPN())
 if torch.cuda.is_available():
     model.cuda()
-model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth'), map_location=torch.device('cpu')), strict=False)
+model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth')), strict=False)
 model.eval() 
 
 pp_model = nn.DataParallel(TCN())
 if torch.cuda.is_available():
     pp_model.cuda()
-pp_model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/TCN.pth'), map_location=torch.device('cpu')), strict=False)
+pp_model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/TCN.pth')), strict=False)
 pp_model.eval() 
 
 
