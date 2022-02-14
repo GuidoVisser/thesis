@@ -37,7 +37,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --model_type 3d_bottleneck \
             --device cuda \
             --img_dir $TMPDIR/video \
-            --initial_mask $TMPDIR/00 $TMPDIR/01\
+            --initial_mask $TMPDIR/00 $TMPDIR/01 $TMPDIR/02 $TMPDIR/03 \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
