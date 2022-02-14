@@ -13,12 +13,16 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='nescio_2'
+VIDEO='kruispunt_rijks'
 cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/video
 mkdir $TMPDIR/00
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00 $TMPDIR/00
 mkdir $TMPDIR/01
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01 $TMPDIR/01
+mkdir $TMPDIR/02
+cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/02 $TMPDIR/02
+mkdir $TMPDIR/03
+cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/03 $TMPDIR/03
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth

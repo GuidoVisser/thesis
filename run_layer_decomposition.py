@@ -361,7 +361,7 @@ if __name__ == "__main__":
     directory_args.add_argument("--continue_from", type=str, default="", help="root directory of training run from which you wish to continue")
 
     model_args = parser.add_argument_group("model")
-    model_args.add_argument("--model_type",     type=str, default="3d_bottleneck", choices=["3d_bottleneck", "fully_2d", "omnimatte", "bottleneck_no_attention", "no_addons"], help="The type of decomposition network to use")
+    model_args.add_argument("--model_type",     type=str, default="omnimatte", choices=["3d_bottleneck", "fully_2d", "omnimatte", "bottleneck_no_attention", "no_addons"], help="The type of decomposition network to use")
     model_args.add_argument("--conv_channels",  type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
     model_args.add_argument("--keydim",         type=int, default=8,  help="number of key channels in the attention memory network")
     model_args.add_argument("--valdim",         type=int, default=16, help="number of value channels in the attention memory network")
