@@ -57,7 +57,6 @@ class FlowHandler(object):
 
         # Get object masks
         _, object_masks = self.mask_iterator[frame_idx]
-        object_masks = object_masks[:, 0]
 
         N_objects = object_masks.shape[0]
 
@@ -79,7 +78,11 @@ class FlowHandler(object):
         # background_mask = 1 - torch.minimum(torch.sum(object_masks, dim=0), torch.ones(object_masks.shape[1:]))
         # dynamics_mask = background_mask * dynamics_mask
 
-        conf = torch.stack([conf]*N_objects, dim=0) * object_masks
+        mask_composite = torch.minimum(torch.sum(object_masks), torch.ones_like(object_masks[0]))
+
+        conf = conf * mask_composite
+        # conf = torch.stack([conf]*N_objects, dim=0).unsqueeze(1) * mask_composite
+        # conf = conf.squeeze(1)
 
         # get flow of objects and background
         object_flow = self.get_object_flow(flow, object_masks)
@@ -129,7 +132,7 @@ class FlowHandler(object):
 
             # Get object masks
             _, object_masks = self.mask_iterator[frame_idx]
-            object_masks = object_masks[:, 0].to(forward_flow.device)
+            object_masks = object_masks.to(forward_flow.device)
 
             object_flow = self.get_object_flow(forward_flow, object_masks)
 
@@ -261,7 +264,7 @@ class FlowHandler(object):
         N_objects =  masks.shape[0]
 
         object_flow = torch.stack([flow]*N_objects)
-        object_flow  = object_flow * masks
+        object_flow = object_flow * masks
 
         return object_flow
 

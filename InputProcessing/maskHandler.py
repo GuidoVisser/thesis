@@ -47,6 +47,8 @@ class MaskHandler(object):
                         fn = path.join(args.initial_mask[i], frame)
                         img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
                         img = cv2.resize(img, self.frame_size)
+                        if len(img.shape) == 2:
+                            img = np.expand_dims(img, axis=2)
                         cv2.imwrite(path.join(save_dir, frame), img)
                 else:
                     raise ValueError(f"{args.initial_mask[i]} is neither a valid directory or file")
