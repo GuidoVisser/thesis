@@ -291,9 +291,6 @@ def video_completion(args):
     # filename_list = sorted(filename_list)[200:]
     # print(filename_list)
 
-    # Obtains imgH, imgW and nFrame.
-    imgH, imgW = np.array(Image.open(filename_list[0])).shape[:2]
-    nFrame = len(filename_list)
 
     # Loads video.
     video = []
@@ -306,6 +303,10 @@ def video_completion(args):
 
     padder = InputPadder(video.shape) 
     video = padder.pad(video)[0]
+
+    # Obtains imgH, imgW and nFrame.
+    imgH, imgW = video.shape[-2:]
+    nFrame = len(filename_list)
 
     # t = profile("initialize", t, args.outroot)
 
@@ -443,10 +444,6 @@ def video_completion_seamless(args):
     filename_list = glob.glob(os.path.join(args.data_dir, args.video, '*.png')) + \
                     glob.glob(os.path.join(args.data_dir, args.video, '*.jpg'))
 
-    # Obtains imgH, imgW and nFrame.
-    imgH, imgW = np.array(Image.open(filename_list[0])).shape[:2]
-    nFrame = len(filename_list)
-
     # Loads video.
     video = []
     for filename in sorted(filename_list):
@@ -458,6 +455,10 @@ def video_completion_seamless(args):
 
     padder = InputPadder(video.shape) 
     video = padder.pad(video)[0]
+
+    # Obtains imgH, imgW and nFrame.
+    imgH, imgW = video.shape[-2:]
+    nFrame = len(filename_list)
 
     # t = profile("initialize", t, args.outroot)
 
