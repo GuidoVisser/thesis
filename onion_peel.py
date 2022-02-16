@@ -69,18 +69,27 @@ holes = holes.unsqueeze(0)
 dists = dists.unsqueeze(0)
 valids = valids.unsqueeze(0)
 
+print(frames.shape)
+print(holes.shape)
+print(dists.shape)
+print(valids.shape)
+
 
 #################### Load Model
 model = nn.DataParallel(OPN())
 if torch.cuda.is_available():
     model.cuda()
-model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth')), strict=False)
+    model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth')), strict=False)
+else:
+    model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth'), map_location=torch.device('cpu')), strict=False)
 model.eval() 
 
 pp_model = nn.DataParallel(TCN())
 if torch.cuda.is_available():
     pp_model.cuda()
-pp_model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/TCN.pth')), strict=False)
+    model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth')), strict=False)
+else:
+    model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth'), map_location=torch.device('cpu')), strict=False)
 pp_model.eval() 
 
 
