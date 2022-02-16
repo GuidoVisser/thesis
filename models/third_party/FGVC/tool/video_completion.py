@@ -17,17 +17,18 @@ import torchvision.transforms.functional as F
 
 from research_archive.models.third_party.edgeconnect.networks import EdgeGenerator_
 from models.third_party.RAFT import utils
+from models.third_party.RAFT.utils.utils import InputPadder
 from models.third_party.RAFT import RAFT
 
-from research_archive.models.third_party.FGVC.utils import region_fill
-from research_archive.models.third_party.FGVC.utils.Poisson_blend import Poisson_blend
-from research_archive.models.third_party.FGVC.utils.Poisson_blend_img import Poisson_blend_img
-from research_archive.models.third_party.FGVC.utils.common_utils import flow_edge
+from models.third_party.FGVC.utils import region_fill
+from models.third_party.FGVC.utils.Poisson_blend import Poisson_blend
+from models.third_party.FGVC.utils.Poisson_blend_img import Poisson_blend_img
+from models.third_party.FGVC.utils.common_utils import flow_edge
 
-from research_archive.models.third_party.FGVC.tool.get_flowNN import get_flowNN
-from research_archive.models.third_party.FGVC.tool.get_flowNN_gradient import get_flowNN_gradient
-from research_archive.models.third_party.FGVC.tool.spatial_inpaint import spatial_inpaint
-from research_archive.models.third_party.FGVC.tool.frame_inpaint import DeepFillv1
+from models.third_party.FGVC.tool.get_flowNN import get_flowNN
+from models.third_party.FGVC.tool.get_flowNN_gradient import get_flowNN_gradient
+from models.third_party.FGVC.tool.spatial_inpaint import spatial_inpaint
+from models.third_party.FGVC.tool.frame_inpaint import DeepFillv1
 
 
 
@@ -81,10 +82,14 @@ def initialize_RAFT(args):
     """Initializes the RAFT model.
     """
     model = torch.nn.DataParallel(RAFT(args))
-    model.load_state_dict(torch.load(args.RAFT_weights))
+    if torch.cuda.is_available():
+        model.load_state_dict(torch.load(args.RAFT_weights))
+    else:    
+        model.load_state_dict(torch.load(args.RAFT_weights, map_location=torch.device('cpu')))
 
     model = model.module
-    model.to('cuda')
+    if torch.cuda.is_available():
+        model.to('cuda')
     model.eval()
 
     return model
@@ -99,7 +104,7 @@ def calculate_flow(args, model, video, mode):
     nFrame, _, imgH, imgW = video.shape
     Flow = np.empty(((imgH, imgW, 2, 0)), dtype=np.float32)
 
-    if os.path.isdir(os.path.join(args.outroot, 'flow', mode + '_flo')):
+    if os.path.isdir(os.path.join(args.outroot, 'flow', mode + '_flo')) and False:
         for flow_name in sorted(glob.glob(os.path.join(args.outroot, 'flow', mode + '_flo', '*.flo'))):
             print("Loading {0}".format(flow_name), '\r', end='')
             flow = utils.frame_utils.readFlow(flow_name)
@@ -296,7 +301,11 @@ def video_completion(args):
         video.append(torch.from_numpy(np.array(Image.open(filename)).astype(np.uint8)).permute(2, 0, 1).float())
 
     video = torch.stack(video, dim=0)
-    video = video.to('cuda')
+    if torch.cuda.is_available():
+        video = video.to('cuda')
+
+    padder = InputPadder(video.shape) 
+    video = padder.pad(video)[0]
 
     # t = profile("initialize", t, args.outroot)
 
@@ -374,7 +383,8 @@ def video_completion(args):
     video_comp = video
 
     # Image inpainting model.
-    deepfill = DeepFillv1(pretrained_model=args.deepfill_model, image_shape=[imgH, imgW])
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    deepfill = DeepFillv1(pretrained_model=args.deepfill_model, image_shape=[imgH, imgW], device=device)
 
     # t = profile("initialize image completion", t, args.outroot)
 
@@ -441,7 +451,11 @@ def video_completion_seamless(args):
         video.append(torch.from_numpy(np.array(Image.open(filename)).astype(np.uint8)).permute(2, 0, 1).float())
 
     video = torch.stack(video, dim=0)
-    video = video.to('cuda')
+    if torch.cuda.is_available():
+        video = video.to('cuda')
+
+    padder = InputPadder(video.shape) 
+    video = padder.pad(video)[0]
 
     # t = profile("initialize", t, args.outroot)
 
@@ -549,7 +563,8 @@ def video_completion_seamless(args):
     video_comp = video
 
     # Image inpainting model.
-    deepfill = DeepFillv1(pretrained_model=args.deepfill_model, image_shape=[imgH, imgW])
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    deepfill = DeepFillv1(pretrained_model=args.deepfill_model, image_shape=[imgH, imgW], device=device)
 
     # t = profile("initialize completion", t, args.outroot)
 

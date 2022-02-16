@@ -4,7 +4,7 @@ import cv2
 import copy
 import numpy as np
 import scipy.io as sio
-from research_archive.models.third_party.FGVC.utils.common_utils import interp, BFconsistCheck, \
+from models.third_party.FGVC.utils.common_utils import interp, BFconsistCheck, \
     FBconsistCheck, consistCheck, get_KeySourceFrame_flowNN_gradient
 
 

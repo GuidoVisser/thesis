@@ -1,4 +1,4 @@
-from research_archive.models.third_party.FGVC.tool.video_completion import *
+from models.third_party.FGVC.tool.video_completion import *
 import argparse
 
 def main(args):
@@ -18,9 +18,9 @@ if __name__ == "__main__":
     parser.add_argument('--seamless', action='store_true', help='Whether operate in the gradient domain')
     parser.add_argument('--edge_guide', action='store_true', help='Whether use edge as guidance to complete flow')
     parser.add_argument('--mode', default='object_removal', help="modes: object_removal / video_extrapolation")
-    parser.add_argument('--data_dir', default='datasets/DAVIS/JPEGImages/480p/', help="dataset for evaluation")
-    parser.add_argument('--mask_dir', default='datasets/DAVIS/generated_masks/480p/', help="mask for object removal")
-    parser.add_argument('--video', default='', help='the name of the video')
+    parser.add_argument('--data_dir', default='datasets/DAVIS/Images/', help="dataset for evaluation")
+    parser.add_argument('--mask_dir', default='datasets/DAVIS/Annotations/', help="mask for object removal")
+    parser.add_argument('--video', default='dance-jump', help='the name of the video')
     parser.add_argument('--outroot', default='results/VIS_FGVC/DAVIS/480p/', help="output directory")
     parser.add_argument('--consistencyThres', dest='consistencyThres', default=np.inf, type=float, help='flow consistency error threshold')
     parser.add_argument('--alpha', dest='alpha', default=0.1, type=float)

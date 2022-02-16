@@ -16,7 +16,10 @@ class DeepFillv1(object):
         self.device = device
 
         self.deepfill = DeepFill.Generator().to(device)
-        model_weight = torch.load(pretrained_model)
+        if device == 'cpu':
+            model_weight = torch.load(pretrained_model, map_location=torch.device('cpu'))
+        else:
+            model_weight = torch.load(pretrained_model)
         self.deepfill.load_state_dict(model_weight, strict=True)
         self.deepfill.eval()
         print('Load Deepfill Model from', pretrained_model)
@@ -105,7 +108,8 @@ def main():
 
     deepfill = DeepFillv1(pretrained_model=args.pretrained_model,
                           image_shape=args.image_shape,
-                          res_shape=args.res_shape)
+                          res_shape=args.res_shape,
+                          device = "cuda" if torch.cuda.is_available() else 'cpu')
 
     test_image = cv2.imread(args.test_img)
     mask = cv2.imread(args.test_mask, cv2.IMREAD_UNCHANGED)
