@@ -406,7 +406,7 @@ if __name__ == "__main__":
     lambdas.add_argument("--lambda_alpha_l0",          nargs="+", default=[0.005], help="lambda of the l0 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_alpha_l1",          nargs="+", default=[0.01, 100, 0.], help="lambda of the l1 part of the alpha regularization loss")
     lambdas.add_argument("--lambda_stabilization",     nargs="+", default=[0.001], help="lambda of the camera stabilization loss")
-    lambdas.add_argument("--lambda_detail_reg",        nargs="+", default=[10, 50, 0.05], help="lambda of the detail bleed regularization loss")
+    lambdas.add_argument("--lambda_detail_reg",        nargs="+", default=[10, 50, 0.1], help="lambda of the detail bleed regularization loss")
     lambdas.add_argument("--lambda_bg_scaling",        nargs="+", default=[1.], help="downscaling factor for dynamic background in alpha regularization.")
 
     lambdas.add_argument("--lambda_dynamics_reg_diff", nargs="+", default=[0.01], help="lambda of the difference part of the dynamics regularization loss")

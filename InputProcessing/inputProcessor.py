@@ -427,6 +427,8 @@ class ContextDataset(object):
         # TODO: update handler classes to handle tuple input so we can select one layer.
         # return query_input[layer_idx:layer_idx+1]
 
+        print("NOTE | Doing L=0 in context loader")
+        return query_input[0:1]
         return query_input[layer_idx:layer_idx+1]
 
     def __len__(self):
