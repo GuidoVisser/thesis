@@ -29,6 +29,9 @@ class MaskHandler(object):
         self.img_dir   = args.img_dir
         self.mask_dir  = mask_dir
         self.device    = args.device
+        
+        self.foreground_dir = path.join(args.out_dir, "foreground_masks")
+        create_dir(self.foreground_dir)
 
         # propagate each object mask through video
         for i in range(self.N_objects):
@@ -52,7 +55,9 @@ class MaskHandler(object):
                         cv2.imwrite(path.join(save_dir, frame), img)
                 else:
                     raise ValueError(f"{args.initial_mask[i]} is neither a valid directory or file")
-         
+        
+        self.prepare_foreground_masks()        
+
     @torch.no_grad()
     def propagate(self, initial_mask, top_k, mem_freq, model_device, memory_device, model_weights, save_dir, forward=True):
         """
@@ -121,6 +126,23 @@ class MaskHandler(object):
                 save_frame(mask_pred, path.join(save_dir, f"{i + initial_index:05}.png"))
             else:
                 save_frame(mask_pred, path.join(save_dir, f"{initial_index - i:05}.png"))
+
+    def prepare_foreground_masks(self):
+        """
+        Prepare a directory with all masks of all foreground object for every frame
+        """
+
+        for frame in range(len(self)):
+            foreground_masks = []
+            for layer in sorted(listdir(self.mask_dir)):
+                mask = cv2.imread(path.join(self.mask_dir, layer, f"{frame:05}.png"))
+                foreground_masks.append((mask >= 128).astype('uint8'))
+            
+            foreground_mask = np.minimum(np.sum(np.stack(foreground_masks), axis=0), np.ones_like(foreground_masks[0])) * 255
+
+            foreground_mask = cv2.dilate(foreground_mask.astype('uint8'), kernel=np.ones((3,3)))
+
+            cv2.imwrite(path.join(self.foreground_dir, f"{frame:05}.png"), foreground_mask)
 
     def __getitem__(self, idx: Union[int, slice]) -> torch.Tensor:
         

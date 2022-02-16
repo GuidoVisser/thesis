@@ -15,17 +15,13 @@ class HomographyHandler(object):
     def __init__(self,
                  savepath: str,
                  image_dir: str,
-                 mask_dir: list,
                  device: str = "cuda",
                  frame_size: list = [854, 480],
                  interval: int = 1) -> None:
         super().__init__()
         self.device = device
 
-        self.mask_dirs = [path.join(mask_dir, dir) 
-                               for dir 
-                               in sorted(listdir(mask_dir))]
-        self.mask_dir = mask_dir
+        self.mask_dir = path.join(savepath, "foreground_masks")
 
         self.frame_sequence = [path.join(image_dir, frame) 
                                for frame 
@@ -213,7 +209,7 @@ class HomographyHandler(object):
         origin_size.reverse()
         
         # get masks
-        # masks = self.get_masks()
+        masks = self.get_masks()
 
         # extract features using SuperPoint and match the features using SuperGlue
         feature_matches = extract_and_match_features(frame_tensors, self.device, get_model_config())
@@ -222,7 +218,7 @@ class HomographyHandler(object):
         coords = get_matching_coordinates(feature_matches)
 
         # remove foreground features for cleaner homography estimation
-        # coords = remove_foreground_features(coords, masks)
+        coords = remove_foreground_features(coords, masks)
         
         # apply RANSAC and get homographies from coordinates 
         homographies = self.extract_homography(coords)
@@ -354,8 +350,6 @@ class HomographyHandler(object):
         Returns:
             masks (list): list of combined masks
         """
-
-
         masks = []
         for idx, mask_path in enumerate(sorted(listdir(self.mask_dir))):
             if idx % self.interval == 0:

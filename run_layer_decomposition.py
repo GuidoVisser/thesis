@@ -140,7 +140,7 @@ class ExperimentRunner(object):
         frame_iterator     = FrameIterator(img_dir, self.args)
         mask_handler       = MaskHandler(mask_dir, self.args)
         flow_handler       = FlowHandler(frame_iterator, mask_handler, flow_dir, raft_weights=self.args.flow_model, device=self.args.device, iters=50)
-        homography_handler = HomographyHandler(self.args.out_dir, img_dir, path.join(flow_dir, "dynamics_mask"), self.args.device, (self.args.frame_width, self.args.frame_height))
+        homography_handler = HomographyHandler(self.args.out_dir, img_dir, self.args.device, (self.args.frame_width, self.args.frame_height))
         depth_handler      = DepthHandler(img_dir, depth_dir, self.args, mask_handler)
         background_volume  = BackgroundVolume(background_dir, homography_handler, self.args)
         background_volume.visualize(0)
@@ -349,12 +349,12 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
-    dataset = "Experimental"
-    video = "nescio_1"
+    dataset = "Videos"
+    video = "nescio_2"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00"],#, f"datasets/{dataset}/Annotations/{video}/01"], #, f"datasets/{dataset}/Annotations/{video}/02", f"datasets/{dataset}/Annotations/{video}/03"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00", f"datasets/{dataset}/Annotations/{video}/01"], #, f"datasets/{dataset}/Annotations/{video}/02", f"datasets/{dataset}/Annotations/{video}/03"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/Images/{video}", 
         help="path to the directory in which the video frames are stored")
