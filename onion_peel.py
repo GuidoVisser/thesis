@@ -27,10 +27,11 @@ from models.third_party.onion_peel.models.OPN import OPN
 from models.third_party.onion_peel.models.TCN import TCN
 
 def get_arguments():
+    video = "nescio_2"
     parser = argparse.ArgumentParser(description="args")
-    parser.add_argument("--img_dir", type=str, default="datasets/Videos/Images/scooter-black")
-    parser.add_argument("--mask_dir", type=str, default="datasets/Videos/Annotations/scooter-black/00")
-    parser.add_argument("--out_dir", type=str, default="results/onion_peel/scooter-black")
+    parser.add_argument("--img_dir", type=str, default=f"datasets/Videos/Images/{video}")
+    parser.add_argument("--mask_dir", type=str, default=f"datasets/Videos/Annotations/{video}/00")
+    parser.add_argument("--out_dir", type=str, default=f"results/onion_peel/{video}")
     return parser.parse_args()
 args = get_arguments()
 
@@ -84,9 +85,9 @@ model.eval()
 pp_model = nn.DataParallel(TCN())
 if torch.cuda.is_available():
     pp_model.cuda()
-    model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth')), strict=False)
+    pp_model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/TCN.pth')), strict=False)
 else:
-    model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/OPN.pth'), map_location=torch.device('cpu')), strict=False)
+    pp_model.load_state_dict(torch.load(os.path.join('models/third_party/onion_peel/TCN.pth'), map_location=torch.device('cpu')), strict=False)
 pp_model.eval() 
 
 
