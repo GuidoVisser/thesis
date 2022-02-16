@@ -213,7 +213,7 @@ class HomographyHandler(object):
         origin_size.reverse()
         
         # get masks
-        masks = self.get_masks()
+        # masks = self.get_masks()
 
         # extract features using SuperPoint and match the features using SuperGlue
         feature_matches = extract_and_match_features(frame_tensors, self.device, get_model_config())
@@ -222,7 +222,7 @@ class HomographyHandler(object):
         coords = get_matching_coordinates(feature_matches)
 
         # remove foreground features for cleaner homography estimation
-        coords = remove_foreground_features(coords, masks)
+        # coords = remove_foreground_features(coords, masks)
         
         # apply RANSAC and get homographies from coordinates 
         homographies = self.extract_homography(coords)
@@ -331,7 +331,7 @@ class HomographyHandler(object):
         frames, frame_tensors = [], []
         for frame_path in self.frame_sequence:
 
-            # load frameremove_foreground_features
+            # load frame
             frame = cv2.imread(frame_path)
 
             # convert to grayscale for SuperGlue

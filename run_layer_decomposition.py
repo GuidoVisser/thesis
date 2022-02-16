@@ -349,19 +349,19 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
-    dataset = "Videos"
-    video = "kruispunt_rijks"
+    dataset = "Experimental"
+    video = "nescio_1"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/layer_decomposition_dynamic/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00/00006.png", f"datasets/{dataset}/Annotations/{video}/01/00006.png"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00"],#, f"datasets/{dataset}/Annotations/{video}/01"], #, f"datasets/{dataset}/Annotations/{video}/02", f"datasets/{dataset}/Annotations/{video}/03"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/Images/{video}", 
         help="path to the directory in which the video frames are stored")
     directory_args.add_argument("--continue_from", type=str, default="", help="root directory of training run from which you wish to continue")
 
     model_args = parser.add_argument_group("model")
-    model_args.add_argument("--model_type",     type=str, default="omnimatte", choices=["3d_bottleneck", "fully_2d", "omnimatte", "bottleneck_no_attention", "no_addons"], help="The type of decomposition network to use")
+    model_args.add_argument("--model_type",     type=str, default="3d_bottleneck", choices=["3d_bottleneck", "fully_2d", "omnimatte", "bottleneck_no_attention", "no_addons"], help="The type of decomposition network to use")
     model_args.add_argument("--conv_channels",  type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
     model_args.add_argument("--keydim",         type=int, default=8,  help="number of key channels in the attention memory network")
     model_args.add_argument("--valdim",         type=int, default=16, help="number of value channels in the attention memory network")

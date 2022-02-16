@@ -10,10 +10,10 @@ class Compositer(object):
         super().__init__()
 
         self.root = root
-        self.N_layers = len(listdir(root))
+        self.N_layers = len(listdir(path.join(root, "layers")))
         self.N_frames = len(listdir(path.join(root, "layers/00")))
 
-        self.save_dir = path.join(self.root, "composites")
+        self.save_dir = path.join(self.root, "../composites")
         create_dir(self.save_dir)
 
     def _get_layer_img(self, frame_idx: int, layer_idx: int) -> np.array:

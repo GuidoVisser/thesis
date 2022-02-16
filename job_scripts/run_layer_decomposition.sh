@@ -14,7 +14,7 @@ pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
 VIDEO='kruispunt_rijks_extrinsic'
-cp -RT $HOME/thesis/datasets/Videos/Images/kruispunt_rijks $TMPDIR/video
+cp -RT $HOME/thesis/datasets/Videos/Images/kruispunt_rijks $TMPDIR/$VIDEO
 mkdir $TMPDIR/00
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00 $TMPDIR/00
 mkdir $TMPDIR/01
@@ -36,7 +36,7 @@ echo "$SLURM_JOBID | Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decompos
 python $HOME/thesis/run_layer_decomposition.py \
             --model_type 3d_bottleneck \
             --device cuda \
-            --img_dir $TMPDIR/video \
+            --img_dir $TMPDIR/$VIDEO \
             --initial_mask $TMPDIR/00 $TMPDIR/01  $TMPDIR/02 $TMPDIR/03\
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \

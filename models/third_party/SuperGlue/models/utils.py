@@ -418,7 +418,7 @@ def plot_image_pair(imgs, dpi=100, size=6, pad=.5):
     figsize = (size*n, size*3/4) if size is not None else None
     _, ax = plt.subplots(1, n, figsize=figsize, dpi=dpi)
     for i in range(n):
-        ax[i].imshow(imgs[i], cmap=plt.get_cmap('gray'), vmin=0, vmax=255)
+        ax[i].imshow(imgs[i].squeeze(0).squeeze(0).numpy() * 255., cmap=plt.get_cmap('gray'), vmin=0, vmax=255)
         ax[i].get_yaxis().set_ticks([])
         ax[i].get_xaxis().set_ticks([])
         for spine in ax[i].spines.values():  # remove frame

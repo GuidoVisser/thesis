@@ -7,7 +7,7 @@ from typing import Union
 from models.third_party.SuperGlue.models.matching import Matching
 from models.third_party.SuperGlue.models.utils import make_matching_plot, AverageTimer
 
-from utils.utils import create_dirs
+from utils.utils import create_dir
 
 def get_model_config(superglue: str = "outdoor",
                      max_keypoints: int = 1024,
@@ -48,7 +48,7 @@ def extract_and_match_features(frames: list,
 
     # Create the output directories if they do not exist already.
     if output_dir is not None:
-        create_dirs([output_dir])
+        create_dir(output_dir)
 
     timer = AverageTimer(newline=True)
     output = []

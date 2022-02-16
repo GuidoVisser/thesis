@@ -992,17 +992,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Load our checkpoint
-    prop_saved = torch.load(args.prop_model)
+    prop_saved = torch.load(args.prop_model, map_location='cpu')
     prop_model = PropagationNetwork().cuda().eval()
     prop_model.load_state_dict(prop_saved)
 
-    fusion_saved = torch.load(args.fusion_model)
+    fusion_saved = torch.load(args.fusion_model, map_location='cpu')
     fusion_model = FusionNet().cuda().eval()
     fusion_model.load_state_dict(fusion_saved)
 
     # Loads the S2M model
     if args.s2m_model is not None:
-        s2m_saved = torch.load(args.s2m_model)
+        s2m_saved = torch.load(args.s2m_model, map_location='cpu')
         s2m_model = S2M().cuda().eval()
         s2m_model.load_state_dict(s2m_saved)
     else:

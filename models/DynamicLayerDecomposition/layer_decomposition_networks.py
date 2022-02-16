@@ -206,7 +206,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         background_offset = F.grid_sample(background_offset, adjustment_grid.permute(0, 2, 3, 4, 1), align_corners=True)
         
         # There is no offset in temporal dimension, so add zeros tensor
-        background_offset = torch.cat((torch.zeros_like(background_offset[:, 0:1]), background_offset), dim=1)
+        background_offset = torch.cat((background_offset, torch.zeros_like(background_offset[:, 0:1])), dim=1)
 
         return background_offset
 
@@ -283,9 +283,9 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         base_grid = self.base_grid_bg_offset[:batch_size]
 
         # calculate a Delta grid based on the flow field that offsets the base grid
-        flow_grid = torch.cat([bg_offset[:, 0:1],
-                               bg_offset[:, 1:2] / (w - 1.) / 2., 
-                               bg_offset[:, 2:3] / (h - 1.) / 2.], 1)
+        flow_grid = torch.cat([bg_offset[:, 1:2] / (w - 1.) / 2., 
+                               bg_offset[:, 0:1] / (h - 1.) / 2.,
+                               bg_offset[:, 2:3]], 1)
 
         # construct full grid
         grid = (base_grid + flow_grid).permute(0, 2, 3, 4, 1)
