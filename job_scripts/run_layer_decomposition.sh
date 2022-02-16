@@ -13,16 +13,12 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='kruispunt_rijks_extrinsic'
-cp -RT $HOME/thesis/datasets/Videos/Images/kruispunt_rijks $TMPDIR/$VIDEO
+VIDEO='nescio_2'
+cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/$VIDEO
 mkdir $TMPDIR/00
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00 $TMPDIR/00
 mkdir $TMPDIR/01
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01 $TMPDIR/01
-mkdir $TMPDIR/02
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/02 $TMPDIR/02
-mkdir $TMPDIR/03
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/03 $TMPDIR/03
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -37,7 +33,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --model_type 3d_bottleneck \
             --device cuda \
             --img_dir $TMPDIR/$VIDEO \
-            --initial_mask $TMPDIR/00 $TMPDIR/01  $TMPDIR/02 $TMPDIR/03\
+            --initial_mask $TMPDIR/00 $TMPDIR/01 \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
