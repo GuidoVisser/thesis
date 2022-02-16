@@ -510,7 +510,7 @@ def video_completion_seamless(args):
         mask_dilated = np.stack(mask_dilated, -1).astype(np.bool)
         flow_mask = np.stack(flow_mask, -1).astype(np.bool)
 
-        mask, mask_dilated, flow_mask = padder.pad(mask, mask_dilated, flow_mask)
+        mask, mask_dilated, flow_mask = padder.numpy_pad(mask, mask_dilated, flow_mask)
 
     # t = profile("initialize flow completion", t, args.outroot)
 
