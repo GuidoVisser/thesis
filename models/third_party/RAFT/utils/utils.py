@@ -8,8 +8,9 @@ class InputPadder:
     """ Pads images such that dimensions are divisible by 8 """
     def __init__(self, dims, mode='sintel'):
         self.ht, self.wd = dims[-2:]
-        pad_ht = (((self.ht // 8) + 1) * 8 - self.ht) % 8
-        pad_wd = (((self.wd // 8) + 1) * 8 - self.wd) % 8
+        downscale = 16
+        pad_ht = (((self.ht // downscale) + 1) * downscale - self.ht) % downscale
+        pad_wd = (((self.wd // downscale) + 1) * downscale - self.wd) % downscale
         if mode == 'sintel':
             self._pad = [pad_wd//2, pad_wd - pad_wd//2, pad_ht//2, pad_ht - pad_ht//2]
         else:
@@ -22,6 +23,9 @@ class InputPadder:
         ht, wd = x.shape[-2:]
         c = [self._pad[2], ht-self._pad[3], self._pad[0], wd-self._pad[1]]
         return x[..., c[0]:c[1], c[2]:c[3]]
+
+    def numpy_pad(self, *inputs):
+        return [np.pad(x, ((self._pad[2], self._pad[3]), (self._pad[0], self._pad[1]), (0, 0)), mode='edge') for x in inputs]
 
 def forward_interpolate(flow):
     flow = flow.detach().cpu().numpy()

@@ -104,7 +104,7 @@ def calculate_flow(args, model, video, mode):
     nFrame, _, imgH, imgW = video.shape
     Flow = np.empty(((imgH, imgW, 2, 0)), dtype=np.float32)
 
-    if os.path.isdir(os.path.join(args.outroot, 'flow', mode + '_flo')) and False:
+    if os.path.isdir(os.path.join(args.outroot, 'flow', mode + '_flo')):
         for flow_name in sorted(glob.glob(os.path.join(args.outroot, 'flow', mode + '_flo', '*.flo'))):
             print("Loading {0}".format(flow_name), '\r', end='')
             flow = utils.frame_utils.readFlow(flow_name)
@@ -352,6 +352,8 @@ def video_completion(args):
         mask = np.stack(mask, -1).astype(np.bool)
         flow_mask = np.stack(flow_mask, -1).astype(np.bool)
 
+        mask, flow_mask = padder.numpy_pad(mask, flow_mask)
+
     # t = profile("initialize flow completion", t, args.outroot)
 
     if args.edge_guide:
@@ -507,6 +509,8 @@ def video_completion_seamless(args):
         mask = np.stack(mask, -1).astype(np.bool)
         mask_dilated = np.stack(mask_dilated, -1).astype(np.bool)
         flow_mask = np.stack(flow_mask, -1).astype(np.bool)
+
+        mask, mask_dilated, flow_mask = padder.pad(mask, mask_dilated, flow_mask)
 
     # t = profile("initialize flow completion", t, args.outroot)
 
