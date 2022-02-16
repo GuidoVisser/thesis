@@ -35,8 +35,9 @@ def get_arguments():
 args = get_arguments()
 
 #################### Load video
-T = len(glob.glob(os.path.join(args.img_dir, '*.jpg'))) + len(glob.glob(os.path.join(args.img_dir, '*.jpg')))
-ext = glob.glob(os.path.join(args.img_dir, '*.jpg'))[0][-4:]
+frame_list = glob.glob(os.path.join(args.img_dir, '*.jpg')) + glob.glob(os.path.join(args.img_dir, '*.png'))
+T = len(frame_list)
+ext = frame_list[0][-4:]
 H, W = 240, 424
 frames = np.empty((T, H, W, 3), dtype=np.float32)
 holes = np.empty((T, H, W, 1), dtype=np.float32)
