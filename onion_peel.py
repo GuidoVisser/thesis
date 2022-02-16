@@ -35,14 +35,15 @@ def get_arguments():
 args = get_arguments()
 
 #################### Load video
-T = len(glob.glob(os.path.join(args.img_dir, '*.jpg')))
+T = len(glob.glob(os.path.join(args.img_dir, '*.jpg'))) + len(glob.glob(os.path.join(args.img_dir, '*.jpg')))
+ext = glob.glob(os.path.join(args.img_dir, '*.jpg'))[0][-4:]
 H, W = 240, 424
 frames = np.empty((T, H, W, 3), dtype=np.float32)
 holes = np.empty((T, H, W, 1), dtype=np.float32)
 dists = np.empty((T, H, W, 1), dtype=np.float32)
 for i in range(T):
     #### rgb
-    img_file = os.path.join(args.img_dir, '{:05d}.jpg'.format(i))
+    img_file = os.path.join(args.img_dir, '{:05d}'.format(i)) + ext
     raw_frame = np.array(Image.open(img_file).convert('RGB'))/255.
     raw_frame = cv2.resize(raw_frame, dsize=(W, H), interpolation=cv2.INTER_LINEAR)
     frames[i] = raw_frame
@@ -68,11 +69,6 @@ frames = frames.unsqueeze(0)
 holes = holes.unsqueeze(0)
 dists = dists.unsqueeze(0)
 valids = valids.unsqueeze(0)
-
-print(frames.shape)
-print(holes.shape)
-print(dists.shape)
-print(valids.shape)
 
 
 #################### Load Model
