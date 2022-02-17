@@ -403,7 +403,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--n_gpus",        type=int,   default=torch.cuda.device_count(), help="Number of GPUs to use for training")
 
     lambdas = parser.add_argument_group("lambdas")
-    lambdas.add_argument("--lambda_mask",              nargs="+", default=[1000., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
+    lambdas.add_argument("--lambda_mask",              nargs="+", default=[50., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
     lambdas.add_argument("--lambda_recon_flow",        nargs="+", default=[1.], help="lambda of the flow reconstruction loss")
     lambdas.add_argument("--lambda_recon_depth",       nargs="+", default=[1.], help="lambda of the depth reconstruction loss")
     lambdas.add_argument("--lambda_alpha_l0",          nargs="+", default=[0.005], help="lambda of the l0 part of the alpha regularization loss")

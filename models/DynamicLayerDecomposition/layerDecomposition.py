@@ -83,9 +83,9 @@ class LayerDecompositer(nn.Module):
 
                 if epoch % self.save_freq == 0 and epoch != 0:
                     frame_indices = input["index"][:, 0].tolist()
-                    self.visualize_attention_maps(f"intermediate/{epoch}")
+                    self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
                     if self.using_context:
-                        self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
+                        self.visualize_attention_maps(f"intermediate/{epoch}")
 
             self.loss_module.update_lambdas()
 
