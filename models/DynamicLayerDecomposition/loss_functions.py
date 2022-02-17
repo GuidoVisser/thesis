@@ -444,7 +444,8 @@ class DecompositeLoss2D(DecompositeLoss):
                  lambda_bg_scaling,
                  corr_diff,
                  alpha_reg_layers,
-                 use_alpha_detail_reg) -> None:
+                 use_alpha_detail_reg,
+                 is_omnimatte = False) -> None:
         super().__init__(lambda_mask,
                          lambda_recon_flow,
                          lambda_recon_depth,
@@ -463,6 +464,8 @@ class DecompositeLoss2D(DecompositeLoss):
 
         self.lambda_recon_warp = LambdaScheduler(lambda_recon_warp)
         self.lambda_alpha_warp = LambdaScheduler(lambda_alpha_warp)
+
+        self.is_omnimatte = is_omnimatte
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -542,6 +545,9 @@ class DecompositeLoss2D(DecompositeLoss):
         if self.corr_diff:
             loss += dynamics_reg_loss
 
+        if self.is_omnimatte and mask_bootstrap_loss < 0.05:
+            self.lambda_mask_bootstrap.value = 0.0
+
         # create dict of all separate losses for logging
         loss_values = {
             "total":                          loss.item(),
@@ -576,7 +582,6 @@ class DecompositeLoss2D(DecompositeLoss):
     def update_lambdas(self):
         self.lambda_alpha_l0.update()
         self.lambda_alpha_l1.update()
-        self.lambda_mask_bootstrap.update()
         self.lambda_recon_flow.update()
         self.lambda_recon_depth.update()
         self.lambda_stabilization.update()
@@ -584,6 +589,8 @@ class DecompositeLoss2D(DecompositeLoss):
         self.lambda_dynamics_reg_diff.update()
         self.lambda_recon_warp.update()
         self.lambda_alpha_warp.update()
+        if not self.is_omnimatte:
+            self.lambda_mask_bootstrap.update()
 
 ##############################################################################################################
 # Adapted from Omnimatte: https://github.com/erikalu/omnimatte/tree/018e56a64f389075e548966e4547fcc404e98986 #
