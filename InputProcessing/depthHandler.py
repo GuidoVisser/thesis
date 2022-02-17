@@ -91,7 +91,7 @@ class DepthHandler(object):
             data = data.to(self.device).squeeze()
             
             # Do a forward pass
-            disps = self.model(data)
+            disps = model(data)
             disparities[i] = self.post_process_disparity(disps[0][:, 0, :, :].cpu().numpy())
             
         disparities /= np.max(disparities)
