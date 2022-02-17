@@ -137,19 +137,12 @@ class ExperimentRunner(object):
         # create helper classes 
         #   These helpers prepare the mask propagation, homography estimation and optical flow calculation 
         #   at initialization and save the results for fast retrieval
-        print("start: ", torch.cuda.memory_allocated())
         frame_iterator     = FrameIterator(img_dir, self.args)
-        print("frames: ", torch.cuda.memory_allocated())
         mask_handler       = MaskHandler(mask_dir, self.args)
-        print("masks: ", torch.cuda.memory_allocated())
         flow_handler       = FlowHandler(frame_iterator, mask_handler, flow_dir, raft_weights=self.args.flow_model, device=self.args.device, iters=50)
-        print("flow: ", torch.cuda.memory_allocated())
         homography_handler = HomographyHandler(self.args.out_dir, img_dir, self.args.device, (self.args.frame_width, self.args.frame_height))
-        print("homography: ", torch.cuda.memory_allocated())
         depth_handler      = DepthHandler(img_dir, depth_dir, self.args, mask_handler)
-        print("depth: ", torch.cuda.memory_allocated())
         background_volume  = BackgroundVolume(background_dir, homography_handler, self.args)
-        print("background: ", torch.cuda.memory_allocated())
         background_volume.visualize(0)
 
         input_processor = InputProcessor(
