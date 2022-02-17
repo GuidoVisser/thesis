@@ -112,6 +112,7 @@ class LayerDecompositer(nn.Module):
 
         for (input, targets) in self.dataloader:
 
+            print(torch.cuda.memory_allocated())
             # Forward pass through network
             output = self.net(input)
 

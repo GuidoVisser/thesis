@@ -31,7 +31,9 @@ class FlowHandler(object):
         self.iters  = iters
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
+        print(torch.cuda.memory_allocated())
         self.raft = self.initialize_raft(raft_weights)
+        print(torch.cuda.memory_allocated())
 
         self.output_dir= output_dir
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
