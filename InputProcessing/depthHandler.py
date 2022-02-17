@@ -31,11 +31,7 @@ class DepthHandler(object):
         # Set up model for depth estimation
         self.device = args.device
 
-        self.model = Resnet18_md(num_in_layers=3).to(self.device).eval()
-        if torch.cuda.device_count() == 0:
-            self.model.load_state_dict(torch.load(args.depth_model, map_location='cpu'))
-        else:
-            self.model.load_state_dict(torch.load(args.depth_model))
+        self.model_weights = args.depth_model
 
         # Load data
         self.frame_size = (args.frame_width, args.frame_height)
@@ -78,7 +74,13 @@ class DepthHandler(object):
 
 
     @ torch.no_grad()
-    def estimate_depth(self):        
+    def estimate_depth(self):
+
+        model = Resnet18_md(num_in_layers=3).to(self.device).eval()
+        if torch.cuda.device_count() == 0:
+            model.load_state_dict(torch.load(self.model_weights, map_location='cpu'))
+        else:
+            model.load_state_dict(torch.load(self.model_weights))
         
         disparities = np.zeros((self.n_img,
                                   self.frame_size[1], self.frame_size[0]),

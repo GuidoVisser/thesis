@@ -31,7 +31,7 @@ class FlowHandler(object):
         self.iters  = iters
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
-        self.raft = self.initialize_raft(raft_weights)
+        self.raft_weights = raft_weights
 
         self.output_dir= output_dir
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
@@ -92,6 +92,8 @@ class FlowHandler(object):
     @torch.no_grad()
     def calculate_full_video_flow(self):
 
+        raft = self.initialize_raft(self.raft_weights)
+
         for frame_idx in range(len(self.frame_iterator) - 1):
             # print(f"Calculating Optical Flow: {frame_idx} / {len(self.frame_iterator) - 1}")
 
@@ -109,8 +111,8 @@ class FlowHandler(object):
             image0, image1 = padder.pad(image0, image1)
 
             # Calculate forward and backward optical flow
-            _, forward_flow  = self.raft(image0, image1, iters=self.iters, test_mode=True)
-            _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
+            _, forward_flow  = raft(image0, image1, iters=self.iters, test_mode=True)
+            _, backward_flow = raft(image1, image0, iters=self.iters, test_mode=True)
 
             # Get the flow confidence
             conf = self.get_confidence(image0, image1, forward_flow, backward_flow)
@@ -148,9 +150,7 @@ class FlowHandler(object):
                 if frame_idx == 0:
                     create_dirs(path.join(self.output_dir, f"object_flow/{layer:02}"))
                 cv2.imwrite(path.join(self.output_dir, f"object_flow/{layer:02}/{frame_idx:05}.png"), flow_to_image(object_flow[layer], convert_to_bgr=True))
-        
-        # del self.raft
-            
+                    
     def get_confidence(self, image0, image1, forward, backward):
         """
         Calculate an alhpa mask for every object that serves as a weight for the flow reconstruction
@@ -297,42 +297,42 @@ class FlowHandler(object):
 
         return grid_sample(tensor, grid, align_corners=True)
 
-    def calculate_flow_for_video(self, stabalized=False):
-        """
-        Calculate the optical flow for the entire video
-        """
+    # def calculate_flow_for_video(self, stabalized=False):
+    #     """
+    #     Calculate the optical flow for the entire video
+    #     """
 
-        for i in range(len(self.frame_iterator) - 1):
+    #     for i in range(len(self.frame_iterator) - 1):
             
-            if stabalized:
-                flow, _ = self.calculate_flow_between_stabilized_frames(i)
-            else:
-                flow, _ = self.calculate_flow_between_frames(i)
+    #         if stabalized:
+    #             flow, _ = self.calculate_flow_between_stabilized_frames(i)
+    #         else:
+    #             flow, _ = self.calculate_flow_between_frames(i)
 
-            writeFlow(path.join(self.output_dir, "flow", f"{i:05}.flo"), flow)
-            cv2.imwrite(path.join(self.output_dir, "png", f"{i:05}.png"), flow_to_image(flow, convert_to_bgr=True))
+    #         writeFlow(path.join(self.output_dir, "flow", f"{i:05}.flo"), flow)
+    #         cv2.imwrite(path.join(self.output_dir, "png", f"{i:05}.png"), flow_to_image(flow, convert_to_bgr=True))
 
-    def calculate_flow_between_frames(self, frame_idx):
-        """
-        Calculate the forward flow between two subsequent frames
-        """
-        # Define images
-        image0 = self.get_image(frame_idx)
-        image1 = self.get_image(frame_idx + 1)
+    # def calculate_flow_between_frames(self, frame_idx):
+    #     """
+    #     Calculate the forward flow between two subsequent frames
+    #     """
+    #     # Define images
+    #     image0 = self.get_image(frame_idx)
+    #     image1 = self.get_image(frame_idx + 1)
         
-        # Prepare images for use with RAFT
-        image0 = self.prepare_image_for_raft(image0)
-        image1 = self.prepare_image_for_raft(image1)
+    #     # Prepare images for use with RAFT
+    #     image0 = self.prepare_image_for_raft(image0)
+    #     image1 = self.prepare_image_for_raft(image1)
 
-        # Calculate forward and backward optical flow
-        _, forward_flow  = self.raft(image0, image1, iters=self.iters, test_mode=True)
-        _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
+    #     # Calculate forward and backward optical flow
+    #     _, forward_flow  = self.raft(image0, image1, iters=self.iters, test_mode=True)
+    #     _, backward_flow = self.raft(image1, image0, iters=self.iters, test_mode=True)
 
-        # Get the flow confidence
-        object_mask = self.mask_iterator[frame_idx]
-        conf = self.get_confidence(image0, image1, forward_flow, backward_flow, object_mask)
+    #     # Get the flow confidence
+    #     object_mask = self.mask_iterator[frame_idx]
+    #     conf = self.get_confidence(image0, image1, forward_flow, backward_flow, object_mask)
 
-        return forward_flow, conf
+    #     return forward_flow, conf
 
     def __len__(self):
         return len(self.frame_iterator) - 1
