@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 #SBATCH -n 1
-#SBATCH -t 1:00:00
+#SBATCH -t 12:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -43,9 +43,9 @@ python $HOME/thesis/run_layer_decomposition.py \
             --num_static_channels 16 \
             --in_channels 16 \
             --lambda_mask 50.0 \
-            --batch_size 32 \
-            --n_epochs 10 \
-            --save_freq 250 \
+            --batch_size 12 \
+            --n_epochs 1500 \
+            --save_freq 500 \
             --conv_channels 64 \
             --description 'Omnimatte final results'
 
