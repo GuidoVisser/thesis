@@ -41,9 +41,11 @@ class MaskHandler(object):
 
                 # if the path points to a single mask, propagate it through the video
                 if path.isfile(args.initial_mask[i]):
+                    print("mask before: ", torch.cuda.memory_allocated())
                     self.propagate(args.initial_mask[i], 50, 10, self.device, self.device, args.propagation_model, save_dir)
                     self.propagate(args.initial_mask[i], 50, 10, self.device, self.device, args.propagation_model, save_dir, forward=False)
-                
+                    print("mask after: ", torch.cuda.memory_allocated())
+
                 # if the path points to a directory with masks, resize them and use them
                 elif path.isdir(args.initial_mask[i]):
                     for frame in sorted(listdir(args.initial_mask[i])):
@@ -92,6 +94,8 @@ class MaskHandler(object):
         propagation_model.load_pretrained(model_weights)
         propagation_model.eval()
 
+        print("mask during: ", torch.cuda.memory_allocated())
+
         # get the frame in video for initial mask
         frame = next(iter(frame_iterator))
 
@@ -126,6 +130,8 @@ class MaskHandler(object):
                 save_frame(mask_pred, path.join(save_dir, f"{i + initial_index:05}.png"))
             else:
                 save_frame(mask_pred, path.join(save_dir, f"{initial_index - i:05}.png"))
+
+        del propagation_model
 
     def prepare_foreground_masks(self):
         """
