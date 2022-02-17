@@ -43,10 +43,8 @@ def extract_and_match_features(frames: list,
     """
     """
 
-    print("homography before: ", torch.cuda.memory_allocated())
     # Load the SuperPoint and SuperGlue models.
     matching = Matching(model_config).eval().to(device)
-    print("homography_during: ", torch.cuda.memory_allocated())
     # Create the output directories if they do not exist already.
     if output_dir is not None:
         create_dir(output_dir)
@@ -113,7 +111,6 @@ def extract_and_match_features(frames: list,
 
         # timer.print(f"Finished pair {i:5} of {len(frames)-2:5}") # -2:= -1 for zero index, -1 because we look at pairs i.s.o. frames
 
-    print("homography after: ", torch.cuda.memory_allocated())
     return output
 
 def get_matching_coordinates(keypoint_matches: list) -> list:

@@ -41,10 +41,8 @@ class MaskHandler(object):
 
                 # if the path points to a single mask, propagate it through the video
                 if path.isfile(args.initial_mask[i]):
-                    print("mask before: ", torch.cuda.memory_allocated())
                     self.propagate(args.initial_mask[i], 50, 10, self.device, self.device, args.propagation_model, save_dir)
                     self.propagate(args.initial_mask[i], 50, 10, self.device, self.device, args.propagation_model, save_dir, forward=False)
-                    print("mask after: ", torch.cuda.memory_allocated())
 
                 # if the path points to a directory with masks, resize them and use them
                 elif path.isdir(args.initial_mask[i]):

@@ -31,9 +31,7 @@ class FlowHandler(object):
         self.iters  = iters
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
-        print("flow before: ", torch.cuda.memory_allocated())
         self.raft = self.initialize_raft(raft_weights)
-        print("flow during: ", torch.cuda.memory_allocated())
 
         self.output_dir= output_dir
         create_dirs(path.join(self.output_dir, "forward", "flow"), 
@@ -152,8 +150,6 @@ class FlowHandler(object):
                 cv2.imwrite(path.join(self.output_dir, f"object_flow/{layer:02}/{frame_idx:05}.png"), flow_to_image(object_flow[layer], convert_to_bgr=True))
         
         # del self.raft
-        print("flow after: ", torch.cuda.memory_allocated())
-
             
     def get_confidence(self, image0, image1, forward, backward):
         """
