@@ -37,7 +37,8 @@ class DepthHandler(object):
         self.frame_size = (args.frame_width, args.frame_height)
 
         self.n_img, self.loader = prepare_dataloader(img_dir, (args.frame_height, args.frame_width))
-        self.estimate_depth()
+        if not path.exists(path.join(self.out_dir, f"00000.png")):
+            self.estimate_depth()
 
         self.frame_paths = [path.join(out_dir, fn) for fn in sorted(listdir(self.out_dir))]
 

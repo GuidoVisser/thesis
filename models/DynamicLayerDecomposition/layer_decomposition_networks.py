@@ -13,7 +13,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
     """
     Layer Decomposition Attention Memory Net base class
     """
-    def __init__(self, context_loader, num_context_frames, max_frames=200, coarseness=10, do_adjustment=True, unsampled_dynamic_bg_input=False):
+    def __init__(self, context_loader, num_context_frames, max_frames=200, br_coarseness=10, offset_coarseness=10, do_adjustment=True, unsampled_dynamic_bg_input=False):
         super().__init__()
 
         # initialize foreground encoder and decoder
@@ -31,8 +31,8 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         self.context_loader     = context_loader
         self.num_context_frames = num_context_frames
 
-        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
-        self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
+        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // br_coarseness, 4, 7))
+        self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // offset_coarseness, 4, 7))
 
         self.max_frames = max_frames
         self.do_adjustment = do_adjustment
@@ -308,11 +308,12 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
                  max_frames=200, 
                  transposed_bottleneck=True,
                  separate_value_layer=True,
-                 coarseness=10, 
+                 br_coarseness=10,
+                 offset_coarseness=10, 
                  do_adjustment=True,
                  unsampled_dynamic_bg_input=False):
 
-        super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment, unsampled_dynamic_bg_input)
+        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment, unsampled_dynamic_bg_input)
 
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
@@ -450,10 +451,11 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
                  conv_channels=64, 
                  max_frames=200, 
                  transposed_bottleneck=True,
-                 coarseness=10, 
+                 br_coarseness=10, 
+                 offset_coarseness=10,
                  do_adjustment=True):
 
-        super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment)
+        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
 
         # initialize foreground encoder and decoder
         self.encoder = nn.ModuleList([
@@ -650,10 +652,11 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
                  keydim=64, 
                  topk=0, 
                  max_frames=200, 
-                 coarseness=10, 
+                 br_coarseness=10, 
+                 offset_coarseness=10,
                  do_adjustment=True,
                  separate_value_layer=True):
-        super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment)
+        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
 
         self.keydim = keydim
         self.valdim = valdim
@@ -913,8 +916,8 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
     """
     Layer Decomposition Attention Memory Net base class
     """
-    def __init__(self, context_loader, num_context_frames, max_frames=200, coarseness=10, do_adjustment=True):
-        super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment)
+    def __init__(self, context_loader, num_context_frames, max_frames=200, br_coarseness=10, offset_coarseness=10, do_adjustment=True):
+        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
 
     def forward(self, input: dict) -> dict:
         """
@@ -1018,10 +1021,11 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
                  max_frames=200,
                  transposed_bottleneck=True, 
                  separate_value_layer=True,
-                 coarseness=10, 
+                 br_coarseness=10, 
+                 offset_coarseness=10, 
                  do_adjustment=True):
 
-        super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment)
+        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
 
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
@@ -1166,10 +1170,11 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
                  keydim=64, 
                  topk=0, 
                  max_frames=200, 
-                 coarseness=10, 
+                 br_coarseness=10, 
+                 offset_coarseness=10, 
                  do_adjustment=True,
                  separate_value_layer=True):
-        super().__init__(context_loader, num_context_frames, max_frames, coarseness, do_adjustment)
+        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
 
         self.keydim = keydim
         self.valdim = valdim
@@ -1437,7 +1442,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
 
 
 class Omnimatte(nn.Module):
-    def __init__(self, conv_channels=64, in_channels=16, max_frames=200, coarseness=10, do_adjustment=True, force_dynamics_layer=False):
+    def __init__(self, conv_channels=64, in_channels=16, max_frames=200, br_coarseness=10, offset_coarseness=10, do_adjustment=True, force_dynamics_layer=False):
         super().__init__()
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),
@@ -1458,8 +1463,8 @@ class Omnimatte(nn.Module):
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
 
-        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // coarseness, 4, 7))
-        self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // coarseness, 4, 7))
+        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // offset_coarseness, 4, 7))
+        self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // br_coarseness, 4, 7))
 
         self.max_frames = max_frames
         self.do_adjustment = do_adjustment
@@ -1635,10 +1640,10 @@ class Omnimatte(nn.Module):
         """
         if len(input.shape) == 6:
             b, l, c, t, h, w = input.shape
-            return input.permute(0, 3, 1, 2, 4, 5).reshape(b*t, l, c, h, w)
+            return input.permute(3, 0, 1, 2, 4, 5).reshape(b*t, l, c, h, w)
         elif len(input.shape) == 5:
             b, c, t, h, w = input.shape
-            return input.permute(0, 2, 1, 3, 4).reshape(b*t, c, h, w)
+            return input.permute(2, 0, 1, 3, 4).reshape(b*t, c, h, w)
         else:
             raise NotImplementedError("Input shape is not supported")
     

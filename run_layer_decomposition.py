@@ -141,9 +141,12 @@ class ExperimentRunner(object):
         mask_handler       = MaskHandler(mask_dir, self.args)
         flow_handler       = FlowHandler(frame_iterator, mask_handler, flow_dir, raft_weights=self.args.flow_model, device=self.args.device, iters=50)
         homography_handler = HomographyHandler(self.args.out_dir, img_dir, self.args.device, (self.args.frame_width, self.args.frame_height))
-        depth_handler      = DepthHandler(img_dir, depth_dir, self.args, mask_handler)
         background_volume  = BackgroundVolume(background_dir, homography_handler, self.args)
         background_volume.visualize(0)
+        if self.args.use_depth:
+            depth_handler  = DepthHandler(img_dir, depth_dir, self.args, mask_handler)
+        else:
+            depth_handler = None
 
         input_processor = InputProcessor(
             self.args,
@@ -171,8 +174,6 @@ class ExperimentRunner(object):
             depth_handler,
             background_volume
         )
-
-        print("dataloader: ", torch.cuda.memory_allocated())
 
         return dataloader, context_loader
 
@@ -239,7 +240,8 @@ class ExperimentRunner(object):
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,
-                    coarseness=self.args.coarseness,
+                    br_coarseness=self.args.br_coarseness,
+                    offse_coarseness=self.args.offset_coarseness,
                     separate_value_layer=self.args.separate_value_layer,
                     unsampled_dynamic_bg_input=self.args.unsampled_dynamic_bg_input
                 )
@@ -255,7 +257,8 @@ class ExperimentRunner(object):
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,
-                    coarseness=self.args.coarseness,
+                    br_coarseness=self.args.br_coarseness,
+                    offset_coarseness=self.args.offset_coarseness,
                     separate_value_layer=self.args.separate_value_layer
                 )    
         elif self.args.model_type == "omnimatte":
@@ -263,7 +266,8 @@ class ExperimentRunner(object):
                 in_channels=self.args.in_channels,
                 conv_channels=args.conv_channels,
                 max_frames=len(dataloader.dataset.frame_iterator),
-                coarseness=args.coarseness,
+                br_coarseness=self.args.br_coarseness,
+                offset_coarseness=self.args.offset_coarseness,
                 do_adjustment=True
             )
         elif self.args.model_type == "fully_2d":
@@ -278,7 +282,8 @@ class ExperimentRunner(object):
                     topk=self.args.topk,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
-                    coarseness=self.args.coarseness,
+                    br_coarseness=self.args.br_coarseness,
+                    offset_coarseness=self.args.offset_coarseness,
                     separate_value_layer=self.args.separate_value_layer
                 )
             else:
@@ -292,7 +297,8 @@ class ExperimentRunner(object):
                     topk=self.args.topk,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
-                    coarseness=self.args.coarseness,
+                    br_coarseness=self.args.br_coarseness,
+                    offset_coarseness=self.args.offset_coarseness,
                     separate_value_layer=self.args.separate_value_layer
                 )
         elif self.args.model_type == "bottleneck_no_attention":
@@ -305,7 +311,8 @@ class ExperimentRunner(object):
                     conv_channels=self.args.conv_channels,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
-                    coarseness=self.args.coarseness
+                    br_coarseness=self.args.br_coarseness,
+                    offset_coarseness=self.args.offset_coarseness
             )
         elif self.args.model_type == "no_addons":
             if self.args.use_depth:
@@ -315,7 +322,8 @@ class ExperimentRunner(object):
                     conv_channels=self.args.conv_channels,
                     do_adjustment=True, 
                     max_frames=len(dataloader.dataset.frame_iterator),
-                    coarseness=self.args.coarseness,
+                    br_coarseness=self.args.br_coarseness,
+                    offset_coarseness=self.args.offset_coarseness,
                     force_dynamics_layer=True
             )
 
@@ -342,7 +350,6 @@ class ExperimentRunner(object):
             do_detail_transfer=self.args.do_detail_transfer
         )
 
-        print("model: ", torch.cuda.memory_allocated())
         return model
 
 
@@ -353,24 +360,25 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
     dataset = "Videos"
-    video = "nescio_2"
+    video = "nescio_1"
     directory_args = parser.add_argument_group("directories")
-    directory_args.add_argument("--out_dir", type=str, default=f"results/omnimatte/{video}", 
+    directory_args.add_argument("--out_dir", type=str, default=f"results/omnimatte_test/{video}", 
         help="path to directory where results are saved")
-    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00", f"datasets/{dataset}/Annotations/{video}/01"], #, f"datasets/{dataset}/Annotations/{video}/02", f"datasets/{dataset}/Annotations/{video}/03"], 
+    directory_args.add_argument("--initial_mask", nargs="+", default=[f"datasets/{dataset}/Annotations/{video}/00"],#, f"datasets/{dataset}/Annotations/{video}/01"], #, f"datasets/{dataset}/Annotations/{video}/02", f"datasets/{dataset}/Annotations/{video}/03"], 
         help="paths to the initial object masks or the directories containing the object masks")
     directory_args.add_argument("--img_dir", type=str, default=f"datasets/{dataset}/Images/{video}", 
         help="path to the directory in which the video frames are stored")
     directory_args.add_argument("--continue_from", type=str, default="", help="root directory of training run from which you wish to continue")
 
     model_args = parser.add_argument_group("model")
-    model_args.add_argument("--model_type",     type=str, default="omnimatte", choices=["3d_bottleneck", "fully_2d", "omnimatte", "bottleneck_no_attention", "no_addons"], help="The type of decomposition network to use")
-    model_args.add_argument("--conv_channels",  type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
-    model_args.add_argument("--keydim",         type=int, default=8,  help="number of key channels in the attention memory network")
-    model_args.add_argument("--valdim",         type=int, default=16, help="number of value channels in the attention memory network")
-    model_args.add_argument("--in_channels",    type=int, default=16, help="number of channels in the input")
-    model_args.add_argument("--coarseness",     type=int, default=10, help="Temporal coarseness of camera adjustment parameters")
-    model_args.add_argument("--topk",           type=int, default=0,  help="k value for topk channel selection in context distribution")
+    model_args.add_argument("--model_type",        type=str, default="3d_bottleneck", choices=["3d_bottleneck", "fully_2d", "omnimatte", "bottleneck_no_attention", "no_addons"], help="The type of decomposition network to use")
+    model_args.add_argument("--conv_channels",     type=int, default=16, help="base number of convolution channels in the convolutional neural networks")
+    model_args.add_argument("--keydim",            type=int, default=8,  help="number of key channels in the attention memory network")
+    model_args.add_argument("--valdim",            type=int, default=16, help="number of value channels in the attention memory network")
+    model_args.add_argument("--in_channels",       type=int, default=16, help="number of channels in the input")
+    model_args.add_argument("--br_coarseness",     type=int, default=10, help="Temporal coarseness of brightness adjustment")
+    model_args.add_argument("--offset_coarseness", type=int, default=10, help="Temporal coarseness of background offset adjustment")
+    model_args.add_argument("--topk",              type=int, default=0,  help="k value for topk channel selection in context distribution")
     model_args.add_argument("--use_2d_loss_module",   action="store_true", help="Use 2d loss module in stead of 3d loss module")
     model_args.add_argument("--no_static_background", action="store_true", help="Don't use separated static and dynamic background")
     model_args.add_argument("--use_depth",            action="store_true", help="specify that you want to use depth estimation as an input channel")
@@ -402,6 +410,7 @@ if __name__ == "__main__":
     training_param_args.add_argument("--seed",          type=int,   default=1,     help="Random seed for libraries")
     training_param_args.add_argument("--n_gpus",        type=int,   default=torch.cuda.device_count(), help="Number of GPUs to use for training")
 
+    # all lambda schedules should be a list starting with a staring value followed by pairs of UPDATE_EPOCH, NEW_VALUE
     lambdas = parser.add_argument_group("lambdas")
     lambdas.add_argument("--lambda_mask",              nargs="+", default=[50., 50, 0.], help="values for the lambda of the alpha_mask_bootstrap loss")
     lambdas.add_argument("--lambda_recon_flow",        nargs="+", default=[1.], help="lambda of the flow reconstruction loss")

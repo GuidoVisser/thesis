@@ -40,7 +40,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --depth_model $TMPDIR/weights/depth_model.pth \
             --use_2d_loss_module \
             --timesteps 2 \
-            --num_static_channels 16 \
+            --num_static_channels 13 \
             --in_channels 16 \
             --lambda_mask 50.0 \
             --batch_size 12 \
