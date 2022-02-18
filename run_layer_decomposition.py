@@ -241,7 +241,7 @@ class ExperimentRunner(object):
                     max_frames=len(dataloader.dataset.frame_iterator),
                     transposed_bottleneck=not self.args.bottleneck_normal,
                     br_coarseness=self.args.br_coarseness,
-                    offse_coarseness=self.args.offset_coarseness,
+                    offset_coarseness=self.args.offset_coarseness,
                     separate_value_layer=self.args.separate_value_layer,
                     unsampled_dynamic_bg_input=self.args.unsampled_dynamic_bg_input
                 )
