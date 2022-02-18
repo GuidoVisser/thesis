@@ -200,7 +200,8 @@ class ExperimentRunner(object):
                 self.args.lambda_bg_scaling,
                 self.args.corr_diff,
                 self.args.alpha_reg_layers,
-                self.args.use_alpha_detail_reg
+                self.args.use_alpha_detail_reg,
+                is_omnimatte=self.args.model_type == 'omnimatte'
             )
         else:
             loss_module = DecompositeLoss3D(
