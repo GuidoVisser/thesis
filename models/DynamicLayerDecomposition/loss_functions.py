@@ -353,7 +353,6 @@ class DecompositeLoss3D(DecompositeLoss):
         if "depth" in targets.keys():
             depth_gt        = targets["depth"]                                              # [B,    1, T, H, W]
             depth_reconstruction = predictions["depth_reconstruction"]                      # [B,    1, T, H, W]
-            print(depth_reconstruction.device, depth_gt.device)
             depth_reconstruction_loss = self.calculate_loss(depth_reconstruction, depth_gt)
         else:
             depth_reconstruction_loss = torch.zeros((1)).to(rgb_reconstruction_loss.device)
@@ -371,6 +370,7 @@ class DecompositeLoss3D(DecompositeLoss):
         stabilization_loss = brightness_regularization_loss + background_offset_loss
 
         # Combine loss values
+        print(rgb_reconstruction_loss.device, alpha_reg_loss.device, detail_reg_loss.device, flow_reconstruction_loss.device, depth_reconstruction_loss.device, mask_bootstrap_loss.device, stabilization_loss.device)
         loss = rgb_reconstruction_loss + \
                alpha_reg_loss + \
                self.lambda_detail_reg.value     * detail_reg_loss + \
