@@ -162,7 +162,8 @@ class ExperimentRunner(object):
         dataloader = DataLoader(
             input_processor, 
             batch_size=args.batch_size,
-            shuffle=True
+            shuffle=True,
+            pin_memory=True
         )
 
         context_loader = ContextDataset(
