@@ -1515,7 +1515,7 @@ class Omnimatte(nn.Module):
         B, L, C, T, H, W = input_tensor.shape
 
         input_tensor = self.reorder_time2batch(input_tensor)
-        background_uv_map = background_uv_map.view(T*B, H, W, 2)
+        background_uv_map = background_uv_map.transpose(0, 1).reshape(T*B, H, W, 2)
 
         composite_rgba = None
         composite_flow = self.reorder_time2batch(background_flow)
