@@ -31,7 +31,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         self.context_loader     = context_loader
         self.num_context_frames = num_context_frames
 
-        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // offset_coarseness, 4, 7))
+        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // offset_coarseness, 12, 21))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // br_coarseness, 4, 7))
 
         self.max_frames = max_frames
