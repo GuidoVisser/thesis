@@ -370,7 +370,6 @@ class DecompositeLoss3D(DecompositeLoss):
         stabilization_loss = brightness_regularization_loss + background_offset_loss
 
         # Combine loss values
-        print(rgb_reconstruction_loss.device, alpha_reg_loss.device, detail_reg_loss.device, flow_reconstruction_loss.device, depth_reconstruction_loss.device, mask_bootstrap_loss.device, stabilization_loss.device)
         loss = rgb_reconstruction_loss + \
                alpha_reg_loss + \
                self.lambda_detail_reg.value     * detail_reg_loss + \
