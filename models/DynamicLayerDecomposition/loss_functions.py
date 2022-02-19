@@ -157,7 +157,7 @@ class DecompositeLoss(nn.Module):
         object_layers  = alpha_layers[:, 2:] * .5 + .5              # [B', L-2, 1, T, H, W]
 
         # TEST detach dynamic bg layer in loss calculation
-        dynamics_layer = dynamics_layer.clone().detach()
+        # dynamics_layer = dynamics_layer.clone().detach()
 
         dynamics_layer = dynamics_layer.expand(object_layers.shape)
 
@@ -353,6 +353,7 @@ class DecompositeLoss3D(DecompositeLoss):
         if "depth" in targets.keys():
             depth_gt        = targets["depth"]                                              # [B,    1, T, H, W]
             depth_reconstruction = predictions["depth_reconstruction"]                      # [B,    1, T, H, W]
+            print(depth_reconstruction.device, depth_gt.device)
             depth_reconstruction_loss = self.calculate_loss(depth_reconstruction, depth_gt)
         else:
             depth_reconstruction_loss = torch.zeros((1)).to(rgb_reconstruction_loss.device)
