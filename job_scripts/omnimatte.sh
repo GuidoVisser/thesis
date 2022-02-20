@@ -15,10 +15,8 @@ pip install --user --upgrade torch && pip install --user --upgrade torchvision
 #Copy input file to scratch
 VIDEO='nescio_2'
 cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/$VIDEO
-mkdir $TMPDIR/00
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/00 $TMPDIR/00
-mkdir $TMPDIR/01
-cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO/01 $TMPDIR/01
+mkdir $TMPDIR/masks
+cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO $TMPDIR/masks
 mkdir $TMPDIR/weights
 cp $HOME/thesis/models/third_party/weights/topkstm.pth $TMPDIR/weights/propagation_model.pth
 cp $HOME/thesis/models/third_party/weights/raft.pth $TMPDIR/weights/flow_model.pth
@@ -33,7 +31,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --model_type omnimatte \
             --device cuda \
             --img_dir $TMPDIR/$VIDEO \
-            --initial_mask $TMPDIR/00 $TMPDIR/01 \
+            --initial_mask $TMPDIR/masks \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
