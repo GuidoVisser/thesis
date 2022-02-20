@@ -1,30 +1,30 @@
-from InputProcessing.homography import HomographyHandler
-from os import path
 import torch
 import torch.nn.functional as F
-from math import ceil
 import cv2
 import numpy as np
+from math import ceil
+from os import path
 
-from .homography import HomographyHandler
+from InputProcessing.homography import HomographyHandler
+from utils.utils import create_dir
 
 class BackgroundVolume(object):
 
     def __init__(self,
-                 save_dir: str,
-                 homography_handler: HomographyHandler,
-                 args) -> None:
+                 args,
+                 homography_handler: HomographyHandler) -> None:
         super().__init__()
 
         num_frames = len(homography_handler)
         assert num_frames > args.noise_temporal_coarseness, "Number of frames in the video must be greater than the temporal coarseness"
 
-        self.save_dir  = save_dir
+        self.save_dir = path.join(args.out_dir, "background")
+        create_dir(self.save_dir)
 
-        if path.exists(path.join(save_dir, "spatiotemporal_noise.pth")):
-            self.spatial_noise           = torch.load(path.join(save_dir, "spatial_noise.pth"))
-            self.spatial_noise_upsampled = torch.load(path.join(save_dir, "spatial_noise_upsampled.pth"))
-            self.spatiotemporal_noise    = torch.load(path.join(save_dir, "spatiotemporal_noise.pth"))
+        if path.exists(path.join(self.save_dir, "spatiotemporal_noise.pth")):
+            self.spatial_noise           = torch.load(path.join(self.save_dir, "spatial_noise.pth"))
+            self.spatial_noise_upsampled = torch.load(path.join(self.save_dir, "spatial_noise_upsampled.pth"))
+            self.spatiotemporal_noise    = torch.load(path.join(self.save_dir, "spatiotemporal_noise.pth"))
         else:
             self.spatial_noise = torch.randn(args.in_channels - 3 - int(args.use_depth), args.frame_height // args.noise_upsample_size, args.frame_width // args.noise_upsample_size)
             self.spatial_noise_upsampled = F.interpolate(self.spatial_noise.unsqueeze(0), (args.frame_height, args.frame_width), mode='bilinear')[0]
@@ -36,9 +36,9 @@ class BackgroundVolume(object):
             else:
                 self.spatiotemporal_noise = self.spatial_noise_upsampled.unsqueeze(1).repeat(1, num_frames, 1, 1)
             
-            torch.save(self.spatial_noise,           path.join(save_dir, "spatial_noise.pth"))
-            torch.save(self.spatial_noise_upsampled, path.join(save_dir, "spatial_noise_upsampled.pth"))
-            torch.save(self.spatiotemporal_noise,    path.join(save_dir, "spatiotemporal_noise.pth"))
+            torch.save(self.spatial_noise,           path.join(self.save_dir, "spatial_noise.pth"))
+            torch.save(self.spatial_noise_upsampled, path.join(self.save_dir, "spatial_noise_upsampled.pth"))
+            torch.save(self.spatiotemporal_noise,    path.join(self.save_dir, "spatiotemporal_noise.pth"))
 
         self.spatiotemporal_noise_uv_sampled = F.grid_sample(self.spatiotemporal_noise.permute(1, 0, 2, 3), homography_handler.uv_maps).permute(1, 0, 2, 3)
 

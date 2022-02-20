@@ -15,18 +15,14 @@ class DepthHandler(object):
     Dataset object that prepares the depth estimation of the video and can be queried for the depth of given frames
     """
 
-    def __init__(self, 
-                 img_dir: str, 
-                 out_dir: str, 
-                 args,
-                 mask_handler: MaskHandler) -> None:
+    def __init__(self, args, mask_handler: MaskHandler) -> None:
         super().__init__()
 
-        self.img_dir = img_dir
-        self.out_dir = out_dir
+        self.img_dir = path.join(args.out_dir, "images")
+        self.out_dir = path.join(args.out_dir, "depth")
         
         # if not path.exists(self.out_dir):
-        create_dir(out_dir)
+        create_dir(self.out_dir)
 
         # Set up model for depth estimation
         self.device = args.device
@@ -36,11 +32,11 @@ class DepthHandler(object):
         # Load data
         self.frame_size = (args.frame_width, args.frame_height)
 
-        self.n_img, self.loader = prepare_dataloader(img_dir, (args.frame_height, args.frame_width))
+        self.n_img, self.loader = prepare_dataloader(self.img_dir, (args.frame_height, args.frame_width))
         if not path.exists(path.join(self.out_dir, f"00000.png")):
             self.estimate_depth()
 
-        self.frame_paths = [path.join(out_dir, fn) for fn in sorted(listdir(self.out_dir))]
+        self.frame_paths = [path.join(self.out_dir, fn) for fn in sorted(listdir(self.out_dir))]
 
         self.mask_handler = mask_handler
 

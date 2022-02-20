@@ -1,72 +1,77 @@
-import torch
-import numpy as np
 import cv2
-from torch.utils.data import DataLoader, Subset
-from PIL import Image
-from os import path, listdir
-from typing import Union
+import numpy as np
+import torch
 import torch.nn.functional as F
 
-from utils.utils import create_dir
-from utils.video_utils import save_frame
-from utils.transforms import get_transforms, ToTensor
-from models.TopkSTM.topkSTM import TopKSTM
-from models.TopkSTM.utils import pad_divide_by
+from torch.utils.data import DataLoader, Subset
+from os import path, listdir
+from typing import Union
+
 from datasets import Video
+from utils.utils import create_dir, create_dirs
+from utils.video_utils import save_frame
+from models.TopkSTM.utils import pad_divide_by
+from models.TopkSTM.topkSTM import TopKSTM
+from InputProcessing.utils.transforms import ToTensor, Compose, Normalize
 
 class MaskHandler(object):
     def __init__(self,
-                 mask_dir: str,
-                 args,
-                 binary_threshold: float = 0.5) -> None:
+                 args) -> None:
         super().__init__()
 
-        # set hyperparameters
-        self.frame_size       = (args.frame_width, args.frame_height)
-        self.binary_threshold = binary_threshold
-        
-        self.N_objects = len(args.initial_mask)
-        self.img_dir   = args.img_dir
-        self.mask_dir  = mask_dir
-        self.device    = args.device
-        
+        self.device  = args.device
+        self.root    = path.join(args.out_dir, "masks")
+        self.img_dir = args.img_dir
         self.foreground_dir = path.join(args.out_dir, "foreground_masks")
-        create_dir(self.foreground_dir)
+        create_dirs(self.foreground_dir, self.root)
+        
+        # set hyperparameters
+        self.frame_size = (args.frame_width, args.frame_height)
+        self.N_objects  = len(listdir(args.mask_dir))
 
         # propagate each object mask through video
         for i in range(self.N_objects):
-            save_dir = path.join(self.mask_dir, f"{i:02}")
+            input_dir = path.join(args.mask_dir, f"{i:02}")
+            save_dir  = path.join(self.root, f"{i:02}")
             if not path.exists(save_dir):
                 create_dir(save_dir)
 
                 # if the path points to a single mask, propagate it through the video
-                if path.isfile(args.initial_mask[i]):
-                    self.propagate(args.initial_mask[i], 50, 10, self.device, self.device, args.propagation_model, save_dir)
-                    self.propagate(args.initial_mask[i], 50, 10, self.device, self.device, args.propagation_model, save_dir, forward=False)
+                if len(listdir(input_dir)) == 1:
+                    mask_path = path.join(input_dir, listdir(input_dir)[0])
+                    self.propagate(mask_path, 50, 10, self.device, self.device, args.propagation_model, save_dir)
+                    self.propagate(mask_path, 50, 10, self.device, self.device, args.propagation_model, save_dir, forward=False)
 
-                # if the path points to a directory with masks, resize them and use them
-                elif path.isdir(args.initial_mask[i]):
-                    for frame in sorted(listdir(args.initial_mask[i])):
-                        fn = path.join(args.initial_mask[i], frame)
+                # if the path points to a directory with masks, resize and copy them
+                else:
+                    for frame in sorted(listdir(input_dir)):
+                        
+                        # read
+                        fn = path.join(input_dir, frame)
                         img = cv2.imread(fn, cv2.IMREAD_UNCHANGED)
+                        
+                        # resize
                         img = cv2.resize(img, self.frame_size)
                         if len(img.shape) == 2:
                             img = np.expand_dims(img, axis=2)
+                        
+                        # save
                         cv2.imwrite(path.join(save_dir, frame), img)
-                else:
-                    raise ValueError(f"{args.initial_mask[i]} is neither a valid directory or file")
         
         self.prepare_foreground_masks()        
 
     @torch.no_grad()
-    def propagate(self, initial_mask, top_k, mem_freq, model_device, memory_device, model_weights, save_dir, forward=True):
+    def propagate(self, initial_mask_path, top_k, mem_freq, model_device, memory_device, model_weights, save_dir, forward=True):
         """
         propagate the mask through the video
         """
-        dataset = Video(self.img_dir, get_transforms(), frame_size=self.frame_size, forward=forward)
+
+        data_transforms = Compose([ToTensor(), Normalize()])
+
+        dataset = Video(self.img_dir, data_transforms, frame_size=self.frame_size, forward=forward)
         length_video = len(dataset)
         
-        initial_index = int((path.splitext(initial_mask)[0]).split("/")[-1])
+        initial_index = int((path.splitext(initial_mask_path)[0]).split("/")[-1])
         
         if forward:
             dataset = Subset(dataset, range(initial_index, length_video))
@@ -92,13 +97,11 @@ class MaskHandler(object):
         propagation_model.load_pretrained(model_weights)
         propagation_model.eval()
 
-        print("mask during: ", torch.cuda.memory_allocated())
-
         # get the frame in video for initial mask
         frame = next(iter(frame_iterator))
 
         # get mask of initial frame
-        mask = np.array(Image.open(initial_mask))
+        mask = cv2.imread(initial_mask_path, cv2.IMREAD_GRAYSCALE)
         mask = ToTensor()([mask])[0]
         mask = mask.unsqueeze(0)
         
@@ -138,8 +141,8 @@ class MaskHandler(object):
 
         for frame in range(len(self)):
             foreground_masks = []
-            for layer in sorted(listdir(self.mask_dir)):
-                mask = cv2.imread(path.join(self.mask_dir, layer, f"{frame:05}.png"))
+            for layer in sorted(listdir(self.root)):
+                mask = cv2.imread(path.join(self.root, layer, f"{frame:05}.png"))
                 foreground_masks.append((mask >= 128).astype('uint8'))
             
             foreground_mask = np.minimum(np.sum(np.stack(foreground_masks), axis=0), np.ones_like(foreground_masks[0])) * 255
@@ -153,13 +156,13 @@ class MaskHandler(object):
         masks = []
         for i_object in range(self.N_objects):
             if isinstance(idx, slice):
-                mask_paths = [path.join(self.mask_dir, f"{i_object:02}", f"{frame_idx:05}.png") for frame_idx in range(idx.start or 0, idx.stop or len(self), idx.step or 1)]
+                mask_paths = [path.join(self.root, f"{i_object:02}", f"{frame_idx:05}.png") for frame_idx in range(idx.start or 0, idx.stop or len(self), idx.step or 1)]
                 object_masks = []
                 for mask_path in mask_paths:
                     object_masks.append(cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.frame_size))
                 masks.append(np.stack(object_masks))
             else:
-                mask_path = path.join(self.mask_dir, f"{i_object:02}", f"{idx:05}.png")
+                mask_path = path.join(self.root, f"{i_object:02}", f"{idx:05}.png")
                 masks.append(cv2.resize(cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE), self.frame_size))
 
         masks = np.float32(np.stack(masks)) / 255.
@@ -182,7 +185,7 @@ class MaskHandler(object):
         return trimaps, binary_masks
 
     def __len__(self):
-        return len(listdir(path.join(self.mask_dir, "00")))
+        return len(listdir(path.join(self.root, "00")))
 
     def mask2trimap(self, mask: torch.Tensor, trimap_width: int = 20):
         """Convert binary mask to trimap with values in [-1, 0, 1]."""

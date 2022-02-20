@@ -1,3 +1,4 @@
+from re import I
 import torch
 import numpy as np
 import cv2
@@ -7,30 +8,26 @@ import imageio
 
 from models.third_party.SuperGlue.models.utils import frame2tensor
 
+from InputProcessing.frameIterator import FrameIterator
 from .utils.utils import get_translation_matrix, homogeneous_2d_transform
 from .utils.feature_matching import extract_and_match_features, get_matching_coordinates, get_model_config
 from .utils.remove_foreground import remove_foreground_features
 
 class HomographyHandler(object):
     def __init__(self,
-                 savepath: str,
-                 image_dir: str,
-                 device: str = "cuda",
-                 frame_size: list = [854, 480],
+                 args,
+                 frame_iterator: FrameIterator,
                  interval: int = 1) -> None:
         super().__init__()
-        self.device = device
+        self.device = args.device
 
-        self.mask_dir = path.join(savepath, "foreground_masks")
+        self.mask_dir = path.join(args.out_dir, "foreground_masks")
 
-        self.frame_sequence = [path.join(image_dir, frame) 
-                               for frame 
-                               in sorted(listdir(image_dir))]
-
-        self.frame_size = frame_size
+        self.frame_iterator = frame_iterator
+        self.frame_size = (args.frame_width, args.frame_height)
         self.interval = interval
 
-        homography_path = path.join(savepath, "homographies.txt")
+        homography_path = path.join(args.out_dir, "homographies.txt")
         if path.exists(homography_path):
             self.load_homography(homography_path)
         else:
@@ -43,7 +40,7 @@ class HomographyHandler(object):
             self.uv_maps.append(self.get_frame_uv(i))
         self.uv_maps = torch.stack(self.uv_maps)
 
-        self.homography_demo(savepath)
+        self.homography_demo(args.out_dir)
 
     def __getitem__(self, idx):
         return self.homographies[idx]
@@ -325,10 +322,10 @@ class HomographyHandler(object):
 
         # loop through file paths and process images
         frames, frame_tensors = [], []
-        for frame_path in self.frame_sequence:
+        for idx in range(len(self.frame_iterator)):
 
             # load frame
-            frame = cv2.imread(frame_path)
+            frame = self.frame_iterator.get_np_frame(idx)
 
             # convert to grayscale for SuperGlue
             frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype('float32')
@@ -377,7 +374,7 @@ class HomographyHandler(object):
         """
         Create a demo of the camera stabilization results
         """
-        frames = [cv2.imread(frame_path) for frame_path in self.frame_sequence]
+        frames = [self.frame_iterator.get_np_frame(idx) for idx in range(len(self.frame_iterator))]
         aligned_frames = self.align_frames(frames)
         img_array = [cv2.cvtColor(img, cv2.COLOR_RGB2BGR) for img in aligned_frames]
         img_array = np.stack(img_array)

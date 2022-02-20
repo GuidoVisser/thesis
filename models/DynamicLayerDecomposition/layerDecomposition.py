@@ -17,38 +17,29 @@ from models.third_party.RAFT.utils.flow_viz import flow_to_image
 
 class LayerDecompositer(nn.Module):
     def __init__(self,
+                 args,
                  dataloader: DataLoader,
                  context_loader: DataLoader,
                  loss_module: nn.Module,
                  network: nn.Module,
-                 summary_writer: SummaryWriter,
-                 learning_rate: float,
-                 results_root: str,
-                 batch_size: int,
-                 n_epochs: int,
-                 save_freq: int,
-                 separate_bg: bool,
-                 use_depth: bool,
-                 using_context: bool,
-                 do_detail_transfer: bool):
+                 summary_writer: SummaryWriter):
         super().__init__()
 
-        self.dataloader = dataloader
+        self.dataloader     = dataloader
         self.context_loader = context_loader
-        self.loss_module = loss_module
-        self.net = network
-        self.learning_rate = learning_rate
-        
-        self.using_context = using_context
-        self.do_detail_transfer = do_detail_transfer
-        self.results_root = results_root
-        self.save_dir = f"{results_root}/decomposition"
-        self.n_epochs = n_epochs
-        self.save_freq = save_freq
-        self.batch_size = batch_size
-        self.writer = summary_writer
-        self.separate_bg = separate_bg
-        self.use_depth = use_depth
+        self.loss_module    = loss_module
+        self.net            = network
+        self.writer         = summary_writer
+
+        self.learning_rate      = args.learning_rate
+        self.using_context      = args.model_type not in ["omnimatte", "no_addons", "bottleneck_no_attention"]
+        self.do_detail_transfer = args.do_detail_transfer
+        self.n_epochs           = args.n_epochs
+        self.save_freq          = args.save_freq
+        self.batch_size         = args.batch_size
+        self.use_depth          = args.use_depth
+        self.results_root       = args.out_dir
+        self.save_dir           = f"{self.results_root}/decomposition"
 
         # define optimizers
         self.optimizer = Adam(self.net.parameters(), self.learning_rate)
@@ -144,24 +135,20 @@ class LayerDecompositer(nn.Module):
             for layer_idx in range(self.context_loader.N_layers):
                 key, query = net.get_attention_maps(frame_idx, layer_idx)
 
-                create_dir(f"{self.save_dir}/{epoch_name}/attention_maps/key/{layer_idx:02}/{frame_idx:02}")
-                create_dir(f"{self.save_dir}/{epoch_name}/attention_maps/query/{layer_idx:02}/{frame_idx:02}")
+                key_query = {
+                    "key": key,
+                    "query": query
+                }
 
-                for c in range(key.shape[1]):
-                    key_map   = F.interpolate(key[:, c:c+1], (self.context_loader.frame_size[1], self.context_loader.frame_size[0]), mode='bilinear')[0]
-                    query_map = F.interpolate(query[:, c:c+1], (self.context_loader.frame_size[1], self.context_loader.frame_size[0]), mode='bilinear')[0]
-
-                    key_img   = (key_map.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
-                    query_img = (query_map.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
-
-                    key_img   = cv2.applyColorMap(key_img, cv2.COLORMAP_JET)
-                    query_img = cv2.applyColorMap(query_img, cv2.COLORMAP_JET)
-
-                    key_img   = cv2.addWeighted(frame_img, 0.5, key_img, 0.5, 0)
-                    query_img = cv2.addWeighted(frame_img, 0.5, query_img, 0.5, 0)
-
-                    cv2.imwrite(f"{self.save_dir}/{epoch_name}/attention_maps/key/{layer_idx:02}/{frame_idx:02}/{c:03}.png", key_img)
-                    cv2.imwrite(f"{self.save_dir}/{epoch_name}/attention_maps/query/{layer_idx:02}/{frame_idx:02}/{c:03}.png", query_img)
+                for name, tensor in key_query.items():
+                    create_dir(f"{self.save_dir}/{epoch_name}/attention_maps/{name}/{layer_idx:02}/{frame_idx:02}")
+                    for c in range(tensor.shape[1]):
+                        attn_map = F.interpolate(tensor[:, c:c+1], (self.context_loader.frame_size[1], self.context_loader.frame_size[0]), mode='bilinear')[0]
+                        img      = (attn_map.permute(1, 2, 0).cpu().numpy() * 255).astype('uint8')
+                        img      = cv2.applyColorMap(img, cv2.COLORMAP_JET)
+                        img      = cv2.addWeighted(frame_img, 0.5, img, 0.5, 0)
+                        cv2.imwrite(f"{self.save_dir}/{epoch_name}/attention_maps/{name}/{layer_idx:02}/{frame_idx:02}/{c:03}.png", img)
+                        
 
     def visualize_and_save_output(self, model_output, targets, frame_indices, epoch_name):
         """
@@ -195,25 +182,21 @@ class LayerDecompositer(nn.Module):
             for t in range(timesteps):
 
                 # background
-                if self.separate_bg:
-                    background_rgb_static    = torch.clone(rgba_layers[b, 0, :3, t]).detach()
-                    background_rgb_dynamic   = torch.clone(rgba_layers[b, 1, :3, t]).detach()
-                    background_alpha_dynamic = torch.clone(rgba_layers[b, 1, 3:, t]).detach()
+                background_rgb_static    = torch.clone(rgba_layers[b, 0, :3, t]).detach()
+                background_rgb_dynamic   = torch.clone(rgba_layers[b, 1, :3, t]).detach()
+                background_alpha_dynamic = torch.clone(rgba_layers[b, 1, 3:, t]).detach()
 
-                    # Go from tripmap to binary mask
-                    background_alpha_dynamic = background_alpha_dynamic * .5 + .5
+                # Go from tripmap to binary mask
+                background_alpha_dynamic = background_alpha_dynamic * .5 + .5
 
-                    # Get the full background
-                    background_rgb = (1 - background_alpha_dynamic) * background_rgb_static + background_alpha_dynamic * background_rgb_dynamic
-                else:
-                    background_rgb = torch.clone(rgba_layers[b, 0, :3, t]).detach()
+                # Get the full background
+                background_rgb = (1 - background_alpha_dynamic) * background_rgb_static + background_alpha_dynamic * background_rgb_dynamic
 
                 reconstruction_rgb = torch.clone(reconstruction[b, :3 , t]).detach()
                 gt_rgb_batch       = gt_rgb[b, :, t]
 
                 background_img        = cv2.cvtColor((background_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
-                if self.separate_bg:
-                    background_img_static = cv2.cvtColor((background_rgb_static.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
+                background_img_static = cv2.cvtColor((background_rgb_static.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
                 reconstruction_img    = cv2.cvtColor((reconstruction_rgb.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
                 gt_rgb_img            = cv2.cvtColor((gt_rgb_batch.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
 
@@ -222,8 +205,7 @@ class LayerDecompositer(nn.Module):
 
                 img_name = f"{(frame_indices[b] + t):05}.png"
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background/{img_name}"), background_img)
-                if self.separate_bg:
-                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_static/{img_name}"), background_img_static)
+                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_static/{img_name}"), background_img_static)
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/reconstruction/{img_name}"), reconstruction_img)
                 cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/ground_truth/{img_name}"), gt_rgb_img)
 
@@ -276,9 +258,8 @@ class LayerDecompositer(nn.Module):
                     path.join(self.save_dir, f"{epoch_name}/flow/flo"),
                     path.join(self.save_dir, f"{epoch_name}/depth"),
                     path.join(self.save_dir, f"{epoch_name}/background_offset"),
-                    path.join(self.save_dir, f"{epoch_name}/brightness_scale"))
-        if self.separate_bg:
-            create_dirs(path.join(self.save_dir, f"{epoch_name}/background_static"))
+                    path.join(self.save_dir, f"{epoch_name}/brightness_scale"),
+                    path.join(self.save_dir, f"{epoch_name}/background_static"))
         if self.use_depth:
             create_dirs(path.join(self.save_dir, f"{epoch_name}/depth"))
 
@@ -289,7 +270,7 @@ class LayerDecompositer(nn.Module):
         rgba_with_detail = rgba_layers
 
         n_layers = rgba_layers.shape[1]
-        n_bg_layers = 2 if self.separate_bg else 1
+        n_bg_layers = 2
 
         for i in range(n_layers - 1, n_bg_layers - 1, -1):
             layer_transmission = 1 - transmission_composite

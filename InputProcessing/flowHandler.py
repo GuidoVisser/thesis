@@ -16,25 +16,24 @@ from models.third_party.RAFT.utils.flow_viz import flow_to_image
 from models.third_party.RAFT.utils.utils import InputPadder
 
 class FlowHandler(object):
-    def __init__(self, 
+    def __init__(self,
+                 args, 
                  frame_iterator: FrameIterator, 
                  mask_iterator: MaskHandler,
-                 output_dir: str,
-                 raft_weights: str,
                  iters: int = 50,
                  forward_backward_threshold: float = 20.,
-                 photometric_threshold: float = 20.,
-                 device = "cuda") -> None:
+                 photometric_threshold: float = 20.) -> None:
         super().__init__()
         
-        self.device = device
+        self.device = args.device
         self.iters  = iters
         self.forward_backward_threshold = forward_backward_threshold
         self.photometric_threshold      = photometric_threshold
-        self.raft_weights = raft_weights
+        self.raft_weights = args.flow_model
 
-        self.output_dir= output_dir
-        create_dirs(path.join(self.output_dir, "forward", "flow"), 
+        self.output_dir= path.join(args.out_dir, "flow")
+        create_dirs(self.output_dir,
+                    path.join(self.output_dir, "forward", "flow"), 
                     path.join(self.output_dir, "forward", "png"),
                     path.join(self.output_dir, "backward", "flow"),
                     path.join(self.output_dir, "backward", "png"),

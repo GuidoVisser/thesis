@@ -1,9 +1,8 @@
-from posix import listdir
 import torch
 import cv2
 import numpy as np
 import torch.nn.functional as F
-from os import path
+from os import path, listdir
 
 from utils.video_utils import opencv_folder_to_video
 
@@ -28,15 +27,11 @@ class InputProcessor(object):
         self.do_jitter                  = do_jitter
         self.jitter_rate                = args.jitter_rate
         self.jitter_mode                = 'bilinear'
-        self.num_bg_layers              = 1 if args.no_static_background else 2
+        self.num_bg_layers              = 2
         self.use_depth                  = args.use_depth
         self.unsampled_dynamic_bg_input = args.unsampled_dynamic_bg_input
 
-        if isinstance(args.initial_mask, str):
-            self.N_objects = 1
-        else:
-            self.N_objects = len(args.initial_mask)
-
+        self.N_objects = mask_handler.N_objects
         self.N_layers = self.N_objects + self.num_bg_layers
 
         # create input directories
@@ -98,9 +93,9 @@ class InputProcessor(object):
         # Get spatial noise input if a separate static background is used
         # background_noise:  [1, C-4, T, H, W]
         # background_uv_map: [T, H, W, 2]
-        if self.num_bg_layers == 2:
-            static_background_noise = self.background_volume.spatial_noise_upsampled
-            static_background_noise = static_background_noise.unsqueeze(0).unsqueeze(2).repeat(1, 1, self.timesteps, 1, 1) 
+
+        static_background_noise = self.background_volume.spatial_noise_upsampled
+        static_background_noise = static_background_noise.unsqueeze(0).unsqueeze(2).repeat(1, 1, self.timesteps, 1, 1) 
 
         # UV maps for sampling the static background
         background_uv_map = self.homography_handler.uv_maps[idx:idx+self.timesteps]
@@ -130,13 +125,10 @@ class InputProcessor(object):
 
         zeros_channels = 4 if self.use_depth else 3
         zeros = torch.zeros((1, zeros_channels, self.timesteps, self.frame_size[1], self.frame_size[0]), dtype=torch.float32)  # [1, 4, T, H, W]
-        if self.num_bg_layers == 2:
-            static_background_input  = torch.cat((zeros, static_background_noise), dim=1)            # [1, C, T, H, W]
-            dynamic_background_input = torch.cat((zeros, dynamic_background_noise), dim=1)        # [1, C, T, H, W]
-            background_input = torch.cat((static_background_input, dynamic_background_input)) # [2, C, T, H, W]
-        else:
-            # [1, C, T, H, W]
-            background_input = torch.cat((zeros, spatiotemporal_noise), dim=1)
+
+        static_background_input  = torch.cat((zeros, static_background_noise), dim=1)     # [1, C, T, H, W]
+        dynamic_background_input = torch.cat((zeros, dynamic_background_noise), dim=1)    # [1, C, T, H, W]
+        background_input = torch.cat((static_background_input, dynamic_background_input)) # [2, C, T, H, W]
 
         query_input = torch.cat((background_input, query_input)) # [L, C, T, H, W]
 
@@ -357,11 +349,7 @@ class ContextDataset(object):
         self.use_depth    = args.use_depth
         self.unsampled_dynamic_bg_input = args.unsampled_dynamic_bg_input
 
-        if isinstance(args.initial_mask, str):
-            self.N_objects = 1
-        else:
-            self.N_objects = len(args.initial_mask)
-
+        self.N_objects = mask_handler.N_objects
         self.N_layers = self.N_objects + 1
 
         # create input directories

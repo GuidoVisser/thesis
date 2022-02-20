@@ -48,42 +48,25 @@ class DecompositeLoss(nn.Module):
 
     Handles loss computations
     """
-    def __init__(self,
-                 lambda_mask,
-                 lambda_recon_flow,
-                 lambda_recon_depth,
-                 lambda_alpha_l0,
-                 lambda_alpha_l1,
-                 lambda_stabilization,
-                 lambda_dynamics_reg_corr,
-                 lambda_dynamics_reg_diff,
-                 lambda_dynamics_reg_l0,
-                 lambda_dynamics_reg_l1,
-                 lambda_detail_reg,
-                 lambda_bg_scaling,
-                 corr_diff,
-                 alpha_reg_layers,
-                 use_alpha_detail_reg) -> None:
+    def __init__(self, args) -> None:
         super().__init__()
 
-        self.criterion = nn.L1Loss()
+        self.criterion      = nn.L1Loss()
         self.mask_criterion = MaskLoss()
-        self.corr_diff = corr_diff
-        self.alpha_reg_layers = alpha_reg_layers
-        self.use_alpha_detail_reg = use_alpha_detail_reg
 
-        self.lambda_alpha_l0          = LambdaScheduler(lambda_alpha_l0)
-        self.lambda_alpha_l1          = LambdaScheduler(lambda_alpha_l1)
-        self.lambda_mask_bootstrap    = LambdaScheduler(lambda_mask)
-        self.lambda_recon_flow        = LambdaScheduler(lambda_recon_flow)
-        self.lambda_recon_depth       = LambdaScheduler(lambda_recon_depth)
-        self.lambda_stabilization     = LambdaScheduler(lambda_stabilization)
-        self.lambda_dynamics_reg_corr = LambdaScheduler(lambda_dynamics_reg_corr)
-        self.lambda_dynamics_reg_diff = LambdaScheduler(lambda_dynamics_reg_diff)
-        self.lambda_dynamics_reg_l0   = LambdaScheduler(lambda_dynamics_reg_l0)
-        self.lambda_dynamics_reg_l1   = LambdaScheduler(lambda_dynamics_reg_l1)
-        self.lambda_detail_reg        = LambdaScheduler(lambda_detail_reg)
-        self.lambda_bg_scaling        = LambdaScheduler(lambda_bg_scaling)
+        self.use_alpha_dyn_reg    = args.use_alpha_dyn_reg
+        self.use_alpha_detail_reg = args.use_alpha_detail_reg
+
+        self.lambda_alpha_l0          = LambdaScheduler(args.lambda_alpha_l0)
+        self.lambda_alpha_l1          = LambdaScheduler(args.lambda_alpha_l1)
+        self.lambda_mask_bootstrap    = LambdaScheduler(args.lambda_mask)
+        self.lambda_recon_flow        = LambdaScheduler(args.lambda_recon_flow)
+        self.lambda_recon_depth       = LambdaScheduler(args.lambda_recon_depth)
+        self.lambda_stabilization     = LambdaScheduler(args.lambda_stabilization)
+        self.lambda_dynamics_reg_corr = LambdaScheduler(args.lambda_dynamics_reg_corr)
+        self.lambda_dynamics_reg_diff = LambdaScheduler(args.lambda_dynamics_reg_diff)
+        self.lambda_detail_reg        = LambdaScheduler(args.lambda_detail_reg)
+        self.lambda_bg_scaling        = LambdaScheduler(args.lambda_bg_scaling)
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -153,31 +136,19 @@ class DecompositeLoss(nn.Module):
         Returns the dynamic regularization loss term
         """
 
-        dynamics_layer = alpha_layers[:, 1].unsqueeze(1) * .5 + .5  # [B',   1, 1, T, H, W]
-        object_layers  = alpha_layers[:, 2:] * .5 + .5              # [B', L-2, 1, T, H, W]
+        dynamics_layer = alpha_layers[:, 1:2] * .5 + .5  # [B',   1, 1, T, H, W]
+        object_layers  = alpha_layers[:, 2: ] * .5 + .5  # [B', L-2, 1, T, H, W]
 
         # TEST detach dynamic bg layer in loss calculation
-        # dynamics_layer = dynamics_layer.clone().detach()
+        dynamics_layer = dynamics_layer.clone().detach()
 
         dynamics_layer = dynamics_layer.expand(object_layers.shape)
 
+        alpha_diff = self.lambda_dynamics_reg_diff.value * torch.maximum((object_layers - dynamics_layer), torch.zeros_like(dynamics_layer))
+        alpha_corr = self.lambda_dynamics_reg_corr.value * (object_layers * dynamics_layer)
 
-        if self.corr_diff:
-            alpha_diff = self.lambda_dynamics_reg_diff.value * torch.maximum((object_layers - dynamics_layer), torch.zeros_like(dynamics_layer))
-            alpha_corr = self.lambda_dynamics_reg_corr.value * (object_layers * dynamics_layer)
-
-            loss = torch.mean((1 - binary_masks) * (alpha_corr + alpha_diff))
-        else:
-            # loss = self.lambda_dynamics_reg_diff.value * object_layers - self.lambda_dynamics_reg_corr.value * (object_layers * dynamics_layer)
-
-            # loss = self.lambda_dynamics_reg_corr.value * ((1 - object_layers) * dynamics_layer + object_layers)
-            # loss -= self.lambda_dynamics_reg_diff.value * (dynamics_layer)
-
-            loss = (1 - self.lambda_dynamics_reg_diff.value) * (1 - object_layers) * dynamics_layer + object_layers + self.lambda_dynamics_reg_corr.value * dynamics_layer
-            loss = (1 - binary_masks) * loss
-
-            loss = self.lambda_dynamics_reg_l1.value * torch.mean(loss) #+ self.lambda_dynamics_reg_l0.value * torch.mean((torch.sigmoid(loss * 5.0) - 0.5) * 2.0)
-
+        loss = torch.mean((1 - binary_masks) * (alpha_corr + alpha_diff))
+    
         return loss
 
     def cal_alpha_reg(self, prediction: torch.Tensor) -> torch.Tensor:
@@ -270,38 +241,9 @@ class DecompositeLoss3D(DecompositeLoss):
 
     Handles loss computations
     """
-    def __init__(self,
-                 lambda_mask,
-                 lambda_recon_flow,
-                 lambda_recon_depth,
-                 lambda_alpha_l0,
-                 lambda_alpha_l1,
-                 lambda_stabilization,
-                 lambda_dynamics_reg_corr,
-                 lambda_dynamics_reg_diff,
-                 lambda_dynamics_reg_l0,
-                 lambda_dynamics_reg_l1,
-                 lambda_detail_reg,
-                 lambda_bg_scaling,
-                 corr_diff,
-                 alpha_reg_layers,
-                 use_alpha_detail_reg) -> None:
+    def __init__(self, args) -> None:
         
-        super().__init__(lambda_mask,
-                         lambda_recon_flow,
-                         lambda_recon_depth,
-                         lambda_alpha_l0,
-                         lambda_alpha_l1,
-                         lambda_stabilization,
-                         lambda_dynamics_reg_corr,
-                         lambda_dynamics_reg_diff,
-                         lambda_dynamics_reg_l0,
-                         lambda_dynamics_reg_l1,
-                         lambda_detail_reg,
-                         lambda_bg_scaling,
-                         corr_diff,
-                         alpha_reg_layers,
-                         use_alpha_detail_reg)
+        super().__init__(args)
         
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -332,27 +274,28 @@ class DecompositeLoss3D(DecompositeLoss):
         alpha_composite      = self.get_alpha_composite(alpha_layers)
 
         # Calculate main loss
-        rgb_reconstruction_loss   = self.calculate_loss(rgb_reconstruction, rgb_gt)
-        flow_reconstruction_loss  = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
-        mask_bootstrap_loss       = self.calculate_loss(alpha_layers, masks, mask_loss=True)
-        if self.corr_diff:
-            dynamics_reg_loss     = self.cal_dynamics_reg(alpha_layers, binary_masks)
+        rgb_reconstruction_loss  = self.calculate_loss(rgb_reconstruction, rgb_gt)
+        flow_reconstruction_loss = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
+        mask_bootstrap_loss      = self.calculate_loss(alpha_layers, masks, mask_loss=True)
+        alpha_reg_loss           = self.cal_alpha_reg(alpha_composite * 0.5 + 0.5)
+
+        # Calculate dynamics regularization loss
+        if self.use_alpha_dyn_reg:
+            dynamics_reg_loss    = self.cal_dynamics_reg(alpha_layers, binary_masks)
         
+        # Calculate detail bleed regularization loss
         if self.use_alpha_detail_reg:
-            detail_reg_loss = self.cal_detail_reg_alpha(alpha_layers[:, 1:] *.5 + .5)
-        elif binary_masks.shape[1] > 1:
-            detail_reg_loss = self.cal_detail_reg_mask(alpha_layers[:, 2:] * 0.5 + 0.5, binary_masks)
+            detail_reg_loss = self.cal_detail_reg_alpha(alpha_layers[:, 1:] * .5 + .5)
+        elif binary_masks.shape[1] >= 2:
+            detail_reg_loss = self.cal_detail_reg_mask(alpha_layers[:, 2:] * .5 + .5, binary_masks)
         else:
             detail_reg_loss = torch.Tensor([0.]).to(rgb_reconstruction_loss.device)
         
-        if self.alpha_reg_layers:
-            alpha_reg_loss        = self.cal_alpha_reg(alpha_layers * 0.5 + 0.5)
-        else:
-            alpha_reg_loss        = self.cal_alpha_reg(alpha_composite * 0.5 + 0.5)
-
+        # Calculate depth reconstruction loss
         if "depth" in targets.keys():
-            depth_gt        = targets["depth"]                                              # [B,    1, T, H, W]
-            depth_reconstruction = predictions["depth_reconstruction"]                      # [B,    1, T, H, W]
+            depth_gt             = targets["depth"]                    # [B,    1, T, H, W]
+            depth_reconstruction = predictions["depth_reconstruction"] # [B,    1, T, H, W]
+
             depth_reconstruction_loss = self.calculate_loss(depth_reconstruction, depth_gt)
         else:
             depth_reconstruction_loss = torch.zeros((1)).to(rgb_reconstruction_loss.device)
@@ -378,7 +321,7 @@ class DecompositeLoss3D(DecompositeLoss):
                self.lambda_mask_bootstrap.value * mask_bootstrap_loss + \
                self.lambda_stabilization.value  * stabilization_loss
 
-        if self.corr_diff:
+        if self.use_alpha_dyn_reg:
             loss += dynamics_reg_loss
 
         # create dict of all separate losses for logging
@@ -386,7 +329,6 @@ class DecompositeLoss3D(DecompositeLoss):
             "total":                          loss.item(),
             "rgb_reconstruction_loss":        rgb_reconstruction_loss.item(),
             "alpha_regularization_loss":      alpha_reg_loss.item(),
-            # "dynamics_regularization_loss":   dynamics_reg_loss.item(),
             "detail regularization loss":     detail_reg_loss.item(),
             "flow_reconstruction_loss":       self.lambda_recon_flow.value     * flow_reconstruction_loss.item(),
             "depth_reconstruction_loss":      self.lambda_recon_depth.value    * depth_reconstruction_loss.item(),
@@ -404,7 +346,7 @@ class DecompositeLoss3D(DecompositeLoss):
             "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr.value
         }
 
-        if self.corr_diff:
+        if self.use_alpha_dyn_reg:
             loss_values["dynamics_regularization_loss"] = dynamics_reg_loss.item()
 
         return loss, loss_values
@@ -420,8 +362,6 @@ class DecompositeLoss3D(DecompositeLoss):
         self.lambda_dynamics_reg_diff.update()
         self.lambda_detail_reg.update()
         self.lambda_bg_scaling.update()
-        self.lambda_dynamics_reg_l0.update()
-        self.lambda_dynamics_reg_l1.update()
 
 class DecompositeLoss2D(DecompositeLoss):
     """
@@ -430,45 +370,13 @@ class DecompositeLoss2D(DecompositeLoss):
     Handles loss computations
     Adds some loss functions for temporal consistency in the output
     """
-    def __init__(self,
-                 lambda_mask,
-                 lambda_recon_flow,
-                 lambda_recon_depth,
-                 lambda_recon_warp,
-                 lambda_alpha_warp,
-                 lambda_alpha_l0,
-                 lambda_alpha_l1,
-                 lambda_stabilization,
-                 lambda_dynamics_reg_corr,
-                 lambda_dynamics_reg_diff,
-                 lambda_dynamics_reg_l0,
-                 lambda_dynamics_reg_l1,
-                 lambda_detail_reg,
-                 lambda_bg_scaling,
-                 corr_diff,
-                 alpha_reg_layers,
-                 use_alpha_detail_reg,
-                 is_omnimatte = False) -> None:
-        super().__init__(lambda_mask,
-                         lambda_recon_flow,
-                         lambda_recon_depth,
-                         lambda_alpha_l0,
-                         lambda_alpha_l1,
-                         lambda_stabilization,
-                         lambda_dynamics_reg_corr,
-                         lambda_dynamics_reg_diff,
-                         lambda_dynamics_reg_l0,
-                         lambda_dynamics_reg_l1,
-                         lambda_detail_reg,
-                         lambda_bg_scaling,
-                         corr_diff,
-                         alpha_reg_layers,
-                         use_alpha_detail_reg)
+    def __init__(self, args) -> None:
+        super().__init__(args)
 
-        self.lambda_recon_warp = LambdaScheduler(lambda_recon_warp)
-        self.lambda_alpha_warp = LambdaScheduler(lambda_alpha_warp)
+        self.lambda_recon_warp = LambdaScheduler(args.lambda_recon_warp)
+        self.lambda_alpha_warp = LambdaScheduler(args.lambda_alpha_warp)
 
-        self.is_omnimatte = is_omnimatte
+        self.is_omnimatte = args.model_type == 'omnimatte'
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -503,7 +411,7 @@ class DecompositeLoss2D(DecompositeLoss):
         flow_reconstruction_loss  = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
         mask_bootstrap_loss       = self.calculate_loss(alpha_layers, masks, mask_loss=True)
         alpha_reg_loss            = self.cal_alpha_reg(alpha_composite * 0.5 + 0.5)
-        if self.corr_diff:
+        if self.use_alpha_dyn_reg:
             dynamics_reg_loss         = self.cal_dynamics_reg(alpha_layers, binary_masks)
 
         if "depth" in targets.keys():
@@ -545,7 +453,7 @@ class DecompositeLoss2D(DecompositeLoss):
                self.lambda_recon_warp.value     * rgb_reconstruction_warp_loss + \
                self.lambda_stabilization.value  * stabilization_loss
 
-        if self.corr_diff:
+        if self.use_alpha_dyn_reg:
             loss += dynamics_reg_loss
 
         if self.is_omnimatte and mask_bootstrap_loss < 0.05:
@@ -556,7 +464,6 @@ class DecompositeLoss2D(DecompositeLoss):
             "total":                          loss.item(),
             "rgb_reconstruction_loss":        rgb_reconstruction_loss.item(),
             "alpha_regularization_loss":      alpha_reg_loss.item(),
-            # "dynamics_regularization_loss":   dynamics_reg_loss.item(),
             "flow_reconstruction_loss":       self.lambda_recon_flow.value     * flow_reconstruction_loss.item(),
             "depth_reconstruction_loss":      self.lambda_recon_depth.value    * depth_reconstruction_loss.item(),
             "mask_bootstrap_loss":            self.lambda_mask_bootstrap.value * mask_bootstrap_loss.item(),
@@ -577,7 +484,7 @@ class DecompositeLoss2D(DecompositeLoss):
             "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr.value
         }
 
-        if self.corr_diff:
+        if self.use_alpha_dyn_reg:
             loss_values["dynamics_regularization_loss"] = dynamics_reg_loss.item()
 
         return loss, loss_values

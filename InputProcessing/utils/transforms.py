@@ -12,7 +12,6 @@ class Compose(object):
             inputs = t(inputs)
         return inputs
 
-
 class RandomHorizontalFlip(object):
     def __init__(self, prob):
         self.prob = prob
@@ -23,7 +22,6 @@ class RandomHorizontalFlip(object):
             for input in inputs:
                 output.append(input.flip(-1))
         return output
-
 
 class ToTensor(object):
     def __call__(self, inputs):

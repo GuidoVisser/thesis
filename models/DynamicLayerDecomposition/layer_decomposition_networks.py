@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from InputProcessing.flowHandler import FlowHandler
-from models.DynamicLayerDecomposition.modules.base_modules import *
 from models.DynamicLayerDecomposition.modules.modules_2d import *
 from models.DynamicLayerDecomposition.modules.modules_3d import *
 
@@ -13,7 +12,15 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
     """
     Layer Decomposition Attention Memory Net base class
     """
-    def __init__(self, context_loader, num_context_frames, max_frames=200, br_coarseness=10, offset_coarseness=10, do_adjustment=True, unsampled_dynamic_bg_input=False):
+    def __init__(self,
+                 context_loader, 
+                 num_context_frames, 
+                 max_frames=200, 
+                 br_coarseness=10, 
+                 offset_coarseness=10, 
+                 do_adjustment=True, 
+                 unsampled_dynamic_bg_input=False):
+
         super().__init__()
 
         # initialize foreground encoder and decoder
@@ -28,15 +35,15 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         self.context_encoder = NotImplemented
         self.global_context  = NotImplemented
+
         self.context_loader     = context_loader
         self.num_context_frames = num_context_frames
 
-        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // offset_coarseness, 4, 7))
+        self.bg_offset        = nn.Parameter(torch.zeros(1, 2, max_frames // offset_coarseness, 24, 42))
         self.brightness_scale = nn.Parameter(torch.ones(1, 1, max_frames // br_coarseness, 4, 7))
 
-        self.max_frames = max_frames
-        self.do_adjustment = do_adjustment
-
+        self.max_frames                 = max_frames
+        self.do_adjustment              = do_adjustment
         self.unsampled_dynamic_bg_input = unsampled_dynamic_bg_input
 
         self.base_grid_bg_offset = None
@@ -313,19 +320,26 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
                  do_adjustment=True,
                  unsampled_dynamic_bg_input=False):
 
-        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment, unsampled_dynamic_bg_input)
+        super().__init__(context_loader,
+                         num_context_frames, 
+                         max_frames, 
+                         br_coarseness, 
+                         offset_coarseness, 
+                         do_adjustment, 
+                         unsampled_dynamic_bg_input)
 
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
         # initialize foreground encoder and decoder
+        self.n_skips = 4
         self.encoder = nn.ModuleList([
-            ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
+            ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                     # 1/2
             ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
             ConvBlock2D(conv_channels * 2, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/8
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky'),  # 1/16
             ConvBlock2D(conv_channels * 4, conv_channels * 4, ksize=4, stride=1, dil=2, norm=nn.InstanceNorm2d, activation='leaky')]) # 1/16
-                
+
         self.value_layer         = ConvBlock2D(conv_channels * 4, valdim, ksize=4, activation='leaky')
         if separate_value_layer:
             context_value_layer  = self.value_layer
@@ -360,6 +374,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
 
         context = self.get_context(layer_idx)
 
+        # Encoding
         outputs = []
         skips = []
         for t in range(T):
@@ -368,21 +383,21 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
             skips_t = []
             for i, layer in enumerate(self.encoder):
                 x_t = layer(x_t)
-                if i < 4:
+                if i < self.n_skips:
                     skips_t.append(x_t)
             
             query = self.query_layer(x_t)
             x_t   = self.value_layer(x_t)
 
+            # Get context
             global_features = context(query)
-
             x_t = torch.cat((global_features, x_t), dim=1)
             
             outputs.append(x_t)
             skips.append(skips_t)
 
+        # Temporal bottleneck
         x = torch.stack(outputs, dim=-3)
-
         x = self.temporal_bottleneck(x)
 
         rgba  = []
@@ -423,7 +438,7 @@ class LayerDecompositionAttentionMemoryNet3DBottleneck(LayerDecompositionAttenti
         x = x[:, :, 0]
         for i, layer in enumerate(self.encoder):
             x = layer(x)
-            if i < 4:
+            if i < self.n_skips:
                 skips.append(x)
         
         x = self.value_layer(x)
@@ -455,9 +470,15 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
                  offset_coarseness=10,
                  do_adjustment=True):
 
-        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
+        super().__init__(context_loader,
+                         num_context_frames, 
+                         max_frames, 
+                         br_coarseness, 
+                         offset_coarseness, 
+                         do_adjustment)
 
         # initialize foreground encoder and decoder
+        self.n_skips = 4
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
             ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
@@ -578,7 +599,7 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
             x_t = x[..., t, :, :]
             for i, layer in enumerate(self.encoder):
                 x_t = layer(x_t)
-                if i < 4:
+                if i < self.n_skips:
                     skips_t.append(x_t)
                 
             outputs.append(x_t)
@@ -624,7 +645,7 @@ class LayerDecompositionNet3DBottleneck(LayerDecompositionAttentionMemoryNet):
         skips = []
         for i, layer in enumerate(self.encoder):
             x = layer(x)
-            if i < 4:
+            if i < self.n_skips:
                 skips.append(x)
         
         # decoding
@@ -656,12 +677,19 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
                  offset_coarseness=10,
                  do_adjustment=True,
                  separate_value_layer=True):
-        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
+
+        super().__init__(context_loader,
+                         num_context_frames, 
+                         max_frames, 
+                         br_coarseness, 
+                         offset_coarseness, 
+                         do_adjustment)
 
         self.keydim = keydim
         self.valdim = valdim
 
         # initialize foreground encoder and decoder
+        self.n_skips = 4
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
             ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
@@ -707,7 +735,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
         skips = []
         for i, layer in enumerate(self.encoder):
             x = layer(x)
-            if i<4:
+            if i < self.n_skips:
                 skips.append(x)
 
         query = self.query_layer(x)
@@ -742,7 +770,7 @@ class LayerDecompositionAttentionMemoryNet2D(LayerDecompositionAttentionMemoryNe
         skips = []
         for i, layer in enumerate(self.encoder):
             x = layer(x)
-            if i<4:
+            if i < self.n_skips:
                 skips.append(x)
 
         x = self.value_layer(x)
@@ -916,8 +944,20 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
     """
     Layer Decomposition Attention Memory Net base class
     """
-    def __init__(self, context_loader, num_context_frames, max_frames=200, br_coarseness=10, offset_coarseness=10, do_adjustment=True):
-        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
+    def __init__(self, 
+                 context_loader, 
+                 num_context_frames, 
+                 max_frames=200, 
+                 br_coarseness=10, 
+                 offset_coarseness=10, 
+                 do_adjustment=True):
+
+        super().__init__(context_loader,
+                         num_context_frames, 
+                         max_frames, 
+                         br_coarseness, 
+                         offset_coarseness, 
+                         do_adjustment)
 
     def forward(self, input: dict) -> dict:
         """
@@ -1025,11 +1065,17 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
                  offset_coarseness=10, 
                  do_adjustment=True):
 
-        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
+        super().__init__(context_loader, 
+                         num_context_frames, 
+                         max_frames, 
+                         br_coarseness, 
+                         offset_coarseness, 
+                         do_adjustment)
 
         context_dim = topk if topk > 0 and topk < valdim else valdim
 
         # initialize foreground encoder and decoder
+        self.n_skips = 4
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
             ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
@@ -1081,7 +1127,7 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
             skips_t = []
             for i, layer in enumerate(self.encoder):
                 x_t = layer(x_t)
-                if i < 4:
+                if i < self.n_skips:
                     skips_t.append(x_t)
             
             query = self.query_layer(x_t)
@@ -1139,7 +1185,7 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
         x = x[:, :, 0]
         for i, layer in enumerate(self.encoder):
             x = layer(x)
-            if i < 4:
+            if i < self.n_skips:
                 skips.append(x)
         
         x = self.value_layer(x)
@@ -1174,7 +1220,12 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
                  offset_coarseness=10, 
                  do_adjustment=True,
                  separate_value_layer=True):
-        super().__init__(context_loader, num_context_frames, max_frames, br_coarseness, offset_coarseness, do_adjustment)
+        
+        super().__init__(context_loader, 
+                         num_context_frames, 
+                         max_frames, br_coarseness, 
+                         offset_coarseness, 
+                         do_adjustment)
 
         self.keydim = keydim
         self.valdim = valdim
@@ -1183,6 +1234,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
         decoder_in_channels = conv_channels * 4 + valdim + context_dim
 
         # initialize foreground encoder and decoder
+        self.n_skips = 4
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),                                                  # 1/2
             ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),  # 1/4
@@ -1226,7 +1278,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
         skips = []
         for i, layer in enumerate(self.encoder):
             x = layer(x)
-            if i<4:
+            if i < self.n_skips:
                 skips.append(x)
 
         query = self.query_layer(x)
@@ -1260,7 +1312,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
         skips = []
         for i, layer in enumerate(self.encoder):
             x = layer(x)
-            if i<4:
+            if i < self.n_skips:
                 skips.append(x)
 
         x = self.value_layer(x)
@@ -1442,8 +1494,17 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
 
 
 class Omnimatte(nn.Module):
-    def __init__(self, conv_channels=64, in_channels=16, max_frames=200, br_coarseness=10, offset_coarseness=10, do_adjustment=True, force_dynamics_layer=False):
+    def __init__(self, 
+                 conv_channels=64, 
+                 in_channels=16, 
+                 max_frames=200, 
+                 br_coarseness=10, 
+                 offset_coarseness=10, 
+                 do_adjustment=True, 
+                 force_dynamics_layer=False):
         super().__init__()
+
+        self.n_skips = 5
         self.encoder = nn.ModuleList([
             ConvBlock2D(in_channels,       conv_channels,     ksize=4, stride=2),
             ConvBlock2D(conv_channels,     conv_channels * 2, ksize=4, stride=2,        norm=nn.InstanceNorm2d, activation='leaky'),
@@ -1483,7 +1544,7 @@ class Omnimatte(nn.Module):
         skips = [x]
         for i, layer in enumerate(self.encoder):
             x = layer(x)
-            if i < 5:
+            if i < self.n_skips:
                 skips.append(x)
         
         # decode

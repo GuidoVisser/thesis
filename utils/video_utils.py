@@ -7,7 +7,7 @@ from moviepy.editor import ImageSequenceClip, CompositeVideoClip, concatenate_vi
 
 from torchvision.transforms.functional import to_tensor
 from torchvision.utils import save_image
-from utils.transforms import DeNormalize
+from InputProcessing.utils.transforms import DeNormalize
 
 
 def load_frame(filepath, ismask=False):
