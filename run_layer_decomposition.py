@@ -292,7 +292,7 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="no description given", help="description of the experiment")
 
     dataset = "Videos"
-    video = "raam_kruisend"
+    video = "scooter-black"
     directory_args = parser.add_argument_group("directories")
     directory_args.add_argument("--out_dir", type=str, default=f"results/mask_test/{video}", 
         help="path to directory where results are saved")
