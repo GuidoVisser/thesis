@@ -69,7 +69,7 @@ class LayerDecompositer(nn.Module):
                 global_step = iteration + epoch*len(self.dataloader)
                 self.writer.add_scalars("losses", loss_values, global_step=global_step)
 
-                loss.backward(retain_graph=True)
+                loss.backward()
                 self.optimizer.step()
 
                 if epoch % self.save_freq == 0 and epoch != 0:
