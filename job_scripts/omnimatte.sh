@@ -31,7 +31,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --model_type omnimatte \
             --device cuda \
             --img_dir $TMPDIR/$VIDEO \
-            --initial_mask $TMPDIR/masks \
+            --mask_dir $TMPDIR/masks \
             --out_dir $TMPDIR/output_dir \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \

@@ -44,10 +44,11 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 256 \
             --timesteps 4 \
             --use_alpha_dyn_reg \
-            --description 'Final tryout nescio | high dynamics reg lambdas; offset spatial resolution x6; detached bg alpha channel in loss' \
+            --description 'Final tryout nescio | high dynamics reg lambdas; offset spatial resolution x6; detached bg alpha channel in loss; low temporal coarseness' \
             --num_context_frames 11 \
             --lambda_dynamics_reg_corr 0.01 \
-            --lambda_dynamics_reg_diff 0.05
+            --lambda_dynamics_reg_diff 0.05 \
+            --offset_coarseness 3
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
