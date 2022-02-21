@@ -13,7 +13,7 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='raam_kruisend'
+VIDEO='nescio_2'
 cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/$VIDEO
 mkdir $TMPDIR/masks
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO $TMPDIR/masks
@@ -45,11 +45,11 @@ python $HOME/thesis/run_layer_decomposition.py \
             --timesteps 4 \
             --use_alpha_dyn_reg \
             --description 'no detail bleed' \
-            --num_context_frames 12 \
-            --use_depth
+            --num_context_frames 11 \
+            --unsampled_dynamic_bg_input
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/depth_${VIDEO}_${SLURM_JOBID}
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/depth_${VIDEO}_${SLURM_JOBID}
+mkdir -p $HOME/thesis/results/layer_decomposition/noise_sampling_${VIDEO}_${SLURM_JOBID}
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/noise_sampling_${VIDEO}_${SLURM_JOBID}
