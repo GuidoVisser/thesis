@@ -44,12 +44,13 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 256 \
             --timesteps 4 \
             --use_alpha_dyn_reg \
-            --description 'noise ratio' \
+            --description 'dynamics reg' \
             --num_context_frames 12 \
-            --num_static_channels 0
+            --lambda_dynamics_reg_corr 0.0 \
+            --lambda_dynamics_reg_diff 0.0
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/noise_ratio_${VIDEO}_${SLURM_JOBID}
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/noise_ratio_${VIDEO}_${SLURM_JOBID}
+mkdir -p $HOME/thesis/results/layer_decomposition/dynamics_reg_${VIDEO}_${SLURM_JOBID}
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/dynamics_reg_${VIDEO}_${SLURM_JOBID}
