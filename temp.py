@@ -23,4 +23,4 @@ if __name__ == "__main__":
     ]
 
     for directory in dirs:
-        png2jpg("datasets/Experimental/Dynamics/nescio_2")
+        png2jpg(directory)
