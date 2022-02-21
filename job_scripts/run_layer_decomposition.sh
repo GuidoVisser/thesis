@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 #SBATCH -n 1
-#SBATCH -t 24:00:00
+#SBATCH -t 48:00:00
 #SBATCH -p gpu
 #SBATCH --gpus-per-node=gtx1080ti:4
 
@@ -13,7 +13,7 @@ module load Python/3.8.2-GCCcore-9.3.0
 pip install --user --upgrade torch && pip install --user --upgrade torchvision
 
 #Copy input file to scratch
-VIDEO='nescio_2'
+VIDEO='amsterdamse_brug'
 cp -RT $HOME/thesis/datasets/Videos/Images/$VIDEO $TMPDIR/$VIDEO
 mkdir $TMPDIR/masks
 cp -RT $HOME/thesis/datasets/Videos/Annotations/$VIDEO $TMPDIR/masks
@@ -44,14 +44,12 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 256 \
             --timesteps 4 \
             --use_alpha_dyn_reg \
-            --description 'Final tryout nescio | high dynamics reg lambdas; offset spatial resolution x6; detached bg alpha channel in loss; low temporal coarseness' \
-            --num_context_frames 11 \
-            --lambda_dynamics_reg_corr 0.01 \
-            --lambda_dynamics_reg_diff 0.05 \
-            --offset_coarseness 3
+            --description 'no detail bleed' \
+            --num_context_frames 8 \
+            --lambda_detail_reg 0
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/${VIDEO}_${SLURM_JOBID}
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/${VIDEO}_${SLURM_JOBID}
+mkdir -p $HOME/thesis/results/layer_decomposition/detail_bleed_${VIDEO}_${SLURM_JOBID}
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/detail_bleed_${VIDEO}_${SLURM_JOBID}

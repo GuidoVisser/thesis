@@ -140,7 +140,7 @@ class DecompositeLoss(nn.Module):
         object_layers  = alpha_layers[:, 2: ] * .5 + .5  # [B', L-2, 1, T, H, W]
 
         # TEST detach dynamic bg layer in loss calculation
-        dynamics_layer = dynamics_layer.clone().detach()
+        # dynamics_layer = dynamics_layer.clone().detach()
 
         dynamics_layer = dynamics_layer.expand(object_layers.shape)
 
