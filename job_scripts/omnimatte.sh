@@ -41,7 +41,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --num_static_channels 13 \
             --in_channels 16 \
             --lambda_mask 50.0 \
-            --batch_size 12 \
+            --batch_size 8 \
             --n_epochs 1500 \
             --save_freq 500 \
             --conv_channels 64 \
