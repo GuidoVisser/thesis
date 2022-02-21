@@ -28,7 +28,7 @@ mkdir $TMPDIR/output_dir
 #Execute a Python program located in $HOME, that takes an input file and output directory as arguments.
 echo "$SLURM_JOBID | Start: $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 python $HOME/thesis/run_layer_decomposition.py \
-            --model_type fully_2d \
+            --model_type 3d_bottleneck \
             --device cuda \
             --img_dir $TMPDIR/$VIDEO \
             --mask_dir $TMPDIR/masks \
@@ -44,11 +44,12 @@ python $HOME/thesis/run_layer_decomposition.py \
             --valdim 256 \
             --timesteps 4 \
             --use_alpha_dyn_reg \
-            --description 'fully_2d' \
-            --num_context_frames 12 
+            --description 'noise ratio' \
+            --num_context_frames 12 \
+            --num_static_channels 0
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
 #Copy output directory from scratch to home
-mkdir -p $HOME/thesis/results/layer_decomposition/fully_2d_${VIDEO}_${SLURM_JOBID}
-cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/fully_2d_${VIDEO}_${SLURM_JOBID}
+mkdir -p $HOME/thesis/results/layer_decomposition/noise_ratio_${VIDEO}_${SLURM_JOBID}
+cp -RT $TMPDIR/output_dir $HOME/thesis/results/layer_decomposition/noise_ratio_${VIDEO}_${SLURM_JOBID}
