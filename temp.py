@@ -16,11 +16,10 @@ def png2jpg(directory):
 
 if __name__ == "__main__":
     dirs = [
-        "datasets/Videos/Images/amsterdamse_brug",
-        "datasets/Videos/Images/nescio_1",
-        "datasets/Videos/Images/nescio_2",
-        "datasets/Videos/Images/nescio_2_long",
-        "datasets/Videos/Images/ringdijk",
+        "thesis/datasets/Videos/Images/amsterdamse_brug",
+        "thesis/datasets/Videos/Images/ringdijk",
+        "thesis/datasets/Videos/Images/nescio_2",
+        "thesis/datasets/Videos/Images/nescio_1",
     ]
 
     for directory in dirs:
