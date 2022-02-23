@@ -72,11 +72,9 @@ class LayerDecompositer(nn.Module):
                 loss.backward()
                 self.optimizer.step()
 
-                if epoch % self.save_freq == 0 and epoch != 0:
+                if epoch % self.save_freq == 0: # and epoch != 0:
                     frame_indices = input["index"][:, 0].tolist()
-                    self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}")
-                    if self.using_context:
-                        self.visualize_attention_maps(f"intermediate/{epoch}")
+                    self.visualize_and_save_output(output, targets, frame_indices, f"intermediate/{epoch}", intermediate=True)
 
             self.loss_module.update_lambdas()
 
@@ -86,11 +84,14 @@ class LayerDecompositer(nn.Module):
                 t1 = datetime.now()
                 print(f"Epoch: {epoch} / {self.n_epochs - 1} done in {(t1 - t0).total_seconds()} seconds")           
 
-        print(f"Average time per epoch: {sum(t_avg) / len(t_avg)} seconds")
+        print(f"Average time per epoch: {sum(t_avg) / max(len(t_avg), 1)} seconds")
         with open(path.join(self.results_root, "time.txt"), "w") as f:
-            f.write(str(sum(t_avg) / len(t_avg)))
+            f.write(str(sum(t_avg) / max(len(t_avg), 1)))
 
-        torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
+        if isinstance(self.net, DataParallel):
+            torch.save(self.net.module.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
+        else:
+            torch.save(self.net.state_dict(), path.join(self.results_root, "reconstruction_weights.pth"))
 
     # TODO Change to include context encoding step
     @torch.no_grad()
@@ -150,7 +151,7 @@ class LayerDecompositer(nn.Module):
                         cv2.imwrite(f"{self.save_dir}/{epoch_name}/attention_maps/{name}/{layer_idx:02}/{frame_idx:02}/{c:03}.png", img)
                         
 
-    def visualize_and_save_output(self, model_output, targets, frame_indices, epoch_name):
+    def visualize_and_save_output(self, model_output, targets, frame_indices, epoch_name, intermediate=False):
         """
         Save the output of the model 
         """
@@ -161,12 +162,12 @@ class LayerDecompositer(nn.Module):
             depth_layers   = model_output["layers_depth"]
         reconstruction = model_output["rgba_reconstruction"]
 
-        flow_max_rad = torch.max(torch.sqrt(torch.square(flow_layers[:, :, 0]) + torch.square(flow_layers[:, :, 1]))).item()
+        gt_flow = targets["flow"]
         
         background_offset = model_output["background_offset"]
         brightness_scale  = model_output["brightness_scale"]
 
-        if "full_static_bg" in model_output:
+        if "full_static_bg" in model_output and not intermediate:
             full_static_bg = model_output["full_static_bg"]
             bg_plate = full_static_bg[0, :]
             background_plate_img  = cv2.cvtColor((bg_plate.permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255, cv2.COLOR_RGB2BGR)
@@ -180,6 +181,9 @@ class LayerDecompositer(nn.Module):
         for b in range(current_batch_size):
             
             for t in range(timesteps):
+
+                # get max_rad for optical flow visualization
+                flow_max_rad = torch.max(torch.sqrt(torch.square(gt_flow[b, 0, t]) + torch.square(gt_flow[b, 1, t]))).item()
 
                 # background
                 background_rgb_static    = torch.clone(rgba_layers[b, 0, :3, t]).detach()
@@ -204,13 +208,14 @@ class LayerDecompositer(nn.Module):
                 brightness_scale_img  = (torch.clone(brightness_scale[b, :, t]).detach().permute(1, 2, 0).cpu().numpy() + 1) / 2. * 255
 
                 img_name = f"{(frame_indices[b] + t):05}.png"
-                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background/{img_name}"), background_img)
-                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_static/{img_name}"), background_img_static)
-                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/reconstruction/{img_name}"), reconstruction_img)
-                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/ground_truth/{img_name}"), gt_rgb_img)
+                if not intermediate:
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background/{img_name}"), background_img)
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_static/{img_name}"), background_img_static)
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/reconstruction/{img_name}"), reconstruction_img)
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/ground_truth/{img_name}"), gt_rgb_img)
 
-                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_offset/{img_name}"), flow_to_image(background_offset_img[:, :, :2], convert_to_bgr=True))
-                cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/brightness_scale/{img_name}"), brightness_scale_img)
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/background_offset/{img_name}"), flow_to_image(background_offset_img[:, :, :2], convert_to_bgr=True))
+                    cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/brightness_scale/{img_name}"), brightness_scale_img)
 
                 for l in range(0, n_layers):
 
@@ -224,7 +229,8 @@ class LayerDecompositer(nn.Module):
                     foreground_flow    = torch.clone(flow_layers[b, l, :, t]).detach().permute(1, 2, 0).cpu()
                     foreground_alpha   = torch.clone(rgba_layers[b, l, 3, t]).detach().cpu()
 
-                    writeFlow(path.join(self.save_dir, f"{epoch_name}/flow/flo/{layer_name}/{img_name[:-4]}.flo"), foreground_flow)
+                    if not intermediate:
+                        writeFlow(path.join(self.save_dir, f"{epoch_name}/flow/flo/{layer_name}/{img_name[:-4]}.flo"), foreground_flow)
 
                     alpha_img           = (foreground_alpha.numpy() + 1) / 2. * 255
                     foreground_flow_img = flow_to_image(foreground_flow.numpy(), convert_to_bgr=True, rad_max=flow_max_rad)

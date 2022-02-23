@@ -10,14 +10,20 @@ class LambdaScheduler(object):
     Scheduler for the lambda values
     """
 
-    def __init__(self, lambda_schedule: list) -> None:
+    def __init__(self, lambda_schedule: list, start_iteration: int = 0) -> None:
         super().__init__()
 
         assert len(lambda_schedule) % 2 == 1, "Input needs to be list of odd length"
 
-        self.iteration = 0
-        self.value = float(lambda_schedule[0])
-        self.schedule = self.create_schedule(lambda_schedule[1:])
+        self.iteration = start_iteration
+        self.schedule = self.create_schedule(lambda_schedule)
+        
+        update_iters = [int(key) for key in sorted(self.schedule.keys())]
+        # self.value = float(lambda_schedule[0])
+        for i in update_iters:
+            if i <= start_iteration:
+                self.value = float(self.schedule[str(i)])
+
 
     def create_schedule(self, lambda_schedule: list):
         """
@@ -32,7 +38,10 @@ class LambdaScheduler(object):
             ...
         }
         """
-        return {str(lambda_schedule[i]):lambda_schedule[i+1] for i in range(0, len(lambda_schedule), 2)}
+        schedule = {str(lambda_schedule[i]):lambda_schedule[i+1] for i in range(1, len(lambda_schedule), 2)}
+        schedule["0"] = lambda_schedule[0]
+
+        return schedule
 
     def update(self):
         """
@@ -48,7 +57,7 @@ class DecompositeLoss(nn.Module):
 
     Handles loss computations
     """
-    def __init__(self, args) -> None:
+    def __init__(self, args, start_epoch) -> None:
         super().__init__()
 
         self.criterion      = nn.L1Loss()
@@ -57,16 +66,16 @@ class DecompositeLoss(nn.Module):
         self.use_alpha_dyn_reg    = args.use_alpha_dyn_reg
         self.use_alpha_detail_reg = args.use_alpha_detail_reg
 
-        self.lambda_alpha_l0          = LambdaScheduler(args.lambda_alpha_l0)
-        self.lambda_alpha_l1          = LambdaScheduler(args.lambda_alpha_l1)
-        self.lambda_mask_bootstrap    = LambdaScheduler(args.lambda_mask)
-        self.lambda_recon_flow        = LambdaScheduler(args.lambda_recon_flow)
-        self.lambda_recon_depth       = LambdaScheduler(args.lambda_recon_depth)
-        self.lambda_stabilization     = LambdaScheduler(args.lambda_stabilization)
-        self.lambda_dynamics_reg_corr = LambdaScheduler(args.lambda_dynamics_reg_corr)
-        self.lambda_dynamics_reg_diff = LambdaScheduler(args.lambda_dynamics_reg_diff)
-        self.lambda_detail_reg        = LambdaScheduler(args.lambda_detail_reg)
-        self.lambda_bg_scaling        = LambdaScheduler(args.lambda_bg_scaling)
+        self.lambda_alpha_l0          = LambdaScheduler(args.lambda_alpha_l0, start_epoch)
+        self.lambda_alpha_l1          = LambdaScheduler(args.lambda_alpha_l1, start_epoch)
+        self.lambda_mask_bootstrap    = LambdaScheduler(args.lambda_mask, start_epoch)
+        self.lambda_recon_flow        = LambdaScheduler(args.lambda_recon_flow, start_epoch)
+        self.lambda_recon_depth       = LambdaScheduler(args.lambda_recon_depth, start_epoch)
+        self.lambda_stabilization     = LambdaScheduler(args.lambda_stabilization, start_epoch)
+        self.lambda_dynamics_reg_corr = LambdaScheduler(args.lambda_dynamics_reg_corr, start_epoch)
+        self.lambda_dynamics_reg_diff = LambdaScheduler(args.lambda_dynamics_reg_diff, start_epoch)
+        self.lambda_detail_reg        = LambdaScheduler(args.lambda_detail_reg, start_epoch)
+        self.lambda_bg_scaling        = LambdaScheduler(args.lambda_bg_scaling, start_epoch)
 
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -241,9 +250,9 @@ class DecompositeLoss3D(DecompositeLoss):
 
     Handles loss computations
     """
-    def __init__(self, args) -> None:
+    def __init__(self, args, start_epoch) -> None:
         
-        super().__init__(args)
+        super().__init__(args, start_epoch)
         
     def __call__(self, predictions: dict, targets: dict) -> Tuple[torch.Tensor, dict]:
         """
@@ -370,8 +379,8 @@ class DecompositeLoss2D(DecompositeLoss):
     Handles loss computations
     Adds some loss functions for temporal consistency in the output
     """
-    def __init__(self, args) -> None:
-        super().__init__(args)
+    def __init__(self, args, start_epoch) -> None:
+        super().__init__(args, start_epoch)
 
         self.lambda_recon_warp = LambdaScheduler(args.lambda_recon_warp)
         self.lambda_alpha_warp = LambdaScheduler(args.lambda_alpha_warp)

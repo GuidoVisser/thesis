@@ -1,3 +1,4 @@
+from typing import OrderedDict
 import torch
 import json
 from argparse import ArgumentParser
@@ -35,11 +36,33 @@ class ExperimentRunner(object):
 
             # load config of existing save
             new_epochs = args.n_epochs
-            with open(f"{args.out_dir}/config.json", "r") as f:
-                args.__dict__ = json.load(f)
+            with open(f"{args.continue_from}/config.json", "r") as f:
+                new_args = json.load(f)
+                # args.__dict__ = json.load(f)
+
+            not_replaced = [
+                "out_dir",
+                "mask_dir",
+                "img_dir",
+                "continue_from",
+                "propagation_model",
+                "flow_model",
+                "depth_model",
+                "device",
+                "n_gpus",
+                "batch_size",
+                "do_detail_transfer"
+            ]
+
+            for key, item in new_args.items():
+                if key in not_replaced:
+                    continue
+                args.__dict__[key] = item
+
+            args.__dict__["out_dir"] = args.continue_from
 
             # update epoch counts
-            self.start_epoch = args.n_epochs + 1
+            self.start_epoch = args.n_epochs
             args.n_epochs += new_epochs
 
         else:
@@ -157,9 +180,9 @@ class ExperimentRunner(object):
         """
 
         if self.args.use_2d_loss_module:
-            loss_module = DecompositeLoss2D(self.args)
+            loss_module = DecompositeLoss2D(self.args, self.start_epoch)
         else:
-            loss_module = DecompositeLoss3D(self.args)
+            loss_module = DecompositeLoss3D(self.args, self.start_epoch)
         return loss_module
 
     def init_model(self, dataloader, context_loader, loss_module, writer):
@@ -271,7 +294,15 @@ class ExperimentRunner(object):
             network = DataParallel(network).to(self.args.device)
         
         if self.args.continue_from != "":
-            network.load_state_dict(torch.load(f"{self.args.continue_from}/reconstruction_weights.pth"))
+            if torch.cuda.is_available():
+                network.load_state_dict(torch.load(f"{self.args.continue_from}/reconstruction_weights.pth"))
+            else:
+                state_dict = torch.load(f"{self.args.continue_from}/reconstruction_weights.pth", map_location="cpu")
+                new_dict = OrderedDict()
+                for key in state_dict.keys():
+                    if key.startswith("module."):
+                        new_dict[key[len("module."):]] = state_dict[key]
+                network.load_state_dict(new_dict)
 
         model = LayerDecompositer(
             self.args,
@@ -317,7 +348,7 @@ if __name__ == "__main__":
     model_args.add_argument("--use_alpha_detail_reg", action="store_true", help="use the alpha composite in detail bleed regularization")
     model_args.add_argument("--bottleneck_normal",    action="store_true", help="have a normal 3d conv as bottleneck in stead of a transposed conv")
     model_args.add_argument("--separate_value_layer", action="store_true", help="specify wether to use a separate value layer for the context and reconstruction encoder")
-    model_args.add_argument("--do_detail_transfer",   action="store_true", help="specify whether to do detail transfer on the output at inference.")
+    model_args.add_argument("--do_detail_transfer",   action="store_false", help="specify whether to do detail transfer on the output at inference.")
 
     input_args = parser.add_argument_group("model input")
     input_args.add_argument("--composite_order",            type=str,   default="composite_order.txt", help="path to a text file containing the compositing order of the foreground objects")
