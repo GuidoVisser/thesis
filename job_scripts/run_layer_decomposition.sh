@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 #SBATCH -n 1
 #SBATCH -t 48:00:00
@@ -36,7 +36,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --propagation_model $TMPDIR/weights/propagation_model.pth \
             --flow_model $TMPDIR/weights/flow_model.pth \
             --depth_model $TMPDIR/weights/depth_model.pth \
-            --batch_size 4 \
+            --batch_size 8 \
             --n_epochs 750 \
             --save_freq 250 \
             --conv_channels 64 \
@@ -45,7 +45,7 @@ python $HOME/thesis/run_layer_decomposition.py \
             --timesteps 4 \
             --use_alpha_dyn_reg \
             --description 'normal' \
-            --num_context_frames 12 
+            --num_context_frames 12
 
 echo "$SLURM_JOBID | End:   $(date)" >> $HOME/thesis/job_logs/run_layer_decomposition.log
 
