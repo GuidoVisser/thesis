@@ -1,3 +1,4 @@
+from compositing import Compositer
 import cv2
 from os import path, listdir
 import glob
@@ -120,12 +121,104 @@ def visualize_attention_map(root: str, channels: Union[list, None] = None, batch
 
                 cv2.imwrite(path.join(root, f"context_volumes/visualization/layer_{layer:02}/{batch:02}/{frame_idx:05}.png"), imgs)
 
+def video_completion_demo(roots: dict, out_path: str, layers: list, fps: int = 10, end_pause: int = 3):
 
+
+    # Dynamatte
+    compositer = Compositer(roots["dynamatte"])
+    img_array_dyn = []
+    for i in range(len(listdir(roots["ground_truth"]))):
+        img = compositer.composite_frame(i, layers)
+        img = cv2.cvtColor(img[..., :3].astype(np.float32), cv2.COLOR_RGB2BGR) * 255.
+        img_array_dyn.append(img.astype(np.uint8))
+    img_array_dyn.extend([img]*end_pause)
+    dynamatte = np.stack(img_array_dyn)
+
+    # Omnimatte
+    compositer = Compositer(roots["omnimatte"])
+    img_array_om = []
+    for i in range(len(listdir(roots["ground_truth"]))):
+        img = compositer.composite_frame(i, layers)
+        img = cv2.cvtColor(img[..., :3].astype(np.float32), cv2.COLOR_RGB2BGR) * 255.
+        img_array_om.append(img.astype(np.uint8))
+    img_array_om.extend([img]*end_pause)
+    omnimatte = np.stack(img_array_om)
+
+    h, w, c = img_array_dyn[0].shape
+
+    # ground truth
+    img_array_gt = []
+    for fn in sorted(listdir(roots["ground_truth"])):
+        img = cv2.resize(cv2.imread(path.join(roots["ground_truth"], fn)), (w, h))
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        img_array_gt.append(img.astype(np.uint8))
+    img_array_gt.extend([img]*end_pause)
+    ground_truth = np.stack(img_array_gt)
+
+    # FGVC
+    img_array_fgvc = []
+    for fn in sorted(listdir(roots["fgvc"])):
+        if path.splitext(fn)[1] == ".mp4":
+            continue
+
+        img = cv2.resize(cv2.imread(path.join(roots["fgvc"], fn)), (w, h))
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        img_array_fgvc.append(img.astype(np.uint8))
+    img_array_fgvc.extend([img]*end_pause)
+    fgvc = np.stack(img_array_fgvc[:-1])
+
+    # Onion-Peel
+    img_array_op = []
+    for fn in sorted(listdir(roots["onion_peel"])):
+        img = cv2.resize(cv2.imread(path.join(roots["onion_peel"], fn)), (w, h))
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        img_array_op.append(img.astype(np.uint8))
+    img_array_op.extend([img]*end_pause)
+    onion_peel = np.stack(img_array_op[:-1])
+
+    output_array = np.concatenate([ground_truth, dynamatte, omnimatte, fgvc, onion_peel], axis=2)
+
+    imageio.mimsave(out_path, output_array, format="GIF", fps=fps)
 
 
 if __name__ == "__main__":
-    fps = 5
+    fps = 15
     end_pause = 5
+
+    videos = {
+        "kruispunt_rijks": [0, 1, 3],
+        "ringdijk": [0, 1],
+        "amsterdamse_brug": [0, 1, 3],
+        "nescio_1": [0, 1],
+        "nescio_2": [0, 1, 3],
+        "cows": [0, 1],
+        "hockey": [0, 1],
+        "dance-jump": [0, 1],
+        "car-roundabout": [0, 1],
+        "scooter-black": [0, 1],
+        "flamingo": [0, 1],
+        "drift-chicane": [0, 1],
+        "rollerblade": [0, 1]
+    }
+    for video, layers in videos.items():
+        # roots = {
+        #     "dynamatte":    f"results/final/dynamatte/{video}",
+        #     "omnimatte":    f"results/final/omnimatte/{video}/decomposition/final",
+        #     "ground_truth": f"results/final/omnimatte/{video}/decomposition/final/ground_truth",
+        #     "fgvc":         f"results/final/fgvc/{video}/frame_seamless_comp_final",
+        #     "onion_peel":   f"results/final/onion_peel/{video}"
+        # }
+
+        # video_completion_demo(roots, f"results/final/vc_{video}.gif", layers, fps, end_pause)
+
+        fgvc_path = f"results/final/fgvc/{video}/frame_seamless_comp_final"
+        for fn in listdir(fgvc_path):
+            if path.splitext(fn)[1] == ".mp4":
+                continue
+            
+            img = cv2.imread(path.join(fgvc_path, fn))
+            img = cv2.resize(img, (448, 256))
+            cv2.imwrite(path.join(fgvc_path, fn), img)
 
     # file_paths = [
     #     "results/layer_decomposition/scooter-black_10_20_18_24_28/decomposition/inference",
@@ -135,4 +228,4 @@ if __name__ == "__main__":
 
     # create_decomposite_demo(file_paths, fps, end_pause)
 
-    visualize_attention_map("results/layer_decomposition_dynamic/scooter-black/decomposition/final", channels=list(range(100)))
+    # visualize_attention_map("results/layer_decomposition_dynamic/scooter-black/decomposition/final", channels=list(range(100)))

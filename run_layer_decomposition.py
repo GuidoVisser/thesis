@@ -295,8 +295,13 @@ class ExperimentRunner(object):
         
         if self.args.continue_from != "":
             if torch.cuda.is_available():
-                network.load_state_dict(torch.load(f"{self.args.continue_from}/reconstruction_weights.pth"))
+                state_dict = torch.load(f"{self.args.continue_from}/reconstruction_weights.pth")
+                new_dict = OrderedDict()
+                for key in state_dict.keys():
+                    new_dict["module." + key] = state_dict[key]
+                network.load_state_dict(new_dict)
             else:
+                print("unavailable")
                 state_dict = torch.load(f"{self.args.continue_from}/reconstruction_weights.pth", map_location="cpu")
                 new_dict = OrderedDict()
                 for key in state_dict.keys():
