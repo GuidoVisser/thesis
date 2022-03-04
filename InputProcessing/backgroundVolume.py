@@ -60,5 +60,5 @@ class BackgroundVolume(object):
         spatiotemporal_noise_img = cv2.polylines(np.ascontiguousarray(spatiotemporal_noise_img), [corners], True, color, thickness, cv2.LINE_AA)
 
         cv2.imwrite(f"{self.save_dir}/spatial_noise.png", spatial_noise_img)
-        cv2.imwrite(f"{self.save_dir}/spatiotemporal_noise.png", spatiotemporal_noise_img)
-        cv2.imwrite(f"{self.save_dir}/sampled_spatiotemporal_noise.png", sampled_noise)
+        cv2.imwrite(f"{self.save_dir}/{frame_idx:05}.png", spatiotemporal_noise_img)
+        cv2.imwrite(f"{self.save_dir}/sampled_{frame_idx:05}.png", sampled_noise)

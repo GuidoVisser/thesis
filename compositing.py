@@ -92,11 +92,14 @@ class Compositer(object):
 if __name__ == "__main__":
 
     video = "kruispunt_rijks"
-    root  = f"results/layer_decomposition_dynamic/{video}/decomposition/final"
+    root  = f"results/final/omnimatte/kruispunt_rijks/decomposition/final"
     compositer = Compositer(root)
 
     # frames = sorted(listdir(path.join(root, "layers/00")))
     frames = list(range(50))
-    layers = [0, 2, 3]
+    layers = [0, 1, 3]
 
-    compositer.composite_and_save_frames(frames, layers, "flow")
+    compositer.composite_and_save_frames(frames, layers)
+
+    # fp = "results/final/omnimatte/nescio_2/decomposition/final"
+    # cv2.imwrite(fp, cv2.resize(cv2.imread(fp), (448, 256)))

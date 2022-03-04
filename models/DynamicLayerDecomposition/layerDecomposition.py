@@ -269,14 +269,14 @@ class LayerDecompositer(nn.Module):
         if self.use_depth:
             create_dirs(path.join(self.save_dir, f"{epoch_name}/depth"))
 
-    def transfer_detail(self, reconstruction, rgba_layers, gt_image):
+    def transfer_detail(self, reconstruction, rgba_layers, gt_image, include_dyn_bg=True):
         residual = gt_image - reconstruction
 
         transmission_composite = torch.zeros_like(gt_image[:, :, 0:1])
         rgba_with_detail = rgba_layers
 
         n_layers = rgba_layers.shape[1]
-        n_bg_layers = 2
+        n_bg_layers = 1 if include_dyn_bg else 2
 
         for i in range(n_layers - 1, n_bg_layers - 1, -1):
             layer_transmission = 1 - transmission_composite

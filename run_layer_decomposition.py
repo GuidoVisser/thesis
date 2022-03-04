@@ -155,6 +155,26 @@ class ExperimentRunner(object):
             do_jitter=True
         )
 
+        #### DEMO STUFF ####
+        # for i in range(len(homography_handler)):
+        #     background_volume.visualize(i)
+
+        # import cv2
+        # import imageio
+        # sampled_fp = path.join(args.out_dir, "background")
+
+        # img_array = []
+        # for i in range(len(homography_handler)):
+        #     gt = cv2.imread(path.join(args.out_dir, "images", f"{i:05}.jpg"))
+        #     gt = cv2.cvtColor(gt, cv2.COLOR_RGB2BGR)
+        #     selection = cv2.imread(path.join(sampled_fp, f"low_dim_{i:05}.png"))
+        #     sampled = cv2.imread(path.join(sampled_fp, f"{i:05}.png"))
+        #     img_array.append(np.concatenate((gt, selection, sampled), axis=1))
+
+        # img_array = np.stack(img_array)
+        # video_path = path.join(args.out_dir, "noise_homography_demo.gif")
+        # imageio.mimsave(video_path, img_array, format="GIF", fps=25)
+
         dataloader = DataLoader(
             input_processor, 
             batch_size=args.batch_size,
@@ -289,25 +309,15 @@ class ExperimentRunner(object):
                     offset_coarseness    = self.args.offset_coarseness,
                     force_dynamics_layer = True
             )
+       
+        if self.args.continue_from != "":
+            if torch.cuda.is_available():
+                network.load_state_dict(torch.load(f"{self.args.continue_from}/reconstruction_weights.pth"))
+            else:
+                network.load_state_dict(torch.load(f"{self.args.continue_from}/reconstruction_weights.pth", map_location="cpu"))
 
         if self.args.device != "cpu":
             network = DataParallel(network).to(self.args.device)
-        
-        if self.args.continue_from != "":
-            if torch.cuda.is_available():
-                state_dict = torch.load(f"{self.args.continue_from}/reconstruction_weights.pth")
-                new_dict = OrderedDict()
-                for key in state_dict.keys():
-                    new_dict["module." + key] = state_dict[key]
-                network.load_state_dict(new_dict)
-            else:
-                print("unavailable")
-                state_dict = torch.load(f"{self.args.continue_from}/reconstruction_weights.pth", map_location="cpu")
-                new_dict = OrderedDict()
-                for key in state_dict.keys():
-                    if key.startswith("module."):
-                        new_dict[key[len("module."):]] = state_dict[key]
-                network.load_state_dict(new_dict)
 
         model = LayerDecompositer(
             self.args,
