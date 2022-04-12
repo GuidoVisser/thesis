@@ -39,6 +39,8 @@ class ConvBlock(nn.Module):
             self.activation = nn.Tanh()
         elif activation == 'channel_softmax':
             self.activation = nn.Softmax(dim=1)
+        elif activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
         else:
             self.activation = None
 

@@ -62,9 +62,60 @@ def create_decomposite_demo(roots: Union[str, list], fps=10, end_pause=3, includ
         img_array = np.concatenate((img_array, object_imgs_array), axis=2)
 
         combined_array.append(img_array)
-    
+
     combined_array = np.concatenate(combined_array, axis=1)
     imageio.mimsave(video_path, combined_array, format="GIF", fps=fps)
+
+
+def new_composite_demo(root: str, fps=10, end_pause=3):
+
+    decomposition_root = path.join(root, "decomposition/final")
+
+    video_path = path.join(root, "final_demo.gif")
+    vid_length = len(listdir(path.join(decomposition_root, "ground_truth")))
+    num_object_layers = len(listdir(path.join(decomposition_root, "layers")))
+
+    frames = []
+    for frame_idx in range(vid_length):
+        rgb_array   = []
+        alpha_array = []
+        flow_array  = []
+
+        # Ground truth
+        rgb_array.append(cv2.imread(path.join(decomposition_root, "ground_truth", f"{frame_idx:05}.png")))
+        alpha_array.append(np.ones_like(rgb_array[0]) * 255)
+        flow_array.append(cv2.imread(path.join(root, "flow/forward/png", f"{frame_idx:05}.png")))
+
+        # Object layers
+        for object_idx in range(1, num_object_layers):
+            if object_idx == 1:
+                rgb_array.append(cv2.imread(path.join(decomposition_root, "background", f"{frame_idx:05}.png")))
+
+                alpha = cv2.imread(path.join(decomposition_root, "alpha", f"01/{frame_idx:05}.png"))
+                alpha_array.append(alpha)
+
+                flow_bg = cv2.imread(path.join(decomposition_root, "flow/png", f"00/{frame_idx:05}.png"))
+                flow = cv2.imread(path.join(decomposition_root, "flow/png", f"01/{frame_idx:05}.png"))
+                flow_array.append(((1 - alpha / 255) * flow_bg + alpha / 255 * flow).astype('uint8'))
+            else:
+                rgb_array.append(cv2.imread(path.join(decomposition_root, "layers", f"{object_idx:02}", f"{frame_idx:05}.png")))
+                flow_array.append(cv2.imread(path.join(decomposition_root, "flow/png", f"{object_idx:02}", f"{frame_idx:05}.png")))
+                alpha_array.append(cv2.imread(path.join(decomposition_root, "alpha", f"{object_idx:02}", f"{frame_idx:05}.png")))
+
+        rgb_img   = np.concatenate(rgb_array, axis=1)
+        alpha_img = np.concatenate(alpha_array, axis=1)
+        flow_img  = np.concatenate(flow_array, axis=1)
+
+        img = np.concatenate([alpha_img, rgb_img, flow_img], axis=0)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        frames.append(img)
+
+    frames.extend([img]*end_pause)
+
+    frames = np.stack(frames)
+
+    imageio.mimsave(video_path, frames, format="GIF", fps=fps)
 
 def visualize_attention_map(root: str, channels: Union[list, None] = None, batch_width: int = 8, batch_height: int = 8, scale: int = 2):
     for frame_idx, img_path in enumerate(sorted(listdir(path.join(root, "ground_truth")))):

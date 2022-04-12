@@ -19,7 +19,7 @@ from models.DynamicLayerDecomposition.layerDecomposition import LayerDecomposite
 from models.DynamicLayerDecomposition.loss_functions import DecompositeLoss2D, DecompositeLoss3D
 from models.DynamicLayerDecomposition.layer_decomposition_networks import *
 
-from utils.demo import create_decomposite_demo
+from utils.demo import create_decomposite_demo, new_composite_demo
 from utils.utils import create_dir, seed_all
 
 class ExperimentRunner(object):
@@ -103,6 +103,8 @@ class ExperimentRunner(object):
             self.args.timesteps = 2
             self.args.num_static_channels = self.args.in_channels
             self.args.lambda_recon_depth = [0.]
+            self.args.lambda_dynamics_reg_diff = [0.]
+            self.args.lambda_dynamics_reg_corr = [0.]
             self.args.use_depth = False
 
     def start(self):
@@ -124,7 +126,8 @@ class ExperimentRunner(object):
         
         # create final demo of results
         model.decomposite()
-        create_decomposite_demo(path.join(self.args.out_dir, "decomposition/final"))
+        # create_decomposite_demo(path.join(self.args.out_dir, "decomposition/final"))
+        new_composite_demo(self.args.out_dir)
 
     def init_dataloader(self):
         """
@@ -357,13 +360,13 @@ if __name__ == "__main__":
     model_args.add_argument("--br_coarseness",     type=int, default=10, help="Temporal coarseness of brightness adjustment")
     model_args.add_argument("--offset_coarseness", type=int, default=10, help="Temporal coarseness of background offset adjustment")
     model_args.add_argument("--topk",              type=int, default=0,  help="k value for topk channel selection in context distribution")
-    model_args.add_argument("--use_2d_loss_module",   action="store_true", help="Use 2d loss module in stead of 3d loss module")
-    model_args.add_argument("--use_depth",            action="store_true", help="specify that you want to use depth estimation as an input channel")
-    model_args.add_argument("--use_alpha_dyn_reg",    action="store_true", help="use corr_diff dynamics regularization in stead of alpha composite")
-    model_args.add_argument("--use_alpha_detail_reg", action="store_true", help="use the alpha composite in detail bleed regularization")
-    model_args.add_argument("--bottleneck_normal",    action="store_true", help="have a normal 3d conv as bottleneck in stead of a transposed conv")
-    model_args.add_argument("--separate_value_layer", action="store_true", help="specify wether to use a separate value layer for the context and reconstruction encoder")
-    model_args.add_argument("--do_detail_transfer",   action="store_false", help="specify whether to do detail transfer on the output at inference.")
+    model_args.add_argument("--use_2d_loss_module",    action="store_true", help="Use 2d loss module in stead of 3d loss module")
+    model_args.add_argument("--use_depth",             action="store_true", help="specify that you want to use depth estimation as an input channel")
+    model_args.add_argument("--use_convolved_dyn_reg", action="store_false", help="convolve the alpha layers with an all-ones kernel before calculating regularization.")
+    model_args.add_argument("--use_alpha_detail_reg",  action="store_true", help="use the alpha composite in detail bleed regularization")
+    model_args.add_argument("--bottleneck_normal",     action="store_true", help="have a normal 3d conv as bottleneck in stead of a transposed conv")
+    model_args.add_argument("--separate_value_layer",  action="store_true", help="specify wether to use a separate value layer for the context and reconstruction encoder")
+    model_args.add_argument("--do_detail_transfer",    action="store_false", help="specify whether to do detail transfer on the output at inference.")
 
     input_args = parser.add_argument_group("model input")
     input_args.add_argument("--composite_order",            type=str,   default="composite_order.txt", help="path to a text file containing the compositing order of the foreground objects")

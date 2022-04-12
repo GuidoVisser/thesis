@@ -248,7 +248,7 @@ class LayerDecompositer(nn.Module):
                     if self.use_depth:
                         create_dir(path.join(self.save_dir, f"{epoch_name}/depth/{layer_name}"))
                         foreground_depth   = torch.clone(depth_layers[b, l, 0, t]).detach()
-                        depth_img           = (1 - ((foreground_depth.cpu().numpy() + 1) / 2.)) * 255
+                        depth_img           = (1 - foreground_depth.cpu().numpy()) * 255
                         cv2.imwrite(path.join(self.save_dir, f"{epoch_name}/depth/{layer_name}/{img_name}"), depth_img)
 
 

@@ -91,6 +91,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
         layers_rgba = []
         layers_flow = []
+        layers_alpha_warped = []
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
@@ -114,6 +115,7 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
 
                 composite_rgba = rgba
                 flow = composite_flow
+                alphas_warped = self.get_alpha_from_rgba(rgba[:, :, :-1])
 
             # Object layers
             else:
@@ -125,8 +127,27 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
                 composite_rgba = self.composite_rgba(composite_rgba, rgba)
                 composite_flow = flow * alpha + composite_flow * (1. - alpha)
 
+                ## get warped alpha for for temporal consistency loss
+                # get alpha and flow, they are shifted in time by one timestep, for T=4:
+                # alphas: (x, o, o, o)-,
+                #                      |-> alpha_warped(o, o, o)
+                # flow:   (o, o, o, x)-'
+                alphas    = self.get_alpha_from_rgba(rgba[:, :, 1:])
+                warp_flow = flow[:, :, :T-1]
+
+                # rearrange time dimension to batch dimension for grid_sample
+                alphas = alphas.transpose(1, 2).view(B*(T-1), -1, H, W)
+                warp_flow = warp_flow.transpose(1, 2).view(B*(T-1), -1, H, W)
+
+                # warp alpha channels from t+1 to t
+                alphas_warped = FlowHandler.apply_flow(alphas, warp_flow)
+
+                # return to shape [B, C, T, H, W] (minus one timestep)
+                alphas_warped = alphas_warped.view(B, T-1, -1, H, W).transpose(1, 2)
+
             layers_rgba.append(rgba)
             layers_flow.append(flow)
+            layers_alpha_warped.append(alphas_warped)
 
         if self.do_adjustment:
             # map output to [0, 1]
@@ -141,12 +162,14 @@ class LayerDecompositionAttentionMemoryNet(nn.Module):
         # stack in layer dimension
         layers_rgba  = torch.stack(layers_rgba, 1)
         layers_flow  = torch.stack(layers_flow, 1)
+        layers_alpha_warped = torch.stack(layers_alpha_warped, 1)
 
         out = {
             "rgba_reconstruction": composite_rgba,          # [B,    4, T, H, W]
             "flow_reconstruction": composite_flow,          # [B,    2, T, H, w]
             "layers_rgba": layers_rgba,                     # [B, L, 4, T, H, W]
             "layers_flow": layers_flow,                     # [B, L, 2, T, H, W]
+            "layers_alpha_warped": layers_alpha_warped,     # [B, L, 2, T, H, W]
             "brightness_scale": brightness_scale,           # [B,    1, T, H, W]
             "background_offset": background_offset,         # [B,    2, T, H, W]
             "full_static_bg": full_static_bg                # [B,    3, T, H, W]
@@ -980,6 +1003,7 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
         layers_rgba = []
         layers_flow = []
         layers_depth = []
+        layers_alpha_warped = []
 
         # camera stabilization correction
         index = index.transpose(0, 1).reshape(-1)
@@ -1000,7 +1024,8 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
                 composite_rgba = rgba
                 flow = composite_flow
                 composite_depth = depth
-
+                alphas_warped = self.get_alpha_from_rgba(rgba[:, :, :-1])
+                
             # Object layers
             else:
                 rgba, flow, depth = self.render(layer_input, i - 1)
@@ -1014,9 +1039,28 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
                 binary_alpha = torch.where(alpha > .5, 1, 0)
                 composite_depth = depth * binary_alpha + composite_depth * (1. - binary_alpha)
 
+                ## get warped alpha for for temporal consistency loss
+                # get alpha and flow, they are shifted in time by one timestep, for T=4:
+                # alphas: (x, o, o, o)-,
+                #                      |-> alpha_warped(o, o, o)
+                # flow:   (o, o, o, x)-'
+                alphas    = self.get_alpha_from_rgba(rgba[:, :, 1:])
+                warp_flow = flow[:, :, :T-1]
+
+                # rearrange time dimension to batch dimension for grid_sample
+                alphas = alphas.transpose(1, 2).view(B*(T-1), -1, H, W)
+                warp_flow = warp_flow.transpose(1, 2).view(B*(T-1), -1, H, W)
+
+                # warp alpha channels from t+1 to t
+                alphas_warped = FlowHandler.apply_flow(alphas, warp_flow)
+
+                # return to shape [B, C, T, H, W] (minus one timestep)
+                alphas_warped = alphas_warped.view(B, T-1, -1, H, W).transpose(1, 2)
+
             layers_rgba.append(rgba)
             layers_flow.append(flow)
             layers_depth.append(depth)
+            layers_alpha_warped.append(alphas_warped)
 
         if self.do_adjustment:
             # map output to [0, 1]
@@ -1032,6 +1076,7 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
         layers_rgba  = torch.stack(layers_rgba, 1)
         layers_flow  = torch.stack(layers_flow, 1)
         layers_depth = torch.stack(layers_depth, 1)
+        layers_alpha_warped = torch.stack(layers_alpha_warped, 1)
 
         out = {
             "rgba_reconstruction": composite_rgba,          # [B,    4, T, H, W]
@@ -1040,6 +1085,7 @@ class LayerDecompositionAttentionMemoryDepthNet(LayerDecompositionAttentionMemor
             "layers_rgba": layers_rgba,                     # [B, L, 4, T, H, W]
             "layers_flow": layers_flow,                     # [B, L, 2, T, H, W]
             "layers_depth": layers_depth,                   # [B, L, 1, T, H, W]
+            "layers_alpha_warped": layers_alpha_warped,     # [B, L, 1, T, H, W]
             "brightness_scale": brightness_scale,           # [B,    1, T, H, W]
             "background_offset": background_offset,         # [B,    2, T, H, W]
         }
@@ -1103,7 +1149,7 @@ class LayerDecompositionAttentionMemoryDepthNet3DBottleneck(LayerDecompositionAt
 
         self.final_rgba  = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow  = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
-        self.final_depth = ConvBlock2D(conv_channels, 1, ksize=4, stride=1, activation='tanh')
+        self.final_depth = ConvBlock2D(conv_channels, 1, ksize=4, stride=1, activation='sigmoid')
 
     def render(self, x: torch.Tensor, layer_idx: int):
         """
@@ -1261,7 +1307,7 @@ class LayerDecompositionAttentionMemoryDepthNet2D(LayerDecompositionAttentionMem
 
         self.final_rgba = ConvBlock2D(conv_channels, 4, ksize=4, stride=1, activation='tanh')
         self.final_flow = ConvBlock2D(conv_channels, 2, ksize=4, stride=1, activation='none')
-        self.final_depth = ConvBlock2D(conv_channels, 1, ksize=4, stride=1, activation='tanh')
+        self.final_depth = ConvBlock2D(conv_channels, 1, ksize=4, stride=1, activation='sigmoid')
 
     def render(self, x: torch.Tensor, layer_idx: int):
         """

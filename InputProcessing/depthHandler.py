@@ -61,8 +61,8 @@ class DepthHandler(object):
         else:
             raise ValueError(f"Incorrect shape of depth estimation: {depth.shape}")
 
-        depth        = depth * 2 - 1
-        object_depth = object_depth * 2 - 1
+        # depth        = depth * 2 - 1
+        # object_depth = object_depth * 2 - 1
 
         return depth, object_depth
 

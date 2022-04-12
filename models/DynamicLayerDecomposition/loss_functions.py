@@ -63,8 +63,8 @@ class DecompositeLoss(nn.Module):
         self.criterion      = nn.L1Loss()
         self.mask_criterion = MaskLoss()
 
-        self.use_alpha_dyn_reg    = args.use_alpha_dyn_reg
         self.use_alpha_detail_reg = args.use_alpha_detail_reg
+        self.convolved_dyn_reg    = args.use_convolved_dyn_reg
 
         self.lambda_alpha_l0          = LambdaScheduler(args.lambda_alpha_l0, start_epoch)
         self.lambda_alpha_l1          = LambdaScheduler(args.lambda_alpha_l1, start_epoch)
@@ -74,6 +74,7 @@ class DecompositeLoss(nn.Module):
         self.lambda_stabilization     = LambdaScheduler(args.lambda_stabilization, start_epoch)
         self.lambda_dynamics_reg_corr = LambdaScheduler(args.lambda_dynamics_reg_corr, start_epoch)
         self.lambda_dynamics_reg_diff = LambdaScheduler(args.lambda_dynamics_reg_diff, start_epoch)
+        self.lambda_alpha_warp        = LambdaScheduler(args.lambda_alpha_warp, start_epoch)
         self.lambda_detail_reg        = LambdaScheduler(args.lambda_detail_reg, start_epoch)
         self.lambda_bg_scaling        = LambdaScheduler(args.lambda_bg_scaling, start_epoch)
 
@@ -131,6 +132,38 @@ class DecompositeLoss(nn.Module):
 
         return alpha_composite
 
+    def cal_convolved_dynamics_reg(self, alpha_layers: torch.Tensor, binary_masks: torch.Tensor, ksize=3) -> torch.Tensor:
+        """
+        Calculate the dynamics regularization loss that guides the learning to discourage the 
+        object alpha layers to learn to assign alpha to dynamic regions of the background and leave the
+        dynamic background layer to take care of this.
+
+        Args:
+            alpha_layers (torch.Tensor) [B',     L, 1, T, H, W] (B' = B * 2)
+            binary_masks (torch.Tensor) [B', L - 2, 1, T, H, W]
+        
+        Returns the dynamic regularization loss term
+        """
+        B, L, C, T, H, W = alpha_layers.shape
+
+        dynamics_layer = alpha_layers[:, 1:2] * .5 + .5  # [B',   1, 1, T, H, W]
+        object_layers  = alpha_layers[:, 2: ] * .5 + .5  # [B', L-2, 1, T, H, W]
+
+        dynamics_layer = dynamics_layer.expand(object_layers.shape)
+
+        dynamics_layer = dynamics_layer.permute(0, 1, 3, 2, 4, 5).view(B*T*(L-2), C, H, W)
+        object_layers  = object_layers.permute(0, 1, 3, 2, 4, 5).view(B*T*(L-2), C, H, W)
+        binary_masks   = binary_masks.permute(0, 1, 3, 2, 4, 5).view(B*T*(L-2), C, H, W)
+
+        dynamics_layer = F.conv2d(dynamics_layer, torch.ones((1, 1, ksize, ksize)), padding='same') / ksize**2
+        object_layers  = F.conv2d(object_layers, torch.ones((1, 1, ksize, ksize)), padding='same') / ksize**2
+
+        alpha_diff = self.lambda_dynamics_reg_diff.value * torch.maximum((object_layers - dynamics_layer), torch.zeros_like(dynamics_layer))
+        alpha_corr = self.lambda_dynamics_reg_corr.value * (object_layers * dynamics_layer)
+
+        loss = torch.mean((1 - binary_masks) * (alpha_corr + alpha_diff))
+    
+        return loss
 
     def cal_dynamics_reg(self, alpha_layers: torch.Tensor, binary_masks: torch.Tensor) -> torch.Tensor:
         """
@@ -280,6 +313,7 @@ class DecompositeLoss3D(DecompositeLoss):
         flow_reconstruction  = predictions["flow_reconstruction"]   # [B,    2, T, H, w]
         rgb_reconstruction   = rgba_reconstruction[:, :3]           # [B,    3, T, H, W]
         alpha_layers         = predictions["layers_rgba"][:, :, 3:] # [B, L, 1, T, H, W]
+        alpha_layers_warped  = predictions["layers_alpha_warped"]   # [B, L, 1, T, H, W]
         alpha_composite      = self.get_alpha_composite(alpha_layers)
 
         # Calculate main loss
@@ -289,7 +323,9 @@ class DecompositeLoss3D(DecompositeLoss):
         alpha_reg_loss           = self.cal_alpha_reg(alpha_composite * 0.5 + 0.5)
 
         # Calculate dynamics regularization loss
-        if self.use_alpha_dyn_reg:
+        if self.convolved_dyn_reg:
+            dynamics_reg_loss    = self.cal_convolved_dynamics_reg(alpha_layers, binary_masks)
+        else:
             dynamics_reg_loss    = self.cal_dynamics_reg(alpha_layers, binary_masks)
         
         # Calculate detail bleed regularization loss
@@ -305,9 +341,12 @@ class DecompositeLoss3D(DecompositeLoss):
             depth_gt             = targets["depth"]                    # [B,    1, T, H, W]
             depth_reconstruction = predictions["depth_reconstruction"] # [B,    1, T, H, W]
 
-            depth_reconstruction_loss = self.calculate_loss(depth_reconstruction, depth_gt)
+            depth_reconstruction_loss = self.calculate_loss(depth_reconstruction * flow_confidence, depth_gt * flow_confidence)
         else:
             depth_reconstruction_loss = torch.zeros((1)).to(rgb_reconstruction_loss.device)
+
+        # Calculate loss for temporal consistency
+        alpha_warp_loss = self.calculate_loss(alpha_layers_warped, alpha_layers[..., :-1, :, :])
 
         ### Adjust for camera stabilization errors
 
@@ -324,14 +363,13 @@ class DecompositeLoss3D(DecompositeLoss):
         # Combine loss values
         loss = rgb_reconstruction_loss + \
                alpha_reg_loss + \
+               dynamics_reg_loss + \
                self.lambda_detail_reg.value     * detail_reg_loss + \
                self.lambda_recon_flow.value     * flow_reconstruction_loss + \
                self.lambda_recon_depth.value    * depth_reconstruction_loss + \
                self.lambda_mask_bootstrap.value * mask_bootstrap_loss + \
+               self.lambda_alpha_warp.value     * alpha_warp_loss + \
                self.lambda_stabilization.value  * stabilization_loss
-
-        if self.use_alpha_dyn_reg:
-            loss += dynamics_reg_loss
 
         # create dict of all separate losses for logging
         loss_values = {
@@ -339,9 +377,11 @@ class DecompositeLoss3D(DecompositeLoss):
             "rgb_reconstruction_loss":        rgb_reconstruction_loss.item(),
             "alpha_regularization_loss":      alpha_reg_loss.item(),
             "detail regularization loss":     detail_reg_loss.item(),
+            "dynamics_regularization_loss":   dynamics_reg_loss.item(),
             "flow_reconstruction_loss":       self.lambda_recon_flow.value     * flow_reconstruction_loss.item(),
             "depth_reconstruction_loss":      self.lambda_recon_depth.value    * depth_reconstruction_loss.item(),
             "mask_bootstrap_loss":            self.lambda_mask_bootstrap.value * mask_bootstrap_loss.item(),
+            "alpha_warp_loss":                self.lambda_alpha_warp.value     * alpha_warp_loss.item(),
             "camera_stabilization_loss":      self.lambda_stabilization.value  * stabilization_loss.item(),
             "brightness_regularization_loss": brightness_regularization_loss.item(),
             "background_offset_loss":         background_offset_loss.item(),
@@ -354,9 +394,6 @@ class DecompositeLoss3D(DecompositeLoss):
             "lambda_dynamics_reg_diff":       self.lambda_dynamics_reg_diff.value,
             "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr.value
         }
-
-        if self.use_alpha_dyn_reg:
-            loss_values["dynamics_regularization_loss"] = dynamics_reg_loss.item()
 
         return loss, loss_values
 
@@ -383,7 +420,6 @@ class DecompositeLoss2D(DecompositeLoss):
         super().__init__(args, start_epoch)
 
         self.lambda_recon_warp = LambdaScheduler(args.lambda_recon_warp)
-        self.lambda_alpha_warp = LambdaScheduler(args.lambda_alpha_warp)
 
         self.is_omnimatte = args.model_type == 'omnimatte'
 
@@ -420,8 +456,10 @@ class DecompositeLoss2D(DecompositeLoss):
         flow_reconstruction_loss  = self.calculate_loss(flow_reconstruction * flow_confidence, flow_gt * flow_confidence)
         mask_bootstrap_loss       = self.calculate_loss(alpha_layers, masks, mask_loss=True)
         alpha_reg_loss            = self.cal_alpha_reg(alpha_composite * 0.5 + 0.5)
-        if self.use_alpha_dyn_reg:
-            dynamics_reg_loss         = self.cal_dynamics_reg(alpha_layers, binary_masks)
+        if self.convolved_dyn_reg:
+            dynamics_reg_loss     = self.cal_convolved_dynamics_reg(alpha_layers, binary_masks)
+        else:
+            dynamics_reg_loss     = self.cal_dynamics_reg(alpha_layers, binary_masks)
 
         if "depth" in targets.keys():
             depth_gt        = targets["depth"]                                              # [B,    1, T, H, W]
@@ -455,15 +493,13 @@ class DecompositeLoss2D(DecompositeLoss):
         # Combine loss values
         loss = rgb_reconstruction_loss + \
                alpha_reg_loss + \
+               dynamics_reg_loss + \
                self.lambda_recon_flow.value     * flow_reconstruction_loss + \
                self.lambda_recon_depth.value    * depth_reconstruction_loss + \
                self.lambda_mask_bootstrap.value * mask_bootstrap_loss + \
                self.lambda_alpha_warp.value     * alpha_warp_loss + \
                self.lambda_recon_warp.value     * rgb_reconstruction_warp_loss + \
                self.lambda_stabilization.value  * stabilization_loss
-
-        if self.use_alpha_dyn_reg:
-            loss += dynamics_reg_loss
 
         if self.is_omnimatte and mask_bootstrap_loss < 0.05:
             self.lambda_mask_bootstrap.value = 0.0
@@ -473,6 +509,7 @@ class DecompositeLoss2D(DecompositeLoss):
             "total":                          loss.item(),
             "rgb_reconstruction_loss":        rgb_reconstruction_loss.item(),
             "alpha_regularization_loss":      alpha_reg_loss.item(),
+            "dynamics_regularization_loss":   dynamics_reg_loss.item(),
             "flow_reconstruction_loss":       self.lambda_recon_flow.value     * flow_reconstruction_loss.item(),
             "depth_reconstruction_loss":      self.lambda_recon_depth.value    * depth_reconstruction_loss.item(),
             "mask_bootstrap_loss":            self.lambda_mask_bootstrap.value * mask_bootstrap_loss.item(),
@@ -492,9 +529,6 @@ class DecompositeLoss2D(DecompositeLoss):
             "lambda_dynamics_reg_diff":       self.lambda_dynamics_reg_diff.value,
             "lambda_dynamics_reg_corr":       self.lambda_dynamics_reg_corr.value
         }
-
-        if self.use_alpha_dyn_reg:
-            loss_values["dynamics_regularization_loss"] = dynamics_reg_loss.item()
 
         return loss, loss_values
 
